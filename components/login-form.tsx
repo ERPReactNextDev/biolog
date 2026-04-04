@@ -372,7 +372,8 @@ export function LoginForm({
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [settings, setSettings] = useState<any>(null);
-  const [signUpOpen, setSignUpOpen] = useState(false);   // ← NEW
+  const [signUpOpen, setSignUpOpen] = useState(false);
+  const [googleLoginLoading, setGoogleLoginLoading] = useState(false);
   const router = useRouter();
 
   React.useEffect(() => {
@@ -697,13 +698,38 @@ export function LoginForm({
                     </div>
                   </div>
 
-                  {/* Biometric */}
+                  {/* ── Google Login ── */}
                   <button
-                    type="button" onClick={handleBiometricLogin}
-                    disabled={loading || biometricLoading}
+                    type="button"
+                    onClick={() => {
+                      setGoogleLoginLoading(true);
+                      window.location.href = "/api/auth/google";
+                    }}
+                    disabled={loading || biometricLoading || googleLoginLoading}
                     className={[
                       "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
-                      loading || biometricLoading
+                      loading || biometricLoading || googleLoginLoading
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed"
+                        : "bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
+                    ].join(" ")}
+                  >
+                    {googleLoginLoading ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
+                        Redirecting...
+                      </>
+                    ) : (
+                      <><GoogleIcon size={18} />Continue with Google</>
+                    )}
+                  </button>
+
+                  {/* ── Biometric ── */}
+                  <button
+                    type="button" onClick={handleBiometricLogin}
+                    disabled={loading || biometricLoading || googleLoginLoading}
+                    className={[
+                      "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
+                      loading || biometricLoading || googleLoginLoading
                         ? "bg-gray-50 text-gray-300 cursor-not-allowed"
                         : "bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
                     ].join(" ")}

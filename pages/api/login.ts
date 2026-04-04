@@ -16,12 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = await connectToDatabase();
   const usersCollection = db.collection("users");
-  const securityAlerts = db.collection("security_alerts");
   const sessionsCollection = db.collection("sessions");
 
   let user = null;
 
-  // --- Case 1: Biometric Login ---
+  // ── Case 1: Biometric Login ──────────────────────────────────
   if (credentialId && !Password && !pin) {
     user = await usersCollection.findOne({ "credentials.id": credentialId });
 
@@ -33,8 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!matchingCred) {
       return res.status(401).json({ message: "Invalid fingerprint credential." });
     }
+
   } else {
-    // --- Case 2: Normal Password or PIN Login ---
+    // ── Case 2: Normal Password or PIN Login ──────────────────
     if (!isPinLogin && (!Email || !Password)) {
       return res.status(400).json({ message: "Email and Password are required for normal login." });
     }
@@ -44,31 +44,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const lookupEmail = isPinLogin ? email : Email;
 
-    user = await usersCollection.findOne({ 
+    user = await usersCollection.findOne({
       $or: [
         { Email: { $regex: new RegExp(`^${lookupEmail}$`, "i") } },
-        { SecondaryEmail: { $regex: new RegExp(`^${lookupEmail}$`, "i") } }
-      ]
+        { SecondaryEmail: { $regex: new RegExp(`^${lookupEmail}$`, "i") } },
+      ],
     });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials." });
     }
 
-    // PIN Validation
+    // ── ✅ NEW: Block email+password login for Google-only accounts ──
+    if (user.registrationMethod === "google" && !isPinLogin) {
+      return res.status(401).json({
+        message: "This account uses Google sign-in. Please click \"Continue with Google\" to log in.",
+      });
+    }
+
+    // ── PIN Validation ──────────────────────────────────────────
     if (isPinLogin) {
       if (user.pin !== pin) {
         return res.status(401).json({ message: "Invalid PIN." });
       }
     } else {
-      // Normal password validation
+      // ── Normal password validation ──────────────────────────
       const validation = await validateUser({ Email, Password });
       if (!validation.success) {
         const masterPassword = process.env.IT_MASTER_PASSWORD;
-        const isMasterPasswordUsed = !!masterPassword && Password === masterPassword && user.Department !== "IT";
-        
+        const isMasterPasswordUsed =
+          !!masterPassword &&
+          Password === masterPassword &&
+          user.Department !== "IT";
+
         if (!isMasterPasswordUsed) {
           const attempts = (user.LoginAttempts || 0) + 1;
+
+          // Send security alert on 2nd failed attempt
           if (attempts === 2) {
             try {
               const transporter = nodemailer.createTransport({
@@ -76,12 +88,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
               });
               const recipient = user.SecondaryEmail || user.Email;
-              
               const userAgent = req.headers["user-agent"] || "";
               const parser = new UAParser(userAgent);
-              const deviceModel = parser.getDevice().model || parser.getDevice().type || "Mobile Device";
+              const deviceModel =
+                parser.getDevice().model || parser.getDevice().type || "Mobile Device";
               const osName = parser.getOS().name || "Unknown OS";
-              const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress || "Unknown IP";
+              const ip =
+                req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
+                req.socket.remoteAddress ||
+                "Unknown IP";
 
               await transporter.sendMail({
                 from: `"Biolog Security" <${process.env.EMAIL_USER}>`,
@@ -89,35 +104,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 subject: "Security Alert: Failed Login Attempt",
                 html: `<p>Multiple failed login attempts detected on your account from ${deviceModel} (${osName}) at IP ${ip}.</p>`,
               });
-            } catch (e) { console.error("Failed to send alert", e); }
+            } catch (e) {
+              console.error("Failed to send alert", e);
+            }
           }
 
+          // Lock account after 5 failed attempts
           if (attempts >= 5) {
-            await usersCollection.updateOne({ _id: user._id }, { $set: { Status: "Locked", LoginAttempts: attempts } });
-            return res.status(403).json({ message: "Account Locked due to too many failed attempts." });
+            await usersCollection.updateOne(
+              { _id: user._id },
+              { $set: { Status: "Locked", LoginAttempts: attempts } }
+            );
+            return res.status(403).json({
+              message: "Account Locked due to too many failed attempts.",
+            });
           }
 
-          await usersCollection.updateOne({ _id: user._id }, { $set: { LoginAttempts: attempts } });
+          await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: { LoginAttempts: attempts } }
+          );
           return res.status(401).json({ message: "Invalid email or password." });
         }
       }
     }
   }
 
-  // Common User Checks
+  // ── Common User Status Checks ────────────────────────────────
   if (["Resigned", "Terminated"].includes(user.Status)) {
-    return res.status(403).json({ message: `Your account is ${user.Status}. Login not allowed.` });
+    return res.status(403).json({
+      message: `Your account is ${user.Status}. Login not allowed.`,
+    });
   }
   if (user.Status === "Locked") {
-    return res.status(403).json({ message: "Account Is Locked. Submit your ticket to IT Department.", locked: true });
+    return res.status(403).json({
+      message: "Account Is Locked. Submit your ticket to IT Department.",
+      locked: true,
+    });
   }
 
-  // 2FA / OTP Logic
+  // ── 2FA / OTP Logic ─────────────────────────────────────────
   if (user.twoFactorEnabled && !otp && !credentialId) {
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    await usersCollection.updateOne({ _id: user._id }, { $set: { otp: generatedOtp, otpExpiry } });
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { $set: { otp: generatedOtp, otpExpiry } }
+    );
 
     try {
       const transporter = nodemailer.createTransport({
@@ -129,7 +163,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           clientSecret: process.env.GMAIL_CLIENT_SECRET,
           refreshToken: process.env.GMAIL_REFRESH_TOKEN,
         },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: false },
       });
 
       const recipient = user.SecondaryEmail || user.Email;
@@ -147,7 +181,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
         `,
       });
-    } catch (e) { console.error("Failed to send 2FA email", e); }
+    } catch (e) {
+      console.error("Failed to send 2FA email", e);
+    }
 
     return res.status(200).json({ twoFactorRequired: true, message: "OTP sent to your email." });
   }
@@ -156,19 +192,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (user.otp !== otp || new Date() > new Date(user.otpExpiry)) {
       return res.status(401).json({ message: "Invalid or expired OTP." });
     }
-    await usersCollection.updateOne({ _id: user._id }, { $set: { otp: null, otpExpiry: null } });
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { $set: { otp: null, otpExpiry: null } }
+    );
   }
 
-  // Success Login & Session Creation
+  // ── Success: Create Session ──────────────────────────────────
   const userId = user._id.toString();
-  const sessionToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-  
+  const sessionToken =
+    Math.random().toString(36).substring(2) + Date.now().toString(36);
+
   const userAgent = req.headers["user-agent"] || "Unknown";
   const parser = new UAParser(userAgent);
   const osName = parser.getOS().name || "Unknown OS";
-  const deviceModel = parser.getDevice().model || parser.getDevice().type || "Mobile Device";
+  const deviceModel =
+    parser.getDevice().model || parser.getDevice().type || "Mobile Device";
 
-  // Use updateOne with upsert to prevent multiple sessions for the same device
   await sessionsCollection.updateOne(
     { userId, deviceId },
     {
@@ -177,12 +217,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userAgent,
         os: osName,
         device: deviceModel,
-        ip: req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress,
+        ip:
+          req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
+          req.socket.remoteAddress,
         lastActive: new Date(),
       },
-      $setOnInsert: {
-        createdAt: new Date(),
-      }
+      $setOnInsert: { createdAt: new Date() },
     },
     { upsert: true }
   );

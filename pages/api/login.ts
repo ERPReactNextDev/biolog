@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress || "Unknown IP";
 
               await transporter.sendMail({
-                from: `"Acculog Security" <${process.env.EMAIL_USER}>`,
+                from: `"Biolog Security" <${process.env.EMAIL_USER}>`,
                 to: recipient,
                 subject: "Security Alert: Failed Login Attempt",
                 html: `<p>Multiple failed login attempts detected on your account from ${deviceModel} (${osName}) at IP ${ip}.</p>`,
@@ -110,10 +110,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (user.Status === "Locked") {
     return res.status(403).json({ message: "Account Is Locked. Submit your ticket to IT Department.", locked: true });
-  }
-
-  if (user.Department !== "Sales" && user.Department !== "IT" && user.Department !== "CSR" && user.Department !== "Procurement") {
-    return res.status(403).json({ message: "Only Sales, IT, CSR or Procurement department users are allowed to log in." });
   }
 
   // 2FA / OTP Logic
@@ -172,17 +168,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const osName = parser.getOS().name || "Unknown OS";
   const deviceModel = parser.getDevice().model || parser.getDevice().type || "Mobile Device";
 
-  await sessionsCollection.insertOne({
-    userId,
-    token: sessionToken,
-    deviceId,
-    userAgent,
-    os: osName,
-    device: deviceModel,
-    ip: req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress,
-    lastActive: new Date(),
-    createdAt: new Date(),
-  });
+  // Use updateOne with upsert to prevent multiple sessions for the same device
+  await sessionsCollection.updateOne(
+    { userId, deviceId },
+    {
+      $set: {
+        token: sessionToken,
+        userAgent,
+        os: osName,
+        device: deviceModel,
+        ip: req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress,
+        lastActive: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+      }
+    },
+    { upsert: true }
+  );
 
   await usersCollection.updateOne(
     { _id: user._id },

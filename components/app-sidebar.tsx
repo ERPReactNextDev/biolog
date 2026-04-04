@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, LayoutDashboard, FileText, Clock, MapPin, Briefcase, Users, CalendarCheck } from "lucide-react";
+import { Plus, LayoutDashboard, FileText, Clock, MapPin, Briefcase, Users, CalendarCheck, ShieldCheck } from "lucide-react";
 
 import { Calendars } from "@/components/calendars";
 import { DatePicker } from "@/components/date-picker";
@@ -42,14 +42,14 @@ export function AppSidebar({
     Email: string;
     profilePicture: string;
     Position: string;
-    Directories: string[]; // <-- add Directories here
+    Role: string;
   }>({
     Firstname: "",
     Lastname: "",
     Email: "",
     profilePicture: "",
     Position: "",
-    Directories: [],
+    Role: "",
   });
 
   const [jobPostingCount, setJobPostingCount] = React.useState(0);
@@ -67,7 +67,7 @@ export function AppSidebar({
           Email: data.Email || "",
           profilePicture: data.profilePicture || "",
           Position: data.Position || "",
-          Directories: Array.isArray(data.Directories) ? data.Directories : [],
+          Role: data.Role || "",
         })
       )
       .catch((err) => console.error(err));
@@ -92,63 +92,54 @@ export function AppSidebar({
     };
   }, [userId]);
 
-  // Helper to check directory access
-  function hasAccess(dirKey: string) {
-    return userDetails.Directories.includes(dirKey);
-  }
-
   const calendars = React.useMemo(() => {
     const baseCalendars = [];
 
-    if (hasAccess("Acculog:Time Attendance")) {
-      baseCalendars.push({
-        name: "Time & Attendance",
-        items: [
-          {
-            title: "Activity Calendar",
-            href: `/activity-planner${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: CalendarCheck,
-          },
-          {
-            title: "Location",
-            href: `/time-attendance/location${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: MapPin,
-          },
-          {
-            title: "Activity Logs",
-            href: `/time-attendance/activity${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: FileText,
-          },
-          {
-            title: "Timesheet",
-            href: `/time-attendance/timesheet${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: Clock,
-          },
-        ],
-      });
-    }
+    baseCalendars.push({
+      name: "Time & Attendance",
+      items: [
+        {
+          title: "Activity Calendar",
+          href: `/activity-planner${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: CalendarCheck,
+        },
+        {
+          title: "Location",
+          href: `/time-attendance/location${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: MapPin,
+        },
+        {
+          title: "Activity Logs",
+          href: `/time-attendance/activity${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: FileText,
+        },
+        {
+          title: "Timesheet",
+          href: `/time-attendance/timesheet${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: Clock,
+        },
+      ],
+    });
 
-    if (hasAccess("Acculog:Recruitment")) {
-      const totalCount = jobPostingCount + applicationCount;
-      baseCalendars.push({
-        name: `Recruitment (${totalCount})`,
-        items: [
-          {
-            title: `Job Posting (${jobPostingCount})`,
-            href: `/recruitment/job-posting${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: Briefcase,
-          },
-          {
-            title: `Applicant Inquiries (${applicationCount})`,
-            href: `/recruitment/applicant-inquiries${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-            icon: Users,
-          },
-        ],
-      });
-    }
+    const totalCount = jobPostingCount + applicationCount;
+    baseCalendars.push({
+      name: `Recruitment (${totalCount})`,
+      items: [
+        {
+          title: `Job Posting (${jobPostingCount})`,
+          href: `/recruitment/job-posting${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: Briefcase,
+        },
+        {
+          title: `Applicant Inquiries (${applicationCount})`,
+          href: `/recruitment/applicant-inquiries${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+          icon: Users,
+        },
+      ],
+    });
 
     return baseCalendars;
-  }, [userId, userDetails.Directories, jobPostingCount, applicationCount]);
+  }, [userId, jobPostingCount, applicationCount]);
 
   function handleDateRangeSelect(range: DateRange | undefined) {
     setDateCreatedFilterRangeAction(range);
@@ -186,17 +177,15 @@ export function AppSidebar({
           />
           <SidebarSeparator className="my-2" />
 
-          {hasAccess("Acculog:Dashboard") && (
-            <SidebarMenuItem>
-              <Link
-                href={`/dashboard${userId ? `?id=${encodeURIComponent(userId)}` : ""}`}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold hover:bg-muted transition"
-              >
-                <LayoutDashboard className="h-5 w-5 text-primary" />
-                Dashboard
-              </Link>
-            </SidebarMenuItem>
-          )}
+          <SidebarMenuItem>
+            <Link
+              href={`/dashboard${userId ? `?id=${encodeURIComponent(userId)}` : ""}`}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold hover:bg-muted transition"
+            >
+              <LayoutDashboard className="h-5 w-5 text-primary" />
+              Dashboard
+            </Link>
+          </SidebarMenuItem>
         </SidebarMenu>
 
         <Calendars calendars={calendars} />

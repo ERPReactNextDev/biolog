@@ -2,6 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --brand-primary: #CC1318;
+    --brand-primary-rgb: 204, 19, 24;
+    --brand-primary-hover: #A00F13;
+    --brand-bg: #F9F6F4;
+    --brand-light: #FEF0F0;
+  }
+
+  [data-theme='blue'] {
+    --brand-primary: #1E40AF;
+    --brand-primary-rgb: 30, 64, 175;
+    --brand-primary-hover: #1E3A8A;
+    --brand-bg: #F0F4FF;
+    --brand-light: #E0E7FF;
+  }
+
+  [data-theme='black'] {
+    --brand-primary: #111827;
+    --brand-primary-rgb: 17, 24, 39;
+    --brand-primary-hover: #000000;
+    --brand-bg: #F3F4F6;
+    --brand-light: #E5E7EB;
+  }
+
+  [data-theme='green'] {
+    --brand-primary: #15803D;
+    --brand-primary-rgb: 21, 128, 61;
+    --brand-primary-hover: #166534;
+    --brand-bg: #F0FDF4;
+    --brand-light: #DCFCE7;
+  }
+}
+
 @keyframes continuous-shake {
   0%, 100% {
     transform: translateX(0);

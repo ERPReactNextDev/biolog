@@ -82,7 +82,7 @@ function MobileTimesheetCard({
           {profilePicture ? (
             <img src={profilePicture} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-[#FEF0F0] flex items-center justify-center text-[12px] font-bold text-[#CC1318]">
+            <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-[12px] font-bold text-brand-primary">
               {initials}
             </div>
           )}
@@ -93,16 +93,16 @@ function MobileTimesheetCard({
         </div>
         <button 
           onClick={onInfoClick}
-          className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-[#FEF0F0] hover:text-[#CC1318] transition-colors"
+          className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-light hover:text-brand-primary transition-colors"
         >
           <Info size={16} />
         </button>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-[#FEF0F0] rounded-2xl px-3 py-2.5 text-center border border-red-50">
-          <p className="text-[13px] font-bold text-[#CC1318]">{week.late.toFixed(1)}h</p>
-          <p className="text-[#CC1318]/60 text-[9px] font-semibold uppercase tracking-wider mt-0.5">Late</p>
+        <div className="bg-brand-light rounded-2xl px-3 py-2.5 text-center border border-red-50">
+          <p className="text-[13px] font-bold text-brand-primary">{week.late.toFixed(1)}h</p>
+          <p className="text-brand-primary/60 text-[9px] font-semibold uppercase tracking-wider mt-0.5">Late</p>
         </div>
         <div className="bg-[#FDF4E7] rounded-2xl px-3 py-2.5 text-center border border-amber-50">
           <p className="text-[13px] font-bold text-[#A0611A]">{week.undertime.toFixed(1)}h</p>
@@ -136,6 +136,31 @@ function TimesheetPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateCreatedFilterRange, setDateCreatedFilterRange] = useState<DateRange | undefined>(undefined);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
+  const [systemSettings, setSystemSettings] = useState({
+    officeStartTime: "08:00",
+    officeEndTime: "17:00",
+    lunchStart: "12:00",
+    lunchEnd: "13:00",
+    gracePeriod: 15
+  });
+
+  // Fetch system settings
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.type === "global") {
+          setSystemSettings({
+            officeStartTime: data.officeStartTime || "08:00",
+            officeEndTime: data.officeEndTime || "17:00",
+            lunchStart: data.lunchStart || "12:00",
+            lunchEnd: data.lunchEnd || "13:00",
+            gracePeriod: data.gracePeriod || 15
+          });
+        }
+      })
+      .catch((err) => console.error("Failed to load system settings:", err));
+  }, []);
 
   // Back navigation — go back to activity planner with same userId
   function handleBack() {
@@ -244,8 +269,9 @@ function TimesheetPage() {
 
   function formatDate(d: string | Date) {
     const date = new Date(d);
-    // If before 8:00 AM, it belongs to the previous work day
-    if (date.getHours() < 8) {
+    const startH = parseInt(systemSettings.officeStartTime.split(":")[0]);
+    // If before work day start, it belongs to the previous work day
+    if (date.getHours() < startH) {
       date.setDate(date.getDate() - 1);
     }
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -293,29 +319,41 @@ function TimesheetPage() {
 
     if (!firstLogin) return { hours: 0, late: 0, undertime: 0, overtime: 0 };
 
-    // Reference Shift: 8:00 AM - 5:00 PM (Standard 9-hour shift including 1-hour lunch)
+    // Reference Shift: Dynamic from System Settings
     const workDay = new Date(firstLogin);
-    if (workDay.getHours() < 8) workDay.setDate(workDay.getDate() - 1);
+    const startH = parseInt(systemSettings.officeStartTime.split(":")[0]);
+    if (workDay.getHours() < startH) workDay.setDate(workDay.getDate() - 1);
     
-    const shiftStart = new Date(workDay); shiftStart.setHours(8, 0, 0, 0);
-    const shiftEnd = new Date(workDay); shiftEnd.setHours(17, 0, 0, 0);
+    const [sH, sM] = systemSettings.officeStartTime.split(":").map(Number);
+    const [eH, eM] = systemSettings.officeEndTime.split(":").map(Number);
+    const [lsH, lsM] = systemSettings.lunchStart.split(":").map(Number);
+    const [leH, leM] = systemSettings.lunchEnd.split(":").map(Number);
+
+    const shiftStart = new Date(workDay); shiftStart.setHours(sH, sM, 0, 0);
+    const shiftEnd = new Date(workDay); shiftEnd.setHours(eH, eM, 0, 0);
+    const graceThreshold = new Date(shiftStart);
+    graceThreshold.setMinutes(shiftStart.getMinutes() + systemSettings.gracePeriod);
     
-    // 1. Late Calculation: First Login vs 8:00 AM
-    const late = firstLogin > shiftStart ? (firstLogin.getTime() - shiftStart.getTime()) / 3600000 : 0;
+    // 1. Late Calculation: First Login vs Shift Start (including grace period)
+    const late = firstLogin > graceThreshold ? (firstLogin.getTime() - shiftStart.getTime()) / 3600000 : 0;
     
-    // 2. Total Worked Hours (with 1-hour lunch deduction if they worked across 12 PM - 1 PM)
-    const lunchStart = new Date(firstLogin); lunchStart.setHours(12, 0, 0, 0);
-    const lunchEnd = new Date(firstLogin); lunchEnd.setHours(13, 0, 0, 0);
+    // 2. Total Worked Hours (with dynamic lunch deduction)
+    const lunchStart = new Date(workDay); lunchStart.setHours(lsH, lsM, 0, 0);
+    const lunchEnd = new Date(workDay); lunchEnd.setHours(leH, leM, 0, 0);
+    const lunchDurationMs = lunchEnd.getTime() - lunchStart.getTime();
+    const lunchDurationHrs = lunchDurationMs / 3600000;
     
     let actualHours = totalMs / 3600000;
-    // Deduct lunch if the total duration covers the lunch hour
-    if (actualHours > 5) actualHours = Math.max(0, actualHours - 1);
+    // Deduct lunch if the total duration covers the lunch period
+    // Typically, if they worked more than 5 hours, we assume they took a lunch break
+    if (actualHours > 5) actualHours = Math.max(0, actualHours - lunchDurationHrs);
 
-    // 3. Overtime: Worked hours beyond 8 hours
-    const expectedHours = 8;
+    // 3. Overtime: Worked hours beyond standard work hours (e.g. 8 hours)
+    const standardWorkMs = shiftEnd.getTime() - shiftStart.getTime() - lunchDurationMs;
+    const expectedHours = standardWorkMs / 3600000;
     const overtime = actualHours > expectedHours ? actualHours - expectedHours : 0;
     
-    // 4. Undertime: If they logged out before 5:00 PM (only if they have a logout)
+    // 4. Undertime: If they logged out before Shift End
     const undertime = (lastLogout && lastLogout < shiftEnd) ? (shiftEnd.getTime() - lastLogout.getTime()) / 3600000 : 0;
 
     return {
@@ -423,7 +461,7 @@ function TimesheetPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F9F6F4]">
+    <div className="min-h-screen bg-brand-bg">
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 flex items-center justify-between px-4 h-14 gap-3">
@@ -432,7 +470,7 @@ function TimesheetPage() {
           {/* Back button */}
           <button
             onClick={handleBack}
-            className="w-8 h-8 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-[#CC1318] transition-all active:scale-95"
+            className="w-8 h-8 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-brand-primary transition-all active:scale-95"
             title="Back to Activity Planner"
           >
             <ArrowLeft size={14} />
@@ -441,7 +479,7 @@ function TimesheetPage() {
           <div className="h-4 w-px bg-gray-200" />
 
           <div>
-            <p className="text-xs font-semibold text-[#CC1318] uppercase tracking-wider">Timesheet</p>
+            <p className="text-xs font-semibold text-brand-primary uppercase tracking-wider">Timesheet</p>
             <p className="text-[11px] text-gray-400">
               {dateCreatedFilterRange?.from
                 ? `${formatShortDate(new Date(dateCreatedFilterRange.from))}${dateCreatedFilterRange.to ? ` – ${formatShortDate(new Date(dateCreatedFilterRange.to))}` : ""}`
@@ -491,7 +529,7 @@ function TimesheetPage() {
 
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 bg-[#CC1318] text-white h-9 px-4 rounded-2xl text-[12px] font-semibold hover:bg-[#A8100F] transition-all shadow-md shadow-red-100 active:scale-[0.97]"
+            className="flex items-center gap-2 bg-brand-primary text-white h-9 px-4 rounded-2xl text-[12px] font-semibold hover:bg-brand-primary-hover transition-all shadow-md shadow-brand-primary/20 active:scale-[0.97]"
           >
             <DownloadCloud size={14} />
             <span className="hidden sm:inline">Export</span>
@@ -505,7 +543,7 @@ function TimesheetPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {[
             { label: "Total Hours", value: summaryStats.totalHours.toFixed(1), icon: <Clock size={15} />, color: "#185FA5", bg: "#E6F1FB" },
-            { label: "Total Late", value: summaryStats.totalLate.toFixed(1) + "h", icon: <AlertCircle size={15} />, color: "#CC1318", bg: "#FEF0F0" },
+            { label: "Total Late", value: summaryStats.totalLate.toFixed(1) + "h", icon: <AlertCircle size={15} />, color: "var(--brand-primary)", bg: "var(--brand-light)" },
             { label: "Undertime", value: summaryStats.totalUndertime.toFixed(1) + "h", icon: <ArrowDownLeft size={15} />, color: "#A0611A", bg: "#FDF4E7" },
             { label: "Overtime", value: summaryStats.totalOvertime.toFixed(1) + "h", icon: <ArrowUpRight size={15} />, color: "#1A7A4A", bg: "#EEF7F2" },
           ].map((s) => (
@@ -527,10 +565,10 @@ function TimesheetPage() {
             placeholder="Search by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-4 py-2.5 text-[13px] outline-none focus:border-[#CC1318] focus:ring-2 focus:ring-[#CC1318]/10 transition-all"
+            className="w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-4 py-2.5 text-[13px] outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
           />
           {loading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-[#CC1318] rounded-full animate-spin" />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
           )}
         </div>
 
@@ -571,7 +609,7 @@ function TimesheetPage() {
                 {visibleRows.length} employee{visibleRows.length !== 1 ? "s" : ""} · {dayHeaders.length} day{dayHeaders.length !== 1 ? "s" : ""}
               </p>
             </div>
-            <span className="text-[11px] font-semibold text-[#CC1318] bg-[#FEF0F0] rounded-full px-3 py-1">
+            <span className="text-[11px] font-semibold text-brand-primary bg-brand-light rounded-full px-3 py-1">
               {dateCreatedFilterRange ? "Filtered" : "Current Week"}
             </span>
           </div>
@@ -589,7 +627,7 @@ function TimesheetPage() {
                     </th>
                   ))}
                   <th className="text-right px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Total Hrs</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#CC1318] uppercase tracking-wider whitespace-nowrap">Late</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-brand-primary uppercase tracking-wider whitespace-nowrap">Late</th>
                   <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#A0611A] uppercase tracking-wider whitespace-nowrap">Undertime</th>
                   <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#1A7A4A] uppercase tracking-wider whitespace-nowrap">Overtime</th>
                 </tr>
@@ -623,14 +661,14 @@ function TimesheetPage() {
                           {u?.profilePicture ? (
                             <img src={u.profilePicture} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                           ) : (
-                            <div className="w-7 h-7 rounded-full bg-[#FEF0F0] flex items-center justify-center text-[10px] font-bold text-[#CC1318] flex-shrink-0">
+                            <div className="w-7 h-7 rounded-full bg-brand-light flex items-center justify-center text-[10px] font-bold text-brand-primary flex-shrink-0">
                               {initials}
                             </div>
                           )}
                           <span className="font-semibold text-gray-800 capitalize truncate max-w-[120px]">{name}</span>
                           <button
                             onClick={() => setSelectedRef(ref)}
-                            className="flex-shrink-0 w-5 h-5 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#FEF0F0] hover:text-[#CC1318] transition-colors"
+                            className="flex-shrink-0 w-5 h-5 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-brand-light hover:text-brand-primary transition-colors"
                             title="View breakdown"
                           >
                             <Info size={11} />
@@ -662,7 +700,7 @@ function TimesheetPage() {
                       {/* Late */}
                       <td className="text-right px-4 py-3 whitespace-nowrap">
                         {week.late > 0 ? (
-                          <span className="inline-flex items-center justify-center rounded-xl bg-[#FEF0F0] text-[#CC1318] px-2.5 py-0.5 text-[11px] font-semibold">
+                          <span className="inline-flex items-center justify-center rounded-xl bg-brand-light text-brand-primary px-2.5 py-0.5 text-[11px] font-semibold">
                             {week.late.toFixed(2)}h
                           </span>
                         ) : <span className="text-gray-300">—</span>}
@@ -699,7 +737,7 @@ function TimesheetPage() {
         <Dialog open={true} onOpenChange={() => setSelectedRef(null)}>
           <DialogContent className="p-0 rounded-[28px] max-w-sm w-full border-0 shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="bg-[#CC1318] px-6 pt-5 pb-5">
+            <div className="bg-brand-primary px-6 pt-5 pb-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-[14px]">
                   {details.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
@@ -749,7 +787,7 @@ function TimesheetPage() {
             <div className="bg-white px-5 py-4 border-t border-gray-100">
               <button
                 onClick={() => setSelectedRef(null)}
-                className="w-full rounded-2xl py-3 bg-[#CC1318] text-white font-semibold text-[14px] hover:bg-[#A8100F] transition-colors active:scale-[0.98]"
+                className="w-full rounded-2xl py-3 bg-brand-primary text-white font-semibold text-[14px] hover:bg-brand-primary-hover transition-colors active:scale-[0.98]"
               >
                 Close
               </button>

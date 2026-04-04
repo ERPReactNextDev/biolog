@@ -26,11 +26,17 @@ export default async function lastStatus(
     }
 
     const collection = db.collection("TaskLog");
+    const settingsCollection = db.collection("system_settings");
 
-    // Work Day window (8 AM to 8 AM next day)
+    // Fetch dynamic work day start
+    const settings = await settingsCollection.findOne({ type: "global" });
+    const officeStartTime = settings?.officeStartTime || "08:00";
+    const [startH, startM] = officeStartTime.split(":").map(Number);
+
+    // Work Day window (Dynamic start to Dynamic start next day)
     const now = new Date();
     const startOfWorkDay = new Date(now);
-    startOfWorkDay.setHours(8, 0, 0, 0);
+    startOfWorkDay.setHours(startH, startM, 0, 0);
     if (now < startOfWorkDay) {
       startOfWorkDay.setDate(startOfWorkDay.getDate() - 1);
     }

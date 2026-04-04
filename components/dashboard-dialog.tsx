@@ -35,15 +35,15 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
   const isLogin = selectedEvent?.Status === "Login";
   const isLogout = selectedEvent?.Status === "Logout";
 
-  const statusColor = isLogin ? "#1A7A4A" : isLogout ? "#CC1318" : "#888";
-  const statusBg = isLogin ? "#EEF7F2" : isLogout ? "#FEF0F0" : "#F5F5F5";
+  const statusColor = isLogin ? "#1A7A4A" : isLogout ? "var(--brand-primary)" : "#888";
+  const statusBg = isLogin ? "#EEF7F2" : isLogout ? "var(--brand-light)" : "#F5F5F5";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
 
         {/* Header */}
-        <div className="bg-[#CC1318] px-6 pt-5 pb-8">
+        <div className="bg-brand-primary px-6 pt-5 pb-8">
           <div className="flex items-center gap-3 mb-6">
             <button
               onClick={() => onOpenChange(false)}
@@ -85,7 +85,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
         </div>
 
         {/* Body */}
-        <div className="bg-[#F9F6F4] px-5 py-5 flex flex-col gap-3 -mt-4 rounded-t-[24px] relative z-10">
+        <div className="bg-brand-bg px-5 py-5 flex flex-col gap-3 -mt-4 rounded-t-[24px] relative z-10">
 
           {selectedEvent ? (
             <>
@@ -105,8 +105,8 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
               {/* Date & Time */}
               <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-[#FFF0F0] flex items-center justify-center flex-shrink-0">
-                    <Calendar size={14} className="text-[#CC1318]" />
+                  <div className="w-8 h-8 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                    <Calendar size={14} className="text-brand-primary" />
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Date</p>
@@ -130,8 +130,8 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
               {/* Location */}
               <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#FFF0F0] flex items-center justify-center flex-shrink-0">
-                  <Navigation size={14} className="text-[#CC1318]" />
+                <div className="w-8 h-8 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                  <Navigation size={14} className="text-brand-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Location</p>
@@ -143,7 +143,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
               {selectedEvent.PhotoURL && (
                 <div className="bg-white rounded-2xl border border-gray-100 p-1 flex flex-col">
                   <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-50">
-                    <Camera size={13} className="text-[#CC1318]" />
+                    <Camera size={13} className="text-brand-primary" />
                     <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Photo Verification</p>
                   </div>
                   <div className="relative aspect-[4/3] rounded-xl overflow-hidden mt-1">
@@ -171,7 +171,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
               <button
                 onClick={() => onOpenChange(false)}
-                className="w-full mt-1 rounded-2xl py-3.5 bg-[#CC1318] text-white font-semibold text-[14px] hover:bg-[#A8100F] transition-colors active:scale-[0.98]"
+                className="w-full mt-1 rounded-2xl py-3.5 bg-brand-primary text-white font-semibold text-[14px] hover:bg-brand-primary-hover transition-colors active:scale-[0.98]"
               >
                 Close
               </button>

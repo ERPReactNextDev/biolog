@@ -1,7 +1,7 @@
 {
-  "name": "Acculog",
-  "short_name": "Acculog",
-  "description": "Field attendance and activity logging",
+  "name": "Biolog",
+  "short_name": "Biolog",
+  "description": "Biometric attendance and activity logging",
   "start_url": "/activity-planner",
   "display": "standalone",
   "background_color": "#F9F6F4",

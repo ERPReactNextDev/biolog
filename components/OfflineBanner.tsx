@@ -77,7 +77,7 @@ export default function OfflineBanner({ isOnline, isSyncing, pendingCount }: Pro
 
   // ── Offline ──────────────────────────────────────────────────────────────
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-[#CC1318] text-white py-2 px-4 text-[12px] font-semibold">
+    <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-brand-primary text-white py-2 px-4 text-[12px] font-semibold">
       <WifiOff size={13} />
       You are offline
       {pendingCount > 0 && (

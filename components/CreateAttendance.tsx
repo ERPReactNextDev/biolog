@@ -203,7 +203,7 @@ export default function CreateAttendance({
       <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col">
 
         {/* ── Header ── */}
-        <div className="bg-[#CC1318] px-6 pt-5 pb-6 flex-shrink-0">
+        <div className="bg-brand-primary px-6 pt-5 pb-6 flex-shrink-0">
           <div className="flex items-center gap-3 mb-5">
             <button
               onClick={() => onOpenChangeAction(false)}
@@ -227,17 +227,17 @@ export default function CreateAttendance({
         </div>
 
         {/* ── Body ── */}
-        <div className="overflow-y-auto flex-1 bg-[#F9F6F4]">
+        <div className="overflow-y-auto flex-1 bg-brand-bg">
           <div className="flex flex-col gap-4 p-5">
 
             {/* Current Status Banner */}
             {lastStatus && (
-              <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${lastStatus === "Login" ? "bg-[#EEF7F2] border-green-200" : "bg-[#FEF0F0] border-red-200"}`}>
+              <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${lastStatus === "Login" ? "bg-[#EEF7F2] border-green-200" : "bg-brand-light border-red-200"}`}>
                 {lastStatus === "Login"
                   ? <CheckCircle2 size={18} className="text-[#1A7A4A] flex-shrink-0" />
-                  : <AlertCircle size={18} className="text-[#CC1318] flex-shrink-0" />}
+                  : <AlertCircle size={18} className="text-brand-primary flex-shrink-0" />}
                 <div>
-                  <p className={`text-[12px] font-semibold ${lastStatus === "Login" ? "text-[#1A7A4A]" : "text-[#CC1318]"}`}>
+                  <p className={`text-[12px] font-semibold ${lastStatus === "Login" ? "text-[#1A7A4A]" : "text-brand-primary"}`}>
                     Currently {lastStatus === "Login" ? "Logged In" : "Logged Out"}
                   </p>
                   {lastTime && <p className="text-[11px] text-gray-400 mt-0.5">Last activity: {lastStatus} at {lastTime}</p>}
@@ -288,12 +288,12 @@ export default function CreateAttendance({
                       disabled={lastStatus === "Logout"}
                       className={`rounded-2xl border-[1.5px] p-4 flex flex-col items-center gap-2 transition-all ${
                         formData.Status === "Logout"
-                          ? "bg-[#FEF0F0] border-[#CC1318]"
+                          ? "bg-brand-light border-brand-primary"
                           : "bg-white border-gray-200 hover:border-gray-300"
                       } ${lastStatus === "Logout" ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                     >
-                      <LogOut size={20} className={formData.Status === "Logout" ? "text-[#CC1318]" : "text-gray-400"} />
-                      <span className={`text-[13px] font-semibold ${formData.Status === "Logout" ? "text-[#CC1318]" : "text-gray-700"}`}>Logout</span>
+                      <LogOut size={20} className={formData.Status === "Logout" ? "text-brand-primary" : "text-gray-400"} />
+                      <span className={`text-[13px] font-semibold ${formData.Status === "Logout" ? "text-brand-primary" : "text-gray-700"}`}>Logout</span>
                       <span className="text-[10px] text-gray-400">End of shift</span>
                     </button>
                   </div>
@@ -309,7 +309,7 @@ export default function CreateAttendance({
                     onChange={(e) => onChangeAction("Remarks", e.target.value)}
                     placeholder="Add notes or remarks (optional)..."
                     rows={3}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-[#CC1318] focus:ring-2 focus:ring-[#CC1318]/10 transition-all"
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
                   />
                 </div>
 
@@ -317,15 +317,15 @@ export default function CreateAttendance({
                 <div>
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Location</p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 flex gap-3 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-[#FFF0F0] flex items-center justify-center flex-shrink-0">
-                      <MapPin size={16} className="text-[#CC1318]" />
+                    <div className="w-9 h-9 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                      <MapPin size={16} className="text-brand-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-[#CC1318] uppercase tracking-wider mb-1">Detected Location</p>
+                      <p className="text-[11px] font-semibold text-brand-primary uppercase tracking-wider mb-1">Detected Location</p>
                       <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
                       <button
                         onClick={() => setShowMap(!showMap)}
-                        className="mt-2 text-[11px] font-semibold text-[#CC1318] hover:underline"
+                        className="mt-2 text-[11px] font-semibold text-brand-primary hover:underline"
                       >
                         {showMap ? "Hide map" : "⚙ Set manually →"}
                       </button>
@@ -353,7 +353,7 @@ export default function CreateAttendance({
                   className={`w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all ${
                     isSubmitDisabled
                       ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                      : "bg-[#CC1318] text-white hover:bg-[#A8100F] active:scale-[0.98] shadow-lg shadow-red-200"
+                      : "bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                   }`}
                 >
                   {loading ? (

@@ -332,7 +332,7 @@ export default function CreateSalesAttendance({
         }}
       >
         {/* ── Header ── */}
-        <div className="bg-[#CC1318] px-6 pt-5 pb-5 flex-shrink-0">
+        <div className="bg-brand-primary px-6 pt-5 pb-5 flex-shrink-0">
           <div className="flex items-center gap-3 mb-5">
             <button
               onClick={() => onOpenChangeAction(false)}
@@ -387,7 +387,7 @@ export default function CreateSalesAttendance({
         </div>
 
         {/* ── Body ── */}
-        <div className="overflow-y-auto flex-1 bg-[#F9F6F4]">
+        <div className="overflow-y-auto flex-1 bg-brand-bg">
           <div className="flex flex-col gap-4 p-5">
 
             {/* Camera */}
@@ -485,13 +485,13 @@ export default function CreateSalesAttendance({
 
                     {loadingAccounts ? (
                       <div className="bg-white rounded-2xl border border-gray-200 px-4 py-4 flex items-center gap-3">
-                        <div className="w-4 h-4 border-2 border-gray-200 border-t-[#CC1318] rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
                         <span className="text-[13px] text-gray-400">Loading accounts...</span>
                       </div>
                     ) : accountsError ? (
-                      <div className="bg-[#FEF0F0] border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-2">
-                        <AlertCircle size={14} className="text-[#CC1318] flex-shrink-0" />
-                        <span className="text-[12px] text-[#CC1318]">{accountsError}</span>
+                      <div className="bg-brand-light border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-2">
+                        <AlertCircle size={14} className="text-brand-primary flex-shrink-0" />
+                        <span className="text-[12px] text-brand-primary">{accountsError}</span>
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-gray-200 bg-white">
@@ -540,9 +540,9 @@ export default function CreateSalesAttendance({
                             option: (base, state) => ({
                               ...base,
                               backgroundColor: state.isSelected
-                                ? "#CC1318"
+                                ? "var(--brand-primary)"
                                 : state.isFocused
-                                  ? "#FFF0F0"
+                                  ? "var(--brand-light)"
                                   : "white",
                               color: state.isSelected ? "white" : "#1A0A0B",
                               padding: "10px 16px",
@@ -575,7 +575,7 @@ export default function CreateSalesAttendance({
                     onChange={(e) => onChangeAction("Remarks", e.target.value)}
                     placeholder="Add notes or feedback (optional)..."
                     rows={3}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-[#CC1318] focus:ring-2 focus:ring-[#CC1318]/10 transition-all"
+                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
                   />
                 </div>
 
@@ -585,11 +585,11 @@ export default function CreateSalesAttendance({
                     📍 Location
                   </p>
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 flex gap-3 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-[#FFF0F0] flex items-center justify-center flex-shrink-0">
-                      <MapPin size={16} className="text-[#CC1318]" />
+                    <div className="w-9 h-9 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                      <MapPin size={16} className="text-brand-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-[#CC1318] uppercase tracking-wider mb-1">
+                      <p className="text-[11px] font-semibold text-brand-primary uppercase tracking-wider mb-1">
                         Detected Location
                       </p>
                       <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
@@ -601,7 +601,7 @@ export default function CreateSalesAttendance({
                           }
                           setShowMap(!showMap);
                         }}
-                        className="mt-2 text-[11px] font-semibold text-[#CC1318] hover:underline"
+                        className="mt-2 text-[11px] font-semibold text-brand-primary hover:underline"
                       >
                         {showMap ? "Hide map" : "⚙ Set manually →"}
                       </button>
@@ -631,7 +631,7 @@ export default function CreateSalesAttendance({
                     isSubmitDisabled
                       ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                       : isLogout
-                        ? "bg-[#CC1318] text-white hover:bg-[#A8100F] active:scale-[0.98] shadow-lg shadow-red-200"
+                        ? "bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                         : "bg-[#1A7A4A] text-white hover:bg-[#155f38] active:scale-[0.98] shadow-lg shadow-green-200",
                   ].join(" ")}
                 >
@@ -661,7 +661,7 @@ export default function CreateSalesAttendance({
 
             {loadingStatus && capturedImage && (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <div className="w-8 h-8 border-3 border-[#CC1318]/20 border-t-[#CC1318] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-3 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin" />
                 <p className="text-[13px] text-gray-500">Determining login status...</p>
               </div>
             )}

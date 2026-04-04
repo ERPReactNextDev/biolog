@@ -156,7 +156,7 @@ export default function Camera({
           const { x, y, width, height } = det.detection.box;
           const scaleX = overlay.width / video.videoWidth;
           const scaleY = overlay.height / video.videoHeight;
-          ctx.strokeStyle = "#CC1318";
+          ctx.strokeStyle = "var(--brand-primary)";
           ctx.lineWidth = 2;
           ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
         });
@@ -200,8 +200,8 @@ export default function Camera({
         const corner = 18;
 
         // Color logic based on match
-        const statusColor = mode === "register" ? "#1A7A4A" : (isMatch === null ? "#1A7A4A" : (isMatch ? "#1A7A4A" : "#CC1318"));
-        const statusBg = mode === "register" ? "rgba(26, 122, 74, 0.06)" : (isMatch === null ? "rgba(26, 122, 74, 0.06)" : (isMatch ? "rgba(26, 122, 74, 0.06)" : "rgba(204, 19, 24, 0.06)"));
+        const statusColor = mode === "register" ? "#1A7A4A" : (isMatch === null ? "#1A7A4A" : (isMatch ? "#1A7A4A" : "var(--brand-primary)"));
+        const statusBg = mode === "register" ? "rgba(26, 122, 74, 0.06)" : (isMatch === null ? "rgba(26, 122, 74, 0.06)" : (isMatch ? "rgba(26, 122, 74, 0.06)" : "rgba(var(--brand-primary-rgb, 204, 19, 24), 0.06)"));
 
         // Soft glow fill
         ctx.fillStyle = statusBg;
@@ -244,9 +244,9 @@ export default function Camera({
         const t = ((now % period) / period);
         const scanY = py + t * ph;
         const grad = ctx.createLinearGradient(px, scanY - 8, px, scanY + 8);
-        grad.addColorStop(0, "rgba(26,122,74,0)");
-        grad.addColorStop(0.5, isMatch === false ? "rgba(204,19,24,0.4)" : "rgba(26,122,74,0.4)");
-        grad.addColorStop(1, "rgba(26,122,74,0)");
+        grad.addColorStop(0, "rgba(var(--brand-primary-rgb, 204,19,24),0)");
+        grad.addColorStop(0.5, isMatch === false ? "rgba(var(--brand-primary-rgb, 204,19,24),0.4)" : "rgba(26,122,74,0.4)");
+        grad.addColorStop(1, "rgba(var(--brand-primary-rgb, 204,19,24),0)");
         ctx.fillStyle = grad;
         ctx.fillRect(px, scanY - 8, pw, 16);
       }
@@ -520,7 +520,7 @@ export default function Camera({
   const statusConfig: Record<FaceStatus, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
     idle: { label: "Starting camera…", color: "#6B7280", bg: "bg-gray-100", icon: null },
     unsupported: { label: "Tap to capture", color: "#6B7280", bg: "bg-gray-100", icon: null },
-    "no-face": { label: "No face detected", color: "#CC1318", bg: "bg-[#FEF0F0]", icon: <AlertCircle size={13} /> },
+    "no-face": { label: "No face detected", color: "var(--brand-primary)", bg: "bg-brand-light", icon: <AlertCircle size={13} /> },
     multiple: { label: "Multiple faces detected", color: "#A0611A", bg: "bg-[#FDF4E7]", icon: <AlertCircle size={13} /> },
     detected: { 
       label: mode === "register" 
@@ -530,8 +530,8 @@ export default function Camera({
                 ? "Face detected — verifying identity…" 
                 : (isMatch ? "Identity verified — tap to capture" : "Identity mismatch!"))
             : "User not registered — capture blocked"), 
-      color: (mode === "register" || isMatch === true) ? "#1A7A4A" : "#CC1318", 
-      bg: (mode === "register" || isMatch === true) ? "bg-[#EEF7F2]" : "bg-[#FEF0F0]", 
+      color: (mode === "register" || isMatch === true) ? "#1A7A4A" : "var(--brand-primary)", 
+      bg: (mode === "register" || isMatch === true) ? "bg-[#EEF7F2]" : "bg-brand-light", 
       icon: (mode === "register" || isMatch === true) ? <CheckCircle2 size={13} /> : <AlertCircle size={13} /> 
     },
   };
@@ -547,10 +547,10 @@ export default function Camera({
       {!permissionGiven && (
         <button
           onClick={requestPermission}
-          className="w-full rounded-2xl border-2 border-dashed border-gray-200 bg-[#F9F6F4] py-8 flex flex-col items-center gap-3 hover:border-[#CC1318]/40 hover:bg-[#FFF8F8] transition-all group"
+          className="w-full rounded-2xl border-2 border-dashed border-gray-200 bg-brand-bg py-8 flex flex-col items-center gap-3 hover:border-brand-primary/40 hover:bg-brand-light transition-all group"
         >
-          <div className="w-14 h-14 rounded-2xl bg-[#FEF0F0] flex items-center justify-center group-hover:bg-[#CC1318] transition-colors">
-            <CameraIcon size={24} className="text-[#CC1318] group-hover:text-white transition-colors" />
+          <div className="w-14 h-14 rounded-2xl bg-brand-light flex items-center justify-center group-hover:bg-brand-primary transition-colors">
+            <CameraIcon size={24} className="text-brand-primary group-hover:text-white transition-colors" />
           </div>
           <div className="text-center">
             <p className="text-[13px] font-semibold text-gray-700">Start Camera</p>
@@ -606,7 +606,7 @@ export default function Camera({
                     className="text-white font-bold leading-none"
                     style={{
                       fontSize: 72,
-                      textShadow: "0 0 32px rgba(204,19,24,0.8)",
+                      textShadow: "0 0 32px var(--brand-primary)",
                     }}
                   >
                     {countdown}
@@ -628,7 +628,7 @@ export default function Camera({
             {/* Ready to capture hint when face detected */}
             {countdown === null && faceStatus === "detected" && (
               <div className="absolute inset-0 flex items-end justify-center pb-4 pointer-events-none">
-                <div className={`${(isMatch === false || !(registeredDescriptors && registeredDescriptors.length > 0)) && mode === "capture" ? "bg-[#CC1318]/80" : "bg-[#1A7A4A]/80"} rounded-full px-4 py-2 flex items-center gap-2 shadow-lg`}>
+                <div className={`${(isMatch === false || !(registeredDescriptors && registeredDescriptors.length > 0)) && mode === "capture" ? "bg-brand-primary/80" : "bg-[#1A7A4A]/80"} rounded-full px-4 py-2 flex items-center gap-2 shadow-lg`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   <span className="text-white text-[12px] font-medium">
                     {mode === "register" 
@@ -644,7 +644,7 @@ export default function Camera({
             {/* No face / multiple hint */}
             {countdown === null && (faceStatus === "no-face" || faceStatus === "multiple") && (
               <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
-                <div className="bg-[#CC1318]/90 backdrop-blur-sm rounded-full px-5 py-2.5 flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="bg-brand-primary/90 backdrop-blur-sm rounded-full px-5 py-2.5 flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <AlertCircle size={14} className="text-white" />
                   <span className="text-white text-[12px] font-semibold">
                     {faceStatus === "no-face" ? "Position your face in frame" : "Multiple faces detected"}
@@ -672,7 +672,7 @@ export default function Camera({
               <select
                 value={selectedDevice}
                 onChange={(e) => setSelectedDevice(e.target.value)}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none focus:border-[#CC1318] focus:ring-2 focus:ring-[#CC1318]/10 transition-all"
+                className="flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
               >
                 {devices.map((d, i) => (
                   <option key={d.deviceId} value={d.deviceId}>
@@ -711,7 +711,7 @@ export default function Camera({
           {/* Retake button */}
           <button
             onClick={retake}
-            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-2xl py-3 text-[13px] font-semibold text-gray-600 hover:border-[#CC1318]/40 hover:bg-[#FFF8F8] hover:text-[#CC1318] transition-all active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-2xl py-3 text-[13px] font-semibold text-gray-600 hover:border-brand-primary/40 hover:bg-brand-light hover:text-brand-primary transition-all active:scale-[0.98]"
           >
             <RefreshCcw size={14} />
             Retake Photo

@@ -1,103 +1,177 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient } from "mongodb";
 import bcrypt from "bcrypt";
 
-// MONGODB_URI
+/* ============================================================
+   ENV CHECK
+   ============================================================ */
 if (!process.env.MONGODB_URI) {
   throw new Error("Please define the MONGODB_URI environment variable");
 }
 
 const uri = process.env.MONGODB_URI;
-let client: MongoClient | null = null;
+
+/* ============================================================
+   CONNECTION (singleton pattern)
+   ============================================================ */
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
-// MongoDB connection
 if (process.env.NODE_ENV === "development") {
+  // Reuse connection across hot-reloads in dev
   if (!global._mongoClient) {
-    client = new MongoClient(uri);
-    global._mongoClient = client;
-  } else {
-    client = global._mongoClient;
+    global._mongoClient = new MongoClient(uri);
   }
+  client = global._mongoClient;
   clientPromise = client.connect();
 } else {
   client = new MongoClient(uri);
   clientPromise = client.connect();
 }
 
-// Export database connections
 export default clientPromise;
 
-// Connection to Database
+/* ============================================================
+   connectToDatabase
+   ============================================================ */
 export async function connectToDatabase() {
   const client = await clientPromise;
-  return client.db("ecoshift");
+  return client.db("biolog");
 }
 
-// Register a new user
-export async function registerUser(
-  { 
-    Email, 
-    Password, 
-    Role, 
-    Firstname, 
-    Lastname,
-    ReferenceID
-  }: { 
-    Email: string; 
-    Password: string;
-    Role: string;
-    Firstname: string;
-    Lastname: string;
-    ReferenceID: string;
-  }) {
-  const db = await connectToDatabase();
-  const usersCollection = db.collection("users");
+/* ============================================================
+   SUPER ADMIN SEED  (runs once automatically)
+   – Checks the "users" collection on first connect.
+   – Creates the Super Admin only if neither the email
+     nor the ReferenceID already exists.
+   ============================================================ */
 
-  // Check if the email already exists in the database
-  const existingUser = await usersCollection.findOne({ Email });
+/** Called internally – not exported on purpose so it can't be
+ *  triggered from outside this module. */
+async function seedSuperAdmin() {
+  try {
+    const db = await connectToDatabase();
+    const users = db.collection("users");
+
+    const SUPER_ADMIN = {
+      Email:       "superadmin@biolog.com",
+      Password:    "pass",           // ← plain-text; gets hashed below
+      Role:        "Super Admin",
+      Department:  "IT",
+      Firstname:   "Super",
+      Lastname:    "Admin",
+      ReferenceID: "ADMIN-001",
+      Status:      "Active",
+      LoginAttempts: 0,
+      Connection:  "Offline",
+      pin:         "123456",
+    } as const;
+
+    // Skip if Super Admin already exists (by email OR referenceID)
+    const exists = await users.findOne({
+      $or: [
+        { Email:       SUPER_ADMIN.Email },
+        { ReferenceID: SUPER_ADMIN.ReferenceID },
+      ],
+    });
+
+    if (exists) {
+      console.log("[seed] Super Admin already exists – skipping.");
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(SUPER_ADMIN.Password, 10);
+
+    await users.insertOne({
+      ...SUPER_ADMIN,
+      Password:  hashedPassword,
+      createdAt: new Date(),
+    });
+
+    console.log("[seed] ✅ Super Admin created successfully.");
+    console.log(`       Email       : ${SUPER_ADMIN.Email}`);
+    console.log(`       Password    : ${SUPER_ADMIN.Password}`);
+    console.log(`       ReferenceID : ${SUPER_ADMIN.ReferenceID}`);
+  } catch (err) {
+    // Non-fatal: log the error but don't crash the app
+    console.error("[seed] ⚠️  Failed to seed Super Admin:", err);
+  }
+}
+
+// Fire-and-forget – runs as soon as this module is first imported.
+// Because clientPromise is a singleton, this only runs once per
+// process lifetime (not once per request).
+seedSuperAdmin();
+
+/* ============================================================
+   registerUser
+   ============================================================ */
+export async function registerUser({
+  Email,
+  Password,
+  Role,
+  Firstname,
+  Lastname,
+  ReferenceID,
+}: {
+  Email:       string;
+  Password:    string;
+  Role:        string;
+  Firstname:   string;
+  Lastname:    string;
+  ReferenceID: string;
+}) {
+  const db    = await connectToDatabase();
+  const users = db.collection("users");
+
+  const existingUser = await users.findOne({ Email });
   if (existingUser) {
     return { success: false, message: "Email already in use" };
   }
 
-  // Hash the password before saving it to the database
   const hashedPassword = await bcrypt.hash(Password, 10);
 
-  // Insert the new user into the collection
-  await usersCollection.insertOne({
+  await users.insertOne({
     Email,
     Role,
     Firstname,
     Lastname,
     ReferenceID,
-    Password: hashedPassword,
+    Password:  hashedPassword,
     createdAt: new Date(),
   });
 
   return { success: true };
 }
 
-// Validate user credentials
-export async function validateUser({ Email, Password }: { Email: string; Password: string; }) {
-  const db = await connectToDatabase();
-  const usersCollection = db.collection("users");
+/* ============================================================
+   validateUser
+   ============================================================ */
+export async function validateUser({
+  Email,
+  Password,
+}: {
+  Email:    string;
+  Password: string;
+}) {
+  const db    = await connectToDatabase();
+  const users = db.collection("users");
 
-  // Find the user by primary Email OR SecondaryEmail (case-insensitive)
-  const user = await usersCollection.findOne({ 
+  // Match primary Email OR SecondaryEmail (case-insensitive)
+  const user = await users.findOne({
     $or: [
-      { Email: { $regex: new RegExp(`^${Email}$`, "i") } },
-      { SecondaryEmail: { $regex: new RegExp(`^${Email}$`, "i") } }
-    ]
+      { Email:          { $regex: new RegExp(`^${Email}$`, "i") } },
+      { SecondaryEmail: { $regex: new RegExp(`^${Email}$`, "i") } },
+    ],
   });
-  
+
   if (!user) {
     return { success: false, message: "Invalid email or password" };
   }
 
-  // Compare the provided password with the stored hashed password
-  const isValidPassword = await bcrypt.compare(Password, user.Password);
-  if (!isValidPassword) {
+  const isValid = await bcrypt.compare(Password, user.Password);
+  if (!isValid) {
     return { success: false, message: "Invalid email or password" };
   }
 
-  return { success: true, user }; 
+  return { success: true, user };
 }

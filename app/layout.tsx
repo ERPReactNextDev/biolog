@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Acculog - Attendance & Time Tracking System",
+  title: "Biolog - Attendance & Time Tracking System",
   description: "Created in NextJs Developed By Leroux Y Xchire",
   icons: {
     icon: "/images/logo/acculog.png",

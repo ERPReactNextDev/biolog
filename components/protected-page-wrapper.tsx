@@ -28,6 +28,16 @@ export default function ProtectedPageWrapper({ children }: { children: React.Rea
     checkSession();
   }, [router]);
 
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data.themeColor) {
+          document.documentElement.setAttribute("data-theme", data.themeColor);
+        }
+      });
+  }, []);
+
   if (loading) return <div>Loading...</div>;
 
   return <>{children}</>;

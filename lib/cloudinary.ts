@@ -4,9 +4,9 @@
 export async function uploadToCloudinary(base64: string): Promise<string> {
   const imgData = new FormData();
   imgData.append("file", base64);
-  imgData.append("upload_preset", "Xchire");
+  imgData.append("upload_preset", "biolog");
   
-  const res = await fetch("https://api.cloudinary.com/v1_1/dhczsyzcz/image/upload", { 
+  const res = await fetch("https://api.cloudinary.com/v1_1/dvevhirpn/image/upload", { 
     method: "POST", 
     body: imgData 
   });

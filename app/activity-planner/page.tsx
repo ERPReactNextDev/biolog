@@ -18,9 +18,9 @@ import { type DateRange } from "react-day-picker";
 import {
   MapPin, X, CalendarCheck, ChevronLeft, ChevronRight,
   MapPinCheck, Building2, Home, BarChart3, User,
-  LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock,
+  LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone,
   ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Wind, Info, Fingerprint,
-  Smartphone, Laptop, Globe, ShieldCheck, Trash2
+  Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, Search, MoreVertical, Edit2, ShieldAlert, History
 } from "lucide-react";
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
@@ -82,7 +82,7 @@ function WeatherDisplay() {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 
-type ActiveTab = "home" | "calendar" | "reports" | "profile";
+type ActiveTab = "home" | "calendar" | "reports" | "profile" | "admin";
 
 type TimelineItem = {
   id: string;
@@ -105,6 +105,21 @@ interface ActivityLog {
   TSM: string;
   SiteVisitAccount: string;
   _id?: string;
+}
+
+interface Meeting {
+  _id?: string;
+  ReferenceID: string;
+  Email: string;
+  Title: string;
+  StartDate: string;
+  EndDate: string;
+  Duration: number;
+  Location: string;
+  Remarks: string;
+  TSM: string;
+  Status: string;
+  CreatedAt: string;
 }
 
 interface UserInfo {
@@ -133,6 +148,10 @@ interface UserDetails {
   pin?: string;
   TSM: string;
   Directories?: string[];
+  permissions?: {
+    canCreateAttendance: boolean;
+    canCreateSiteVisit: boolean;
+  };
 }
 
 interface FormData {
@@ -150,10 +169,10 @@ interface FormData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toLocalDateKey(date: Date | string) {
+function toLocalDateKey(date: Date | string, startHour: number = 8) {
   const d = typeof date === "string" ? new Date(date) : date;
-  // If before 8:00 AM, it belongs to the previous work day
-  if (d.getHours() < 8) {
+  // If before work day start, it belongs to the previous work day
+  if (d.getHours() < startHour) {
     d.setDate(d.getDate() - 1);
   }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -199,8 +218,9 @@ function TimelineItemComponent({ item, index }: { item: TimelineItem; index: num
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
   const isLogin = item.status === "Login";
-  const iconColor = isLogin ? "#1A7A4A" : "#CC1318";
-  const bgColor = isLogin ? "#EEF7F2" : "#FEF0F0";
+  const isMeeting = item.status === "Meeting";
+  const iconColor = isLogin ? "#1A7A4A" : isMeeting ? "#9333EA" : "var(--brand-primary)";
+  const bgColor = isLogin ? "#EEF7F2" : isMeeting ? "#F5F3FF" : "var(--brand-light)";
 
   return (
     <div ref={ref} className="relative flex gap-3">
@@ -213,7 +233,8 @@ function TimelineItemComponent({ item, index }: { item: TimelineItem; index: num
         <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: bgColor }}>
           {isLogin ? <LogIn size={12} style={{ color: iconColor }} /> :
             item.status === "Logout" ? <LogOut size={12} style={{ color: iconColor }} /> :
-              <Building2 size={12} style={{ color: "#A0611A" }} />}
+              isMeeting ? <Users size={12} style={{ color: iconColor }} /> :
+                <Building2 size={12} style={{ color: "#A0611A" }} />}
         </div>
         <div className="w-px flex-1 mt-1 min-h-[12px]" style={{ background: "#EDE5E1" }} />
       </motion.div>
@@ -253,16 +274,16 @@ function TimesheetNavCard({ userId }: { userId: string | null | undefined }) {
   return (
     <button
       onClick={() => router.push(href)}
-      className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[#CC1318]/30 hover:bg-[#FFF8F8] active:scale-[0.98] transition-all group shadow-sm"
+      className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group shadow-sm"
     >
-      <div className="w-11 h-11 rounded-[14px] bg-[#FEF0F0] flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
-        <FileSpreadsheet size={20} className="text-[#CC1318] group-hover:text-white transition-colors" />
+      <div className="w-11 h-11 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
+        <FileSpreadsheet size={20} className="text-[var(--brand-primary)] group-hover:text-white transition-colors" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-gray-800">Timesheet</p>
         <p className="text-[11px] text-gray-400 mt-0.5">View hours, late, undertime & overtime</p>
       </div>
-      <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
+      <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
         <ArrowRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
       </div>
     </button>
@@ -272,7 +293,7 @@ function TimesheetNavCard({ userId }: { userId: string | null | undefined }) {
 // ── Home Tab ──────────────────────────────────────────────────────────────────
 
 function HomeTab({
-  userDetails, todayLogs, monthlyStats, onCreateAttendance, onCreateSiteVisit, onSetTab,
+  userDetails, todayLogs, monthlyStats, onCreateAttendance, onCreateSiteVisit, onSetTab, userId,
 }: {
   userDetails: UserDetails | null;
   todayLogs: ActivityLog[];
@@ -280,28 +301,77 @@ function HomeTab({
   onCreateAttendance: () => void;
   onCreateSiteVisit: () => void;
   onSetTab: (tab: ActiveTab) => void;
+  userId: string | null | undefined;
 }) {
+  const router = useRouter();
   const today = new Date();
   const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
   const presentRate = monthlyStats.total > 0 ? Math.round((monthlyStats.present / monthlyStats.total) * 100) : 0;
   const initials = userDetails ? `${userDetails.Firstname[0] ?? ""}${userDetails.Lastname[0] ?? ""}`.toUpperCase() : "?";
 
+  const [systemSettings, setSystemSettings] = useState({
+    officeStartTime: "08:00",
+    officeEndTime: "17:00",
+    gracePeriod: 15,
+    themeColor: "red",
+    logoUrl: "",
+    announcement: ""
+  });
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.type === "global") {
+          setSystemSettings({
+            officeStartTime: data.officeStartTime || "08:00",
+            officeEndTime: data.officeEndTime || "17:00",
+            gracePeriod: data.gracePeriod || 15,
+            themeColor: data.themeColor || "red",
+            logoUrl: data.logoUrl || "",
+            announcement: data.announcement || ""
+          });
+          if (data.themeColor) {
+            document.documentElement.setAttribute("data-theme", data.themeColor);
+          }
+        }
+      })
+      .catch(err => console.error("Settings fetch error:", err));
+  }, []);
+
+  // Check if user is late
+  const firstLogin = [...todayLogs].reverse().find(l => l.Status === "Login");
+  let isLate = false;
+  if (firstLogin) {
+    const loginTime = new Date(firstLogin.date_created);
+    const [sH, sM] = systemSettings.officeStartTime.split(":").map(Number);
+    const shiftStart = new Date(loginTime);
+    shiftStart.setHours(sH, sM, 0, 0);
+    const graceThreshold = new Date(shiftStart);
+    graceThreshold.setMinutes(shiftStart.getMinutes() + systemSettings.gracePeriod);
+    isLate = loginTime > graceThreshold;
+  }
+
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="relative px-5 pt-12 pb-8 overflow-hidden flex-shrink-0" style={{ background: "linear-gradient(145deg,#CC1318 0%,#8B0E12 100%)" }}>
+    <div className="flex flex-col h-full">
+      <div className="relative px-5 pt-12 pb-8 overflow-hidden flex-shrink-0" style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}>
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-16 -left-6 w-52 h-52 rounded-full bg-white/[0.03] pointer-events-none" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <rect x="2" y="8" width="14" height="2" rx="1" fill="white" />
-                  <rect x="2" y="4" width="9" height="2" rx="1" fill="white" />
-                  <rect x="2" y="12" width="11" height="2" rx="1" fill="white" />
-                </svg>
+              <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 overflow-hidden">
+                {systemSettings.logoUrl ? (
+                  <img src={systemSettings.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <rect x="2" y="8" width="14" height="2" rx="1" fill="white" />
+                    <rect x="2" y="4" width="9" height="2" rx="1" fill="white" />
+                    <rect x="2" y="12" width="11" height="2" rx="1" fill="white" />
+                  </svg>
+                )}
               </div>
-              <span className="text-white text-[14px] font-black tracking-[0.1em]">ACCULOG</span>
+              <span className="text-white text-[14px] font-black tracking-[0.1em]">BIOLOG</span>
             </div>
             <div className="flex items-center gap-3">
               <WeatherDisplay />
@@ -341,12 +411,14 @@ function HomeTab({
             <div className="text-right">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Work Shift</p>
               <div className="flex items-center gap-1.5 justify-end">
-                <Clock size={14} className="text-[#CC1318]" />
-                <p className="text-[15px] font-bold text-gray-800">08:00 – 17:00</p>
+                <Clock size={14} className="text-[var(--brand-primary)]" />
+                <p className="text-[15px] font-bold text-gray-800">{systemSettings.officeStartTime} – {systemSettings.officeEndTime}</p>
               </div>
-              <span className="inline-flex items-center gap-1.5 mt-2 bg-[#EEF7F2] border border-green-100 rounded-full px-2.5 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1A7A4A] animate-pulse" />
-                <span className="text-[10px] font-bold text-[#1A7A4A] uppercase tracking-wider">On Schedule</span>
+              <span className={`inline-flex items-center gap-1.5 mt-2 ${isLate ? "bg-[var(--brand-light)] border-red-100" : "bg-[#EEF7F2] border-green-100"} border rounded-full px-2.5 py-1`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isLate ? "bg-[var(--brand-primary)]" : "bg-[#1A7A4A]"} animate-pulse`} />
+                <span className={`text-[10px] font-bold ${isLate ? "text-[var(--brand-primary)]" : "text-[#1A7A4A]"} uppercase tracking-wider`}>
+                  {isLate ? "Late" : (firstLogin ? "On Schedule" : "Not In")}
+                </span>
               </span>
             </div>
           </div>
@@ -354,21 +426,79 @@ function HomeTab({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28 scroll-smooth">
+        {/* Global Announcement */}
+        {systemSettings.announcement && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-5 bg-purple-50 border border-purple-100 rounded-[22px] p-4 flex gap-4"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-purple-600 flex-shrink-0 shadow-sm">
+              <Megaphone size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">Admin Announcement</p>
+              <p className="text-[13px] text-purple-900 font-medium leading-relaxed">{systemSettings.announcement}</p>
+            </div>
+          </motion.div>
+        )}
+
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
         <div className="grid grid-cols-2 gap-3 mb-5">
-          {userDetails?.Directories?.includes("Acculog:Button - Client Visit") && (
-            <button onClick={onCreateAttendance} className="bg-[#CC1318] rounded-[18px] p-4 text-left hover:bg-[#A8100F] active:scale-[0.97] transition-all shadow-md shadow-red-200">
-              <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
-              <p className="text-white text-[13px] font-semibold">Time In/Out</p>
-              <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
-            </button>
+          {(userDetails?.Role === "Admin" || userDetails?.Role === "Super Admin") && (
+            <>
+              <button onClick={() => router.push(`/admin/attendance-summary${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                <div className="w-9 h-9 rounded-[10px] bg-[#EEF7F2] flex items-center justify-center mb-3 border border-gray-100"><FileSpreadsheet size={18} className="text-[#1A7A4A]" /></div>
+                <p className="text-gray-800 text-[13px] font-semibold">Reports Summary</p>
+                <p className="text-gray-400 text-[11px] mt-0.5">Payroll export</p>
+              </button>
+              <button onClick={() => router.push(`/admin/tickets${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                <div className="w-9 h-9 rounded-[10px] bg-[#E6F1FB] flex items-center justify-center mb-3 border border-gray-100"><ShieldAlert size={18} className="text-[#185FA5]" /></div>
+                <p className="text-gray-800 text-[13px] font-semibold">Concerns</p>
+                <p className="text-gray-400 text-[11px] mt-0.5">Manage tickets</p>
+              </button>
+              <button onClick={() => router.push(`/admin/live-tracking${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                <div className="w-9 h-9 rounded-[10px] bg-[#FDF4E7] flex items-center justify-center mb-3 border border-gray-100"><MapPin size={18} className="text-[#A0611A]" /></div>
+                <p className="text-gray-800 text-[13px] font-semibold">Live Tracking</p>
+                <p className="text-gray-400 text-[11px] mt-0.5">Monitor field</p>
+              </button>
+              <button onClick={() => router.push(`/admin/activity-logs${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                <div className="w-9 h-9 rounded-[10px] bg-gray-50 flex items-center justify-center mb-3 border border-gray-100"><Clock size={18} className="text-gray-600" /></div>
+                <p className="text-gray-800 text-[13px] font-semibold">Activity Logs</p>
+                <p className="text-gray-400 text-[11px] mt-0.5">Full audit trail</p>
+              </button>
+            </>
           )}
-          {userDetails?.Directories?.includes("Acculog:Button - Site Visit") && (
-            <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
-              <div className="w-9 h-9 rounded-[10px] bg-[#FFF0F0] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[#CC1318]" /></div>
-              <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
-              <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
-            </button>
+          {(userDetails?.Role !== "Super Admin") ? (
+            <>
+              {userDetails?.permissions?.canCreateAttendance && (
+                <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-100">
+                  <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
+                  <p className="text-white text-[13px] font-semibold">Time In/Out</p>
+                  <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
+                </button>
+              )}
+              {userDetails?.permissions?.canCreateSiteVisit && (
+                <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                  <div className="w-9 h-9 rounded-[10px] bg-[var(--brand-light)] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[var(--brand-primary)]" /></div>
+                  <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
+                  <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-200">
+                <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
+                <p className="text-white text-[13px] font-semibold">Time In/Out</p>
+                <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
+              </button>
+              <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+                <div className="w-9 h-9 rounded-[10px] bg-[var(--brand-light)] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[var(--brand-primary)]" /></div>
+                <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
+                <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
+              </button>
+            </>
           )}
           <button onClick={() => onSetTab("calendar")} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
             <div className="w-9 h-9 rounded-[10px] bg-gray-50 flex items-center justify-center mb-3 border border-gray-100"><CalendarCheck size={18} className="text-gray-500" /></div>
@@ -388,7 +518,7 @@ function HomeTab({
             <p className="text-[11px] font-bold text-gray-800">{monthlyStats.present} / {monthlyStats.total} days</p>
           </div>
           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${presentRate}%`, background: "linear-gradient(90deg,#CC1318,#C8A96E)" }} />
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${presentRate}%`, background: "linear-gradient(90deg,var(--brand-primary),var(--brand-primary-hover))" }} />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">{presentRate}% attendance rate this month</p>
         </div>
@@ -428,43 +558,54 @@ function HomeTab({
 
 // ── Calendar Tab ──────────────────────────────────────────────────────────────
 
-function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, monthlyStats, allLogs, onEventClick, goToPrevMonth, goToNextMonth }: {
+function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, monthlyStats, allLogs, allMeetings, onEventClick, onMeetingClick, onCreateMeeting, goToPrevMonth, goToNextMonth, startHour }: {
   currentMonth: Date; calendarDays: Date[];
-  groupedByDate: Record<string, ActivityLog[]>; usersMap: Record<string, UserInfo>;
+  groupedByDate: Record<string, (ActivityLog | Meeting)[]>; usersMap: Record<string, UserInfo>;
   monthlyStats: { present: number; absent: number; visits: number; total: number };
-  allLogs: ActivityLog[]; onEventClick: (log: ActivityLog) => void;
+  allLogs: ActivityLog[];
+  allMeetings: Meeting[];
+  onEventClick: (log: ActivityLog) => void;
+  onMeetingClick: (meeting: Meeting) => void;
+  onCreateMeeting: () => void;
   goToPrevMonth: () => void; goToNextMonth: () => void;
+  startHour: number;
 }) {
   const today = new Date();
   const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
-  const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit">("All");
-  const [selectedDate, setSelectedDate] = useState<string>(toLocalDateKey(today));
+  const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit" | "Meeting">("All");
+  const [selectedDate, setSelectedDate] = useState<string>(toLocalDateKey(today, startHour));
 
-  const filteredLogs = useMemo(() => {
-    let logs = allLogs;
+  const filteredItems = useMemo(() => {
+    let items: (ActivityLog | Meeting)[] = [...allLogs, ...allMeetings];
 
     // Filter by selected date
     if (selectedDate) {
-      logs = logs.filter(l => toLocalDateKey(l.date_created) === selectedDate);
+      items = items.filter(item => {
+        const date = 'date_created' in item ? item.date_created : item.StartDate;
+        return toLocalDateKey(date, startHour) === selectedDate;
+      });
     }
 
-    if (activeFilter === "All") return logs;
-    if (activeFilter === "Login") return logs.filter((l) => l.Status === "Login");
-    if (activeFilter === "Logout") return logs.filter((l) => l.Status === "Logout");
-    return logs.filter((l) => l.Type === "Client Visit");
-  }, [allLogs, activeFilter, selectedDate]);
+    if (activeFilter === "All") return items;
+    if (activeFilter === "Login") return items.filter((l) => 'Status' in l && l.Status === "Login");
+    if (activeFilter === "Logout") return items.filter((l) => 'Status' in l && l.Status === "Logout");
+    if (activeFilter === "Site Visit") return items.filter((l) => 'Type' in l && l.Type === "Client Visit");
+    if (activeFilter === "Meeting") return items.filter((l) => 'Title' in l);
+    return items;
+  }, [allLogs, allMeetings, activeFilter, selectedDate, startHour]);
 
   const presentRate = monthlyStats.total > 0 ? Math.round((monthlyStats.present / monthlyStats.total) * 100) : 0;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-5 pt-12 pb-5 flex-shrink-0" style={{ background: "linear-gradient(145deg,#CC1318 0%,#8B0E12 100%)" }}>
+      <div className="px-5 pt-12 pb-5 flex-shrink-0" style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-white text-[17px] font-semibold">{currentMonth.toLocaleDateString("en-PH", { month: "long" })}</p>
             <p className="text-white/60 text-[12px]">Activity Calendar · {currentMonth.getFullYear()}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={onCreateMeeting} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors" title="Create Meeting"><Plus size={16} /></button>
             <button onClick={goToPrevMonth} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><ChevronLeft size={14} /></button>
             <button onClick={goToNextMonth} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><ChevronRight size={14} /></button>
           </div>
@@ -486,12 +627,13 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           <div className="grid grid-cols-7">
             {calendarDays.map((date, idx) => {
               const dateKey = toLocalDateKey(date);
-              const logs = groupedByDate[dateKey] || [];
+              const items = groupedByDate[dateKey] || [];
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
               const isToday = isSameDay(date, today);
               const isSelected = selectedDate === dateKey;
-              const hasLogin = logs.some((l) => l.Status === "Login");
-              const hasLogout = logs.some((l) => l.Status === "Logout");
+              const hasLogin = items.some((l) => 'Status' in l && l.Status === "Login");
+              const hasLogout = items.some((l) => 'Status' in l && l.Status === "Logout");
+              const hasMeeting = items.some((l) => 'Title' in l);
 
               return (
                 <button
@@ -499,28 +641,27 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
                   onClick={() => setSelectedDate(dateKey)}
                   className={[
                     "aspect-square flex flex-col items-center justify-start pt-1.5 pb-1 transition-all active:scale-95",
-                    isToday ? "ring-2 ring-inset ring-[#CC1318]" : "",
-                    isSelected ? "bg-[#FFF0F0]" : "",
+                    isToday ? "ring-2 ring-inset ring-[var(--brand-primary)]" : "",
+                    isSelected ? "bg-[var(--brand-light)]" : "",
                     isCurrentMonth ? "" : "opacity-30"
                   ].join(" ")}
                 >
                   <span className={[
                     "text-[12px] font-semibold w-6 h-6 flex items-center justify-center rounded-lg transition-colors",
-                    isToday ? "bg-[#CC1318] text-white" : isSelected ? "text-[#CC1318]" : "text-gray-700"
+                    isToday ? "bg-[var(--brand-primary)] text-white" : isSelected ? "text-[var(--brand-primary)]" : "text-gray-700"
                   ].join(" ")}>{date.getDate()}</span>
-                  {(hasLogin || hasLogout) && (
-                    <div className="flex gap-0.5 mt-0.5">
-                      {hasLogin && <span className="w-1 h-1 rounded-full bg-[#1A7A4A]" />}
-                      {hasLogout && <span className="w-1 h-1 rounded-full bg-[#CC1318]" />}
-                    </div>
-                  )}
+                  <div className="flex gap-0.5 mt-0.5">
+                    {hasLogin && <span className="w-1 h-1 rounded-full bg-[#1A7A4A]" />}
+                    {hasLogout && <span className="w-1 h-1 rounded-full bg-[var(--brand-primary)]" />}
+                    {hasMeeting && <span className="w-1 h-1 rounded-full bg-purple-500" />}
+                  </div>
                 </button>
               );
             })}
           </div>
         </div>
-        <div className="flex gap-4 px-5 mt-3 mb-4">
-          {[{ color: "#1A7A4A", label: "Login" }, { color: "#CC1318", label: "Logout" }, { color: "#CC1318", label: "Selected", rounded: true }].map((l) => (
+        <div className="flex gap-4 px-5 mt-3 mb-4 flex-wrap">
+          {[{ color: "#1A7A4A", label: "Login" }, { color: "var(--brand-primary)", label: "Logout" }, { color: "#A855F7", label: "Meeting" }, { color: "var(--brand-primary)", label: "Selected", rounded: true }].map((l) => (
             <div key={l.label} className="flex items-center gap-1.5">
               <span className={`w-2 h-2 flex-shrink-0 ${l.rounded ? "rounded-sm" : "rounded-full"}`} style={{ background: l.color }} />
               <span className="text-[11px] text-gray-500">{l.label}</span>
@@ -532,20 +673,20 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           <p className="text-[13px] font-bold text-gray-800">
             Activities for {new Date(selectedDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
           </p>
-          {filteredLogs.length > 0 && (
-            <span className="text-[10px] font-semibold text-[#CC1318] bg-[#FEF0F0] px-2 py-0.5 rounded-full">
-              {filteredLogs.length} record{filteredLogs.length !== 1 ? "s" : ""}
+          {filteredItems.length > 0 && (
+            <span className="text-[10px] font-semibold text-[var(--brand-primary)] bg-[var(--brand-light)] px-2 py-0.5 rounded-full">
+              {filteredItems.length} record{filteredItems.length !== 1 ? "s" : ""}
             </span>
           )}
         </div>
 
         <div className="flex gap-2 px-4 mb-4 overflow-x-auto">
-          {(["All", "Login", "Logout", "Site Visit"] as const).map((f) => (
-            <button key={f} onClick={() => setActiveFilter(f)} className={["flex-shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all border", activeFilter === f ? "bg-[#CC1318] text-white border-[#CC1318] shadow-md shadow-red-100" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"].join(" ")}>{f}</button>
+          {(["All", "Login", "Logout", "Site Visit", "Meeting"] as const).map((f) => (
+            <button key={f} onClick={() => setActiveFilter(f)} className={["flex-shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all border", activeFilter === f ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-md shadow-red-100" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"].join(" ")}>{f}</button>
           ))}
         </div>
         <div className="px-4 flex flex-col gap-3">
-          {filteredLogs.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
               <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
                 <CalendarCheck size={20} />
@@ -553,46 +694,85 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
               <p className="text-[12px] text-gray-400">No activity recorded for this date.</p>
             </div>
           ) : (
-            filteredLogs.map((log) => {
-              const user = usersMap[log.ReferenceID];
-              const isLogin = log.Status === "Login";
-              return (
-                <button key={log._id ?? log.date_created} onClick={() => onEventClick(log)} className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-gray-200 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center flex-shrink-0 ${isLogin ? "bg-[#EEF7F2]" : log.Type === "Client Visit" ? "bg-[#FDF4E7]" : "bg-[#FEF0F0]"}`}>
-                      {isLogin ? <LogIn size={18} className="text-[#1A7A4A]" /> : log.Type === "Client Visit" ? <Building2 size={18} className="text-[#A0611A]" /> : <LogOut size={18} className="text-[#CC1318]" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-bold text-gray-800">{log.Status} – {log.Type}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{user ? `${user.Firstname} ${user.Lastname}` : log.Email}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-[13px] font-bold text-gray-700 tabular-nums">{new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 border-t border-gray-50 pt-3">
-                    <div className="flex items-start gap-2">
-                      <MapPin size={12} className="text-gray-400 mt-0.5" />
-                      <p className="text-[11px] text-gray-500 leading-snug">{log.Location || "No location captured"}</p>
-                    </div>
-
-                    {log.Type === "Client Visit" && log.SiteVisitAccount && (
-                      <div className="flex items-start gap-2">
-                        <Building2 size={12} className="text-gray-400 mt-0.5" />
-                        <p className="text-[11px] text-gray-600 font-semibold italic">Client: {log.SiteVisitAccount}</p>
+            filteredItems.map((item) => {
+              if ('Title' in item) {
+                // Render Meeting
+                const meeting = item as Meeting;
+                const user = usersMap[meeting.ReferenceID];
+                return (
+                  <button key={meeting._id ?? meeting.CreatedAt} onClick={() => onMeetingClick(meeting)} className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-purple-200 hover:bg-purple-50/30 transition-all active:scale-[0.98] shadow-sm flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-[14px] bg-purple-50 flex items-center justify-center flex-shrink-0">
+                        <Users size={18} className="text-purple-600" />
                       </div>
-                    )}
-
-                    <div className="flex items-start gap-2">
-                      <Info size={12} className="text-gray-400 mt-0.5" />
-                      <p className="text-[11px] text-gray-400 italic">
-                        {log.Remarks && log.Remarks !== "No remarks" ? `"${log.Remarks}"` : "No remarks added"}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-bold text-gray-800">{meeting.Title}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[13px] font-bold text-gray-700 tabular-nums">
+                          {new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                        </p>
+                        <p className="text-[10px] text-purple-600 font-bold">{meeting.Duration} mins</p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
+                    <div className="flex flex-col gap-2 border-t border-gray-50 pt-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin size={12} className="text-gray-400 mt-0.5" />
+                        <p className="text-[11px] text-gray-500 leading-snug">{meeting.Location || "No location set"}</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Info size={12} className="text-gray-400 mt-0.5" />
+                        <p className="text-[11px] text-gray-400 italic">
+                          {meeting.Remarks && meeting.Remarks !== "No remarks" ? `"${meeting.Remarks}"` : "No remarks added"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              } else {
+                // Render ActivityLog
+                const log = item as ActivityLog;
+                const user = usersMap[log.ReferenceID];
+                const isLogin = log.Status === "Login";
+                return (
+                  <button key={log._id ?? log.date_created} onClick={() => onEventClick(log)} className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-gray-200 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center flex-shrink-0 ${isLogin ? "bg-[#EEF7F2]" : log.Type === "Client Visit" ? "bg-[#FDF4E7]" : "bg-[#FEF0F0]"}`}>
+                        {isLogin ? <LogIn size={18} className="text-[#1A7A4A]" /> : log.Type === "Client Visit" ? <Building2 size={18} className="text-[#A0611A]" /> : <LogOut size={18} className="text-[#CC1318]" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-bold text-gray-800">{log.Status} – {log.Type}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{user ? `${user.Firstname} ${user.Lastname}` : log.Email}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[13px] font-bold text-gray-700 tabular-nums">{new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 border-t border-gray-50 pt-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin size={12} className="text-gray-400 mt-0.5" />
+                        <p className="text-[11px] text-gray-500 leading-snug">{log.Location || "No location captured"}</p>
+                      </div>
+
+                      {log.Type === "Client Visit" && log.SiteVisitAccount && (
+                        <div className="flex items-start gap-2">
+                          <Building2 size={12} className="text-gray-400 mt-0.5" />
+                          <p className="text-[11px] text-gray-600 font-semibold italic">Client: {log.SiteVisitAccount}</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-2">
+                        <Info size={12} className="text-gray-400 mt-0.5" />
+                        <p className="text-[11px] text-gray-400 italic">
+                          {log.Remarks && log.Remarks !== "No remarks" ? `"${log.Remarks}"` : "No remarks added"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
             })
           )}
         </div>
@@ -614,8 +794,8 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
   const visitCount = allLogs.filter((l) => l.Type === "Client Visit").length;
 
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="px-5 pt-12 pb-6 flex-shrink-0" style={{ background: "linear-gradient(145deg,#CC1318 0%,#8B0E12 100%)" }}>
+    <div className="flex flex-col h-full">
+      <div className="px-5 pt-12 pb-6 flex-shrink-0" style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}>
         <p className="text-white/65 text-[12px] mb-1">Monthly Overview</p>
         <h2 className="text-white text-[20px] font-semibold">Attendance Reports</h2>
       </div>
@@ -623,7 +803,7 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
         <div className="grid grid-cols-2 gap-3 mb-5">
           {[
             { label: "Present Days", value: monthlyStats.present, icon: <CalendarCheck size={16} />, color: "#1A7A4A", bg: "#EEF7F2" },
-            { label: "Absent Days", value: monthlyStats.absent, icon: <X size={16} />, color: "#CC1318", bg: "#FEF0F0" },
+            { label: "Absent Days", value: monthlyStats.absent, icon: <X size={16} />, color: "var(--brand-primary)", bg: "var(--brand-light)" },
             { label: "Site Visits", value: monthlyStats.visits, icon: <Building2 size={16} />, color: "#A0611A", bg: "#FDF4E7" },
             { label: "Attendance Rate", value: `${presentRate}%`, icon: <TrendingUp size={16} />, color: "#185FA5", bg: "#E6F1FB" },
           ].map((s) => (
@@ -638,7 +818,7 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5">
           {[
             { label: "Login Records", value: loginCount, color: "#1A7A4A" },
-            { label: "Logout Records", value: logoutCount, color: "#CC1318" },
+            { label: "Logout Records", value: logoutCount, color: "var(--brand-primary)" },
             { label: "Client Visits", value: visitCount, color: "#A0611A" },
           ].map((row, i) => (
             <div key={row.label} className={`flex items-center justify-between px-4 py-3 ${i < 2 ? "border-b border-gray-50" : ""}`}>
@@ -652,6 +832,86 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
         </div>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Tools</p>
         <TimesheetNavCard userId={userId} />
+      </div>
+    </div>
+  );
+}
+
+// ── Admin Tab ─────────────────────────────────────────────────────────────────
+
+function AdminTab({ userId }: { userId: string | null | undefined }) {
+  const router = useRouter();
+
+  const adminTools = [
+    {
+      title: "User Management",
+      description: "Manage system users and permissions",
+      icon: <Users size={20} className="text-[var(--brand-primary)]" />,
+      href: `/admin/users${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-[var(--brand-light)]",
+    },
+    {
+      title: "Attendance Summary",
+      description: "Payroll export and summary logs",
+      icon: <FileSpreadsheet size={20} className="text-[#1A7A4A]" />,
+      href: `/admin/attendance-summary${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-[#EEF7F2]",
+    },
+    {
+      title: "Live Tracking",
+      description: "Monitor real-time field locations",
+      icon: <MapPin size={20} className="text-[#A0611A]" />,
+      href: `/admin/live-tracking${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-[#FDF4E7]",
+    },
+    {
+      title: "Audit Trail",
+      description: "Full system activity audit trail",
+      icon: <History size={20} className="text-gray-600" />,
+      href: `/admin/audit-logs${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-gray-100",
+    },
+    {
+      title: "System Settings",
+      description: "Configure work rules and announcements",
+      icon: <Settings size={20} className="text-purple-600" />,
+      href: `/admin/settings${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-purple-50",
+    },
+  ];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div
+        className="px-5 pt-12 pb-10 flex-shrink-0"
+        style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}
+      >
+        <p className="text-white/65 text-[12px] mb-1">Administrator Panel</p>
+        <h2 className="text-white text-[20px] font-semibold">System Control</h2>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 pt-6 pb-32">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-4">Admin Tools</p>
+        <div className="grid grid-cols-1 gap-3">
+          {adminTools.map((tool) => (
+            <button
+              key={tool.title}
+              onClick={() => router.push(tool.href)}
+              className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group shadow-sm"
+            >
+              <div className={`w-11 h-11 rounded-[14px] ${tool.color} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                {tool.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-bold text-gray-800">{tool.title}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{tool.description}</p>
+              </div>
+              <div className="w-7 h-7 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
+                <ArrowRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -803,11 +1063,11 @@ function ProfileTab({
   ] : [];
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto pb-32">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div
         className="px-5 pt-12 pb-10 flex-shrink-0 flex flex-col items-center"
-        style={{ background: "linear-gradient(145deg,#CC1318 0%,#8B0E12 100%)" }}
+        style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}
       >
         {userDetails?.profilePicture ? (
           <img src={userDetails.profilePicture} alt="" className="w-20 h-20 rounded-full border-4 border-white/30 object-cover mb-3" />
@@ -822,13 +1082,13 @@ function ProfileTab({
         <p className="text-white/65 text-[12px] mt-1">{userDetails?.Role ?? "—"}</p>
       </div>
 
-      <div className="px-4 pt-5 pb-5">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-32">
         {/* User info */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5">
           {fields.map((f, i) => (
             <div key={f.label} className={`flex items-center justify-between px-4 py-3.5 ${i < fields.length - 1 ? "border-b border-gray-50" : ""}`}>
               <span className="text-[12px] font-semibold text-gray-400">{f.label}</span>
-              <span className={`text-[13px] font-medium text-right max-w-[60%] truncate ${f.label === "Biometrics" && f.value === "Not Registered" ? "text-red-500" : "text-gray-800"}`}>{f.value}</span>
+              <span className={`text-[13px] font-medium text-right max-w-[60%] truncate ${f.label === "Biometrics" && f.value === "Not Registered" ? "text-[var(--brand-primary)]" : "text-gray-800"}`}>{f.value}</span>
             </div>
           ))}
         </div>
@@ -839,8 +1099,8 @@ function ProfileTab({
           {/* Secondary Email Notification */}
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex flex-col gap-3">
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-[14px] bg-[#FFF0F0] flex items-center justify-center flex-shrink-0">
-                <Globe size={20} className="text-[#CC1318]" />
+              <div className="w-11 h-11 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0">
+                <Globe size={20} className="text-[var(--brand-primary)]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-gray-800">Notification Email</p>
@@ -853,12 +1113,12 @@ function ProfileTab({
                 value={secondaryEmail}
                 onChange={(e) => setSecondaryEmail(e.target.value)}
                 placeholder="backup@email.com"
-                className="flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-[12px] outline-none focus:border-[#CC1318] transition-all"
+                className="flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-[12px] outline-none focus:border-[var(--brand-primary)] transition-all"
               />
               <button
                 onClick={handleUpdateEmail}
                 disabled={emailUpdating || secondaryEmail === userDetails?.SecondaryEmail}
-                className="bg-[#CC1318] text-white text-[11px] font-bold px-4 rounded-xl disabled:opacity-30 transition-all"
+                className="bg-[var(--brand-primary)] text-white text-[11px] font-bold px-4 rounded-xl disabled:opacity-30 transition-all"
               >
                 {emailUpdating ? "..." : "Save"}
               </button>
@@ -868,8 +1128,8 @@ function ProfileTab({
           {/* Login PIN Setup */}
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex flex-col gap-3">
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-[14px] bg-[#FEF0F0] flex items-center justify-center flex-shrink-0">
-                <ShieldCheck size={20} className="text-[#CC1318]" />
+              <div className="w-11 h-11 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0">
+                <ShieldCheck size={20} className="text-[var(--brand-primary)]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-gray-800">Login PIN</p>
@@ -884,12 +1144,12 @@ function ProfileTab({
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
                 placeholder="Set 6-digit PIN"
-                className="flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-[12px] font-bold tracking-[4px] outline-none focus:border-[#CC1318] transition-all"
+                className="flex-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-[12px] font-bold tracking-[4px] outline-none focus:border-[var(--brand-primary)] transition-all"
               />
               <button
                 onClick={handleUpdatePin}
                 disabled={pinUpdating || pin.length !== 6 || pin === userDetails?.pin}
-                className="bg-[#CC1318] text-white text-[11px] font-bold px-4 rounded-xl disabled:opacity-30 transition-all"
+                className="bg-[var(--brand-primary)] text-white text-[11px] font-bold px-4 rounded-xl disabled:opacity-30 transition-all"
               >
                 {pinUpdating ? "..." : "Update PIN"}
               </button>
@@ -908,7 +1168,7 @@ function ProfileTab({
             <button
               onClick={toggleTwoFactor}
               disabled={twoFactorLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${userDetails?.twoFactorEnabled ? 'bg-[#CC1318]' : 'bg-gray-200'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${userDetails?.twoFactorEnabled ? 'bg-[var(--brand-primary)]' : 'bg-gray-200'}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userDetails?.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -916,16 +1176,16 @@ function ProfileTab({
 
           <button
             onClick={onFaceRegister}
-            className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[#CC1318]/30 hover:bg-[#FFF8F8] active:scale-[0.98] transition-all group shadow-sm"
+            className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group shadow-sm"
           >
-            <div className="w-11 h-11 rounded-[14px] bg-[#FEF0F0] flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
-              <User size={20} className="text-[#CC1318] group-hover:text-white transition-colors" />
+            <div className="w-11 h-11 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
+              <User size={20} className="text-[var(--brand-primary)] group-hover:text-white transition-colors" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-semibold text-gray-800">Face Registration</p>
               <p className="text-[11px] text-gray-400 mt-0.5">{userDetails?.faceDescriptors ? "Update your face biometric data" : "Register your face for verification"}</p>
             </div>
-            <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
+            <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
               <ArrowRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
             </div>
           </button>
@@ -1000,16 +1260,16 @@ function ProfileTab({
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Account</p>
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-red-200 hover:bg-[#FFF8F8] active:scale-[0.98] transition-all group"
+            className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-red-200 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group"
           >
-            <div className="w-11 h-11 rounded-[14px] bg-[#FEF0F0] flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
-              <Power size={18} className="text-[#CC1318] group-hover:text-white transition-colors" />
+            <div className="w-11 h-11 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
+              <Power size={18} className="text-[var(--brand-primary)] group-hover:text-white transition-colors" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-[#CC1318]">Log Out</p>
+              <p className="text-[13px] font-semibold text-[var(--brand-primary)]">Log Out</p>
               <p className="text-[11px] text-gray-400 mt-0.5">Sign out of your account</p>
             </div>
-            <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#CC1318] transition-colors">
+            <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--brand-primary)] transition-colors">
               <ArrowRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
             </div>
           </button>
@@ -1029,6 +1289,7 @@ function ActivityPage() {
 
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [posts, setPosts] = useState<ActivityLog[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, UserInfo>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1036,12 +1297,26 @@ function ActivityPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [selectedEvent, setSelectedEvent] = useState<ActivityLog | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
   const [createAttendanceOpen, setCreateAttendanceOpen] = useState(false);
   const [createSalesAttendanceOpen, setCreateSalesAttendanceOpen] = useState(false);
+  const [createMeetingOpen, setCreateMeetingOpen] = useState(false);
   const [faceRegisterOpen, setFaceRegisterOpen] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [biometricRegistering, setBiometricRegistering] = useState(false);
+  const [startHour, setStartHour] = useState(8);
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(data => {
+        if (data?.officeStartTime) {
+          setStartHour(parseInt(data.officeStartTime.split(":")[0]));
+        }
+      });
+  }, []);
 
 
   const [formData, setFormData] = useState<FormData>({
@@ -1081,6 +1356,7 @@ function ActivityPage() {
           pin: data.pin ?? "",
           TSM: data.TSM ?? "",
           Directories: data.Directories ?? [],
+          permissions: data.permissions ?? { canCreateAttendance: true, canCreateSiteVisit: true },
         });
         setError(null);
       } catch { setError("Failed to load user data."); }
@@ -1127,12 +1403,30 @@ function ActivityPage() {
 
   const { pendingCount, isOnline, isSyncing, syncNow } = useOfflineSync(fetchAccountAction);
 
-  useEffect(() => { fetchAccountAction(); }, [userDetails, dateCreatedFilterRange]);
+  const fetchMeetings = useCallback(async () => {
+    if (!userDetails) return;
+    try {
+      const params = new URLSearchParams();
+      params.append("role", userDetails.Role);
+      if (userDetails.Role !== "Super Admin" && userDetails.Role !== "Human Resources") {
+        params.append("referenceID", userDetails.ReferenceID);
+      }
+      const res = await fetch(`/api/ModuleSales/Activity/Meeting?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch meetings", e);
+    }
+  }, [userDetails]);
+
+  useEffect(() => { fetchAccountAction(); fetchMeetings(); }, [userDetails, dateCreatedFilterRange, fetchMeetings]);
 
   useEffect(() => {
-    if (posts.length === 0) return;
+    if (posts.length === 0 && meetings.length === 0) return;
     (async () => {
-      const uniqueRefs = Array.from(new Set(posts.map((p) => p.ReferenceID)));
+      const uniqueRefs = Array.from(new Set([...posts.map((p) => p.ReferenceID), ...meetings.map(m => m.ReferenceID)]));
       try {
         const res = await fetch(`/api/users?referenceIDs=${uniqueRefs.join(",")}`);
         if (!res.ok) return;
@@ -1142,7 +1436,7 @@ function ActivityPage() {
         setUsersMap(map);
       } catch { /* silent */ }
     })();
-  }, [posts]);
+  }, [posts, meetings]);
 
   const allVisibleAccounts = useMemo(() => {
     if (!userDetails) return [];
@@ -1150,32 +1444,65 @@ function ActivityPage() {
     return userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources" ? posts : byRef;
   }, [posts, userDetails]);
 
+  const allVisibleMeetings = useMemo(() => {
+    if (!userDetails) return [];
+    const byRef = meetings.filter((m) => m.ReferenceID === userDetails.ReferenceID);
+    return userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources" ? meetings : byRef;
+  }, [meetings, userDetails]);
+
   const groupedByDate = useMemo(() => {
-    const g: Record<string, ActivityLog[]> = {};
+    const g: Record<string, (ActivityLog | Meeting)[]> = {};
     allVisibleAccounts.forEach((p) => {
-      const k = toLocalDateKey(p.date_created);
+      const k = toLocalDateKey(p.date_created, startHour);
       if (!g[k]) g[k] = [];
       g[k].push(p);
     });
+    allVisibleMeetings.forEach((m) => {
+      const k = toLocalDateKey(m.StartDate, startHour);
+      if (!g[k]) g[k] = [];
+      g[k].push(m);
+    });
     return g;
-  }, [allVisibleAccounts]);
+  }, [allVisibleAccounts, allVisibleMeetings, startHour]);
 
   const calendarDays = useMemo(() => generateCalendarDays(currentMonth.getFullYear(), currentMonth.getMonth()), [currentMonth]);
-  const todayKey = toLocalDateKey(today);
-  const todayLogs = groupedByDate[todayKey] || [];
+  const todayKey = toLocalDateKey(today, startHour);
+  const todayItems = groupedByDate[todayKey] || [];
+  const todayLogs = todayItems.filter((item): item is ActivityLog => 'date_created' in item);
 
-  const todayVisits = useMemo(() => allVisibleAccounts.filter(
-    (p) => (p.Status.toLowerCase() === "login" || p.Status.toLowerCase() === "logout" || p.Type.toLowerCase() === "client visit") && toLocalDateKey(p.date_created) === todayKey
-  ), [allVisibleAccounts, todayKey]);
+  const todayVisits = useMemo(() => {
+    const visits = allVisibleAccounts.filter(
+      (p) => (p.Status.toLowerCase() === "login" || p.Status.toLowerCase() === "logout" || p.Type.toLowerCase() === "client visit") && toLocalDateKey(p.date_created, startHour) === todayKey
+    );
+    const todayMeetings = allVisibleMeetings.filter(
+      (m) => toLocalDateKey(m.StartDate, startHour) === todayKey
+    );
+    return [...visits, ...todayMeetings];
+  }, [allVisibleAccounts, allVisibleMeetings, todayKey, startHour]);
 
-  const timelineItems: TimelineItem[] = todayVisits.map((p) => ({
-    id: p._id ?? p.date_created,
-    title: p.Type === "Client Visit" ? p.SiteVisitAccount : p.Status,
-    description: p.Remarks || "No remarks",
-    location: p.Location || "",
-    status: p.Status || "",
-    date: new Date(p.date_created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  })).sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime());
+  const timelineItems: TimelineItem[] = todayVisits.map((p) => {
+    if ('Title' in p) {
+      // It's a meeting
+      return {
+        id: p._id ?? p.CreatedAt,
+        title: p.Title,
+        description: p.Remarks || "Meeting scheduled",
+        location: p.Location || "",
+        status: "Meeting",
+        date: new Date(p.StartDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    } else {
+      // It's an activity log
+      return {
+        id: p._id ?? p.date_created,
+        title: p.Type === "Client Visit" ? p.SiteVisitAccount : p.Status,
+        description: p.Remarks || "No remarks",
+        location: p.Location || "",
+        status: p.Status || "",
+        date: new Date(p.date_created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    }
+  }).sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime());
 
   const monthlyStats = useMemo(() => {
     const thisMonthLogs = allVisibleAccounts.filter((p) => {
@@ -1194,12 +1521,16 @@ function ActivityPage() {
   const goToPrevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   const goToNextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
-  const NAV = [
-    { id: "home" as const, icon: Home, label: "Home" },
-    { id: "calendar" as const, icon: CalendarCheck, label: "Calendar" },
-    { id: "reports" as const, icon: BarChart3, label: "Reports" },
-    { id: "profile" as const, icon: User, label: "Profile" },
+  const NAV: { id: ActiveTab; icon: any; label: string }[] = [
+    { id: "home", icon: Home, label: "Home" },
+    { id: "calendar", icon: CalendarCheck, label: "Calendar" },
+    { id: "reports", icon: BarChart3, label: "Reports" },
+    { id: "profile", icon: User, label: "Profile" },
   ];
+
+  if (userDetails?.Role === "Super Admin" || userDetails?.Role === "Admin" || userDetails?.Department === "IT") {
+    NAV.splice(3, 0, { id: "admin", icon: ShieldAlert, label: "Admin" });
+  }
 
   const handleFaceRegister = async (descriptors: number[][]) => {
     if (!userId) return;
@@ -1318,13 +1649,29 @@ function ActivityPage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "home":
-        return <HomeTab userDetails={userDetails} todayLogs={todayLogs} monthlyStats={monthlyStats} onCreateAttendance={() => setCreateAttendanceOpen(true)} onCreateSiteVisit={() => setCreateSalesAttendanceOpen(true)} onSetTab={setActiveTab} />;
+        return <HomeTab userDetails={userDetails} todayLogs={todayLogs} monthlyStats={monthlyStats} onCreateAttendance={() => setCreateAttendanceOpen(true)} onCreateSiteVisit={() => setCreateSalesAttendanceOpen(true)} onSetTab={setActiveTab} userId={userId} />;
       case "calendar":
-        return <CalendarTab currentMonth={currentMonth} calendarDays={calendarDays} groupedByDate={groupedByDate} usersMap={usersMap} monthlyStats={monthlyStats} allLogs={allVisibleAccounts} onEventClick={onEventClick} goToPrevMonth={goToPrevMonth} goToNextMonth={goToNextMonth} />;
+        return <CalendarTab 
+          currentMonth={currentMonth} 
+          calendarDays={calendarDays} 
+          groupedByDate={groupedByDate} 
+          usersMap={usersMap} 
+          monthlyStats={monthlyStats} 
+          allLogs={allVisibleAccounts} 
+          allMeetings={allVisibleMeetings}
+          onEventClick={onEventClick} 
+          onMeetingClick={(meeting) => { setSelectedMeeting(meeting); setMeetingDialogOpen(true); }}
+          onCreateMeeting={() => setCreateMeetingOpen(true)}
+          goToPrevMonth={goToPrevMonth} 
+          goToNextMonth={goToNextMonth} 
+          startHour={startHour} 
+        />;
       case "reports":
         return <ReportsTab monthlyStats={monthlyStats} allLogs={allVisibleAccounts} userId={userId} />;
       case "profile":
         return <ProfileTab userDetails={userDetails} userId={userId} onLogout={handleLogout} onFaceRegister={() => setFaceRegisterOpen(true)} onBiometricRegister={handleBiometricRegister} onUpdateSecondaryEmail={handleUpdateSecondaryEmail} />;
+      case "admin":
+        return <AdminTab userId={userId} />;
       default:
         return null;
     }
@@ -1407,18 +1754,21 @@ function ActivityPage() {
         })}
         {activeTab === "home" && (
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2">
-            {userDetails?.Directories?.includes("Acculog:Button - Client Visit") && (
-              <button onClick={() => setCreateAttendanceOpen(true)} className="w-14 h-14 rounded-2xl bg-[#CC1318] flex items-center justify-center shadow-xl shadow-red-300 hover:bg-[#A8100F] active:scale-95 transition-all">
-                <Plus size={24} className="text-white" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {activeTab === "home" && (
-          <div className="absolute bottom-16 left-1/2 -translate-x-1/2">
-            {userDetails?.Directories?.includes("Acculog:Button - Site Visit") && (
-              <button onClick={() => setCreateSalesAttendanceOpen(true)} className="w-14 h-14 rounded-2xl bg-[#CC1318] flex items-center justify-center shadow-xl shadow-red-300 hover:bg-[#A8100F] active:scale-95 transition-all">
+            {(userDetails?.Role === "Super Admin" || userDetails?.permissions?.canCreateAttendance || userDetails?.permissions?.canCreateSiteVisit) && (
+              <button 
+                onClick={() => {
+                  if (userDetails?.Role === "Super Admin" || (userDetails?.permissions?.canCreateAttendance && userDetails?.permissions?.canCreateSiteVisit)) {
+                    // If both allowed, prioritize attendance or show a menu? 
+                    // For now, let's just open attendance as default if both are allowed
+                    setCreateAttendanceOpen(true);
+                  } else if (userDetails?.permissions?.canCreateAttendance) {
+                    setCreateAttendanceOpen(true);
+                  } else {
+                    setCreateSalesAttendanceOpen(true);
+                  }
+                }} 
+                className="w-14 h-14 rounded-2xl bg-[#CC1318] flex items-center justify-center shadow-xl shadow-red-300 hover:bg-[#A8100F] active:scale-95 transition-all"
+              >
                 <Plus size={24} className="text-white" />
               </button>
             )}
@@ -1460,7 +1810,7 @@ function ActivityPage() {
       {/* ── Face Registration Dialog ── */}
       <Dialog open={faceRegisterOpen} onOpenChange={setFaceRegisterOpen}>
         <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col">
-          <div className="bg-[#CC1318] px-6 pt-5 pb-6 flex-shrink-0">
+          <div className="bg-[var(--brand-primary)] px-6 pt-5 pb-6 flex-shrink-0">
             <div className="flex items-center gap-3 mb-2">
               <button
                 onClick={() => setFaceRegisterOpen(false)}
@@ -1487,8 +1837,248 @@ function ActivityPage() {
         </DialogContent>
       </Dialog>
 
+      <MeetingDetailsDialog open={meetingDialogOpen} onOpenChange={setMeetingDialogOpen} meeting={selectedMeeting} usersMap={usersMap} />
+      <CreateMeetingDialog open={createMeetingOpen} onOpenChange={setCreateMeetingOpen} userDetails={userDetails} onSuccess={fetchMeetings} />
       <ActivityDialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedEvent(null); }} selectedEvent={selectedEvent} usersMap={usersMap} />
     </div>
+  );
+}
+
+// ── Meeting Details Dialog ────────────────────────────────────────────────────
+
+function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: { 
+  open: boolean; onOpenChange: (open: boolean) => void; meeting: Meeting | null; usersMap: Record<string, UserInfo>;
+}) {
+  if (!meeting) return null;
+  const user = usersMap[meeting.ReferenceID];
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
+        <div className="bg-purple-600 px-6 pt-8 pb-10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4">
+            <button onClick={() => onOpenChange(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><X size={15} /></button>
+          </div>
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 border border-white/20">
+              <Users size={32} className="text-white" />
+            </div>
+            <h2 className="text-white text-xl font-bold px-4">{meeting.Title}</h2>
+            <div className="flex items-center gap-2 mt-2 bg-white/10 px-3 py-1 rounded-full border border-white/10">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-pulse" />
+              <span className="text-white/80 text-[11px] font-bold uppercase tracking-wider">{meeting.Status}</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white px-6 py-6 -mt-6 rounded-t-[32px] relative z-20">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><User size={18} className="text-purple-600" /></div>
+              <div>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Organizer</p>
+                <p className="text-[14px] font-semibold text-gray-800">{user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><CalendarIcon size={18} className="text-purple-600" /></div>
+              <div>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Schedule</p>
+                <p className="text-[14px] font-semibold text-gray-800">
+                  {new Date(meeting.StartDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
+                </p>
+                <p className="text-[12px] text-gray-500">
+                  {new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })} – {new Date(meeting.EndDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><Clock size={18} className="text-purple-600" /></div>
+              <div>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Duration</p>
+                <p className="text-[14px] font-semibold text-gray-800">{meeting.Duration} minutes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><MapPin size={18} className="text-purple-600" /></div>
+              <div>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Location</p>
+                <p className="text-[14px] font-semibold text-gray-800">{meeting.Location || "Not specified"}</p>
+              </div>
+            </div>
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mb-2">Remarks</p>
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <p className="text-[13px] text-gray-600 italic leading-relaxed">
+                  {meeting.Remarks && meeting.Remarks !== "No remarks" ? `"${meeting.Remarks}"` : "No remarks added for this meeting."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => onOpenChange(false)} className="w-full mt-8 py-4 bg-purple-600 text-white rounded-2xl font-bold text-[14px] shadow-lg shadow-purple-100 active:scale-95 transition-all">Close Details</button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Create Meeting Dialog ─────────────────────────────────────────────────────
+
+function CreateMeetingDialog({ open, onOpenChange, userDetails, onSuccess }: {
+  open: boolean; onOpenChange: (open: boolean) => void; userDetails: UserDetails | null; onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    Title: "",
+    StartDate: "",
+    EndDate: "",
+    Location: "",
+    Remarks: ""
+  });
+
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    if (formData.StartDate && formData.EndDate) {
+      const start = new Date(formData.StartDate);
+      const end = new Date(formData.EndDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+        const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+        setDuration(diff);
+      } else {
+        setDuration(0);
+      }
+    }
+  }, [formData.StartDate, formData.EndDate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userDetails) return;
+    if (!formData.Title || !formData.StartDate || !formData.EndDate) {
+      toast.error("Please fill in required fields");
+      return;
+    }
+
+    if (new Date(formData.EndDate) <= new Date(formData.StartDate)) {
+      toast.error("End date must be after start date");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ModuleSales/Activity/Meeting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          ReferenceID: userDetails.ReferenceID,
+          Email: userDetails.Email,
+          TSM: userDetails.TSM
+        })
+      });
+
+      if (res.ok) {
+        toast.success("Meeting created successfully");
+        onSuccess();
+        onOpenChange(false);
+        setFormData({ Title: "", StartDate: "", EndDate: "", Location: "", Remarks: "" });
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to create meeting");
+      }
+    } catch (e) {
+      toast.error("An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
+        <div className="bg-purple-600 px-6 pt-5 pb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <button onClick={() => onOpenChange(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><X size={15} /></button>
+            <div className="flex-1">
+              <h2 className="text-white font-semibold text-base leading-tight">Create Meeting</h2>
+              <p className="text-white/65 text-[11px] mt-0.5">Schedule a new activity</p>
+            </div>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 bg-white flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Meeting Title</label>
+            <input 
+              required
+              value={formData.Title}
+              onChange={e => setFormData(prev => ({ ...prev, Title: e.target.value }))}
+              placeholder="Project Sync / Client Presentation" 
+              className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-[13px] outline-none focus:border-purple-300 transition-all" 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Start Date</label>
+              <input 
+                required
+                type="datetime-local"
+                value={formData.StartDate}
+                onChange={e => setFormData(prev => ({ ...prev, StartDate: e.target.value }))}
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] outline-none focus:border-purple-300 transition-all" 
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">End Date</label>
+              <input 
+                required
+                type="datetime-local"
+                value={formData.EndDate}
+                onChange={e => setFormData(prev => ({ ...prev, EndDate: e.target.value }))}
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] outline-none focus:border-purple-300 transition-all" 
+              />
+            </div>
+          </div>
+
+          {duration > 0 && (
+            <div className="bg-purple-50 rounded-xl px-4 py-2 flex items-center justify-between border border-purple-100">
+              <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Auto Duration</span>
+              <span className="text-[13px] font-bold text-purple-700">{duration} minutes</span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Location</label>
+            <div className="relative">
+              <MapPin size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input 
+                value={formData.Location}
+                onChange={e => setFormData(prev => ({ ...prev, Location: e.target.value }))}
+                placeholder="Office / Zoom / Client Site" 
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 pl-10 pr-4 py-3 text-[13px] outline-none focus:border-purple-300 transition-all" 
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Remarks</label>
+            <textarea 
+              value={formData.Remarks}
+              onChange={e => setFormData(prev => ({ ...prev, Remarks: e.target.value }))}
+              placeholder="Add any additional notes here..." 
+              rows={3}
+              className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-[13px] outline-none focus:border-purple-300 transition-all resize-none" 
+            />
+          </div>
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 py-4 bg-purple-600 text-white rounded-2xl font-bold text-[14px] shadow-lg shadow-purple-100 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loading ? "Creating..." : "Schedule Meeting"}
+          </button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

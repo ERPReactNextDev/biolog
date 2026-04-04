@@ -11,6 +11,12 @@ const config: Config = {
   theme: {
   	extend: {
   		colors: {
+        brand: {
+          primary: 'var(--brand-primary)',
+          hover: 'var(--brand-primary-hover)',
+          bg: 'var(--brand-bg)',
+          light: 'var(--brand-light)',
+        },
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

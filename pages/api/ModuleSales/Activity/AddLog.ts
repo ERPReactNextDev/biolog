@@ -57,11 +57,17 @@ export default async function addActivityLog(
     }
 
     const collection = db.collection("TaskLog");
+    const settingsCollection = db.collection("system_settings");
 
-    /* ── Day window (8AM → 8AM) ─────────── */
+    // Fetch dynamic work day start
+    const settings = await settingsCollection.findOne({ type: "global" });
+    const officeStartTime = settings?.officeStartTime || "08:00";
+    const [startH, startM] = officeStartTime.split(":").map(Number);
+
+    /* ── Day window (Dynamic start → Dynamic start) ─────────── */
     const now = new Date();
     const startOfDay = new Date(now);
-    startOfDay.setHours(8, 0, 0, 0);
+    startOfDay.setHours(startH, startM, 0, 0);
     if (now < startOfDay) {
       startOfDay.setDate(startOfDay.getDate() - 1);
     }

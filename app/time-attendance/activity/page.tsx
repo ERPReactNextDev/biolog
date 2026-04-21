@@ -144,7 +144,7 @@ export default function Page() {
                     params.append("role", userDetails.Role);
 
                     if (
-                        userDetails.Role !== "Super Admin" &&
+                        userDetails.Role !== "SuperAdmin" &&
                         userDetails.Role !== "Human Resources"
                     ) {
                         params.append("referenceID", userDetails.ReferenceID);
@@ -235,7 +235,7 @@ export default function Page() {
     const filteredByReference = posts.filter((post) => post.ReferenceID === userDetails.ReferenceID);
 
     const allVisibleAccounts =
-        userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources"
+        userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources"
             ? posts
             : filteredByReference;
 
@@ -334,7 +334,7 @@ export default function Page() {
     }, [searchQuery]);
 
     async function handleExport() {
-        if (!(userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources")) {
+        if (!(userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources")) {
             toast.error("You do not have permission to export data.");
             return;
         }
@@ -450,7 +450,7 @@ export default function Page() {
                                     </div>
 
                                     {/* Export button aligned right */}
-                                    {(userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources") && (
+                                    {(userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources") && (
                                         <Button onClick={handleExport} className="bg-black text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#d11a2a] transition-all shadow-lg shadow-gray-200">
                                             <DownloadCloud size={18} />  Export Data
                                         </Button>

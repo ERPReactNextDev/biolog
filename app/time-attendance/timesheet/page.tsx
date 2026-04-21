@@ -204,7 +204,7 @@ function TimesheetPage() {
           params.append("page", page.toString());
           params.append("limit", limit.toString());
           params.append("role", userDetails.Role);
-          if (userDetails.Role !== "Super Admin" && userDetails.Role !== "Human Resources") {
+          if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
             params.append("referenceID", userDetails.ReferenceID);
           }
           if (dateCreatedFilterRange?.from) {
@@ -366,7 +366,7 @@ function TimesheetPage() {
 
   // ── Derived Data ──────────────────────────────────────────────────────────────
 
-  const filteredPosts = userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources"
+  const filteredPosts = userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources"
     ? posts
     : posts.filter((p) => p.ReferenceID === userDetails.ReferenceID);
 

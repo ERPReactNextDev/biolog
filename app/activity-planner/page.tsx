@@ -445,7 +445,7 @@ function HomeTab({
 
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
         <div className="grid grid-cols-2 gap-3 mb-5">
-          {(userDetails?.Role === "Admin" || userDetails?.Role === "Super Admin") && (
+          {(userDetails?.Role === "Admin" || userDetails?.Role === "SuperAdmin") && (
             <>
               <button onClick={() => router.push(`/admin/attendance-summary${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
                 <div className="w-9 h-9 rounded-[10px] bg-[#EEF7F2] flex items-center justify-center mb-3 border border-gray-100"><FileSpreadsheet size={18} className="text-[#1A7A4A]" /></div>
@@ -469,7 +469,7 @@ function HomeTab({
               </button>
             </>
           )}
-          {(userDetails?.Role !== "Super Admin") ? (
+          {(userDetails?.Role !== "SuperAdmin") ? (
             <>
               {userDetails?.permissions?.canCreateAttendance && (
                 <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-100">
@@ -792,6 +792,7 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
   const loginCount = allLogs.filter((l) => l.Status === "Login").length;
   const logoutCount = allLogs.filter((l) => l.Status === "Logout").length;
   const visitCount = allLogs.filter((l) => l.Type === "Client Visit").length;
+  const router = useRouter();
 
   return (
     <div className="flex flex-col h-full">
@@ -832,6 +833,23 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
         </div>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Tools</p>
         <TimesheetNavCard userId={userId} />
+        
+        {/* GPS Report Card */}
+        <button
+          onClick={() => router.push(`/gps-report?id=${encodeURIComponent(userId || "")}`)}
+          className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group shadow-sm mt-3"
+        >
+          <div className="w-11 h-11 rounded-[14px] bg-[#FDF4E7] flex items-center justify-center flex-shrink-0 group-hover:bg-[#A0611A] transition-colors">
+            <MapPin size={20} className="text-[#A0611A] group-hover:text-white transition-colors" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-gray-800">Submit GPS Report</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Offline attendance verification</p>
+          </div>
+          <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#A0611A] transition-colors">
+            <ChevronRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -849,6 +867,13 @@ function AdminTab({ userId }: { userId: string | null | undefined }) {
       icon: <Users size={20} className="text-[var(--brand-primary)]" />,
       href: `/admin/users${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
       color: "bg-[var(--brand-light)]",
+    },
+    {
+      title: "GPS Reports",
+      description: "Review offline attendance submissions",
+      icon: <MapPin size={20} className="text-[#185FA5]" />,
+      href: `/admin/gps-reports${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
+      color: "bg-[#E6F1FB]",
     },
     {
       title: "Attendance Summary",
@@ -1382,7 +1407,7 @@ function ActivityPage() {
         params.append("page", page.toString());
         params.append("limit", limit.toString());
         params.append("role", userDetails.Role);
-        if (userDetails.Role !== "Super Admin" && userDetails.Role !== "Human Resources") {
+        if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
           params.append("referenceID", userDetails.ReferenceID);
         }
         if (dateCreatedFilterRange?.from) {
@@ -1408,7 +1433,7 @@ function ActivityPage() {
     try {
       const params = new URLSearchParams();
       params.append("role", userDetails.Role);
-      if (userDetails.Role !== "Super Admin" && userDetails.Role !== "Human Resources") {
+      if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
         params.append("referenceID", userDetails.ReferenceID);
       }
       const res = await fetch(`/api/ModuleSales/Activity/Meeting?${params.toString()}`);
@@ -1441,13 +1466,13 @@ function ActivityPage() {
   const allVisibleAccounts = useMemo(() => {
     if (!userDetails) return [];
     const byRef = posts.filter((p) => p.ReferenceID === userDetails.ReferenceID);
-    return userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources" ? posts : byRef;
+    return userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources" ? posts : byRef;
   }, [posts, userDetails]);
 
   const allVisibleMeetings = useMemo(() => {
     if (!userDetails) return [];
     const byRef = meetings.filter((m) => m.ReferenceID === userDetails.ReferenceID);
-    return userDetails.Role === "Super Admin" || userDetails.Department === "Human Resources" ? meetings : byRef;
+    return userDetails.Role === "SuperAdmin" || userDetails.Department === "Human Resources" ? meetings : byRef;
   }, [meetings, userDetails]);
 
   const groupedByDate = useMemo(() => {
@@ -1528,7 +1553,7 @@ function ActivityPage() {
     { id: "profile", icon: User, label: "Profile" },
   ];
 
-  if (userDetails?.Role === "Super Admin" || userDetails?.Role === "Admin" || userDetails?.Department === "IT") {
+  if (userDetails?.Role === "SuperAdmin" || userDetails?.Role === "Admin" || userDetails?.Department === "IT") {
     NAV.splice(3, 0, { id: "admin", icon: ShieldAlert, label: "Admin" });
   }
 
@@ -1754,10 +1779,10 @@ function ActivityPage() {
         })}
         {activeTab === "home" && (
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2">
-            {(userDetails?.Role === "Super Admin" || userDetails?.permissions?.canCreateAttendance || userDetails?.permissions?.canCreateSiteVisit) && (
+            {(userDetails?.Role === "SuperAdmin" || userDetails?.permissions?.canCreateAttendance || userDetails?.permissions?.canCreateSiteVisit) && (
               <button 
                 onClick={() => {
-                  if (userDetails?.Role === "Super Admin" || (userDetails?.permissions?.canCreateAttendance && userDetails?.permissions?.canCreateSiteVisit)) {
+                  if (userDetails?.Role === "SuperAdmin" || (userDetails?.permissions?.canCreateAttendance && userDetails?.permissions?.canCreateSiteVisit)) {
                     // If both allowed, prioritize attendance or show a menu? 
                     // For now, let's just open attendance as default if both are allowed
                     setCreateAttendanceOpen(true);

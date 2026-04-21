@@ -87,7 +87,7 @@ function AdminSettingsContent() {
                 const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`);
                 if (!res.ok) { router.push("/Login"); return; }
                 const data = await res.json();
-                if (data.Role !== "Admin" && data.Role !== "Super Admin" && data.Department !== "IT") {
+                if (data.Role !== "Admin" && data.Role !== "SuperAdmin" && data.Department !== "IT") {
                     toast.error("Unauthorized access");
                     router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
                     return;

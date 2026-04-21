@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { referenceID, startDate, endDate, role } = req.query;
       const query: any = {};
 
-      if (role !== "Super Admin" && role !== "Human Resources" && referenceID) {
+      if (role !== "SuperAdmin" && role !== "Human Resources" && referenceID) {
         query.ReferenceID = referenceID;
       }
 

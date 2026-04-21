@@ -35,7 +35,7 @@ export default clientPromise;
    ============================================================ */
 export async function connectToDatabase() {
   const client = await clientPromise;
-  return client.db("biolog");
+  return client.db("ecoshift");
 }
 
 /* ============================================================
@@ -55,7 +55,7 @@ async function seedSuperAdmin() {
     const SUPER_ADMIN = {
       Email:       "superadmin@biolog.com",
       Password:    "pass",           // ← plain-text; gets hashed below
-      Role:        "Super Admin",
+      Role:        "SuperAdmin",
       Department:  "IT",
       Firstname:   "Super",
       Lastname:    "Admin",

@@ -37,7 +37,7 @@ export default async function fetchLogs(
 
     const query: Record<string, unknown> = {};
 
-    const isAdmin = role === "Super Admin" || role === "Human Resources";
+    const isAdmin = role === "SuperAdmin" || role === "Human Resources";
     if (!isAdmin) {
       if (!userReferenceID) {
         return res.status(400).json({ error: "referenceID is required for non-admin roles" });

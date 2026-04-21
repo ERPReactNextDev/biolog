@@ -176,7 +176,7 @@ export default function Page() {
           params.append("role", userDetails.Role);
 
           if (
-            userDetails.Role !== "Super Admin" &&
+            userDetails.Role !== "SuperAdmin" &&
             userDetails.Role !== "Human Resources"
           ) {
             params.append("referenceID", userDetails.ReferenceID);

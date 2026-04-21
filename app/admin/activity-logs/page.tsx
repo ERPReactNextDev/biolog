@@ -118,7 +118,7 @@ function ActivityLogsContent() {
                     return;
                 }
                 const data = await res.json();
-                if (data.Role !== "Admin" && data.Role !== "Super Admin" && data.Department !== "IT") {
+                if (data.Role !== "Admin" && data.Role !== "SuperAdmin" && data.Department !== "IT") {
                     toast.error("Unauthorized access");
                     router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
                     return;
@@ -141,7 +141,7 @@ function ActivityLogsContent() {
             const params = new URLSearchParams();
             params.append("page", "1");
             params.append("limit", "500");
-            params.append("role", "Super Admin"); // To get all logs
+            params.append("role", "SuperAdmin"); // To get all logs
 
             if (dateRange?.from) {
                 params.append("startDate", dateRange.from.toISOString());

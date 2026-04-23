@@ -23,9 +23,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Calculate duration in minutes
+      // FIX: Parse dates without timezone conversion
       const start = new Date(StartDate);
       const end = new Date(EndDate);
+      
+      // Store as ISO strings to preserve the local time
+      const startDateISO = new Date(StartDate).toISOString();
+      const endDateISO = new Date(EndDate).toISOString();
+      
       const durationMs = end.getTime() - start.getTime();
       const durationMin = Math.round(durationMs / (1000 * 60));
 
@@ -33,8 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ReferenceID,
         Email,
         Title,
-        StartDate: new Date(StartDate),
-        EndDate: new Date(EndDate),
+        StartDate: startDateISO,  // Store as ISO string
+        EndDate: endDateISO,      // Store as ISO string
         Duration: durationMin,
         Location,
         Remarks,

@@ -102,8 +102,8 @@ export default function Camera({
             registeredDescriptors.map((d) => new Float32Array(d))
           );
           faceMatcherRef.current = new faceapi.FaceMatcher(labeled, 0.6);
-        } catch (err) {
-          console.error("FaceMatcher init error:", err);
+        } catch {
+          /* silent */
         }
       } else {
         faceMatcherRef.current = null;
@@ -234,8 +234,7 @@ export default function Camera({
         ctx.fillStyle = grad;
         ctx.fillRect(px, scanY - 8, pw, 16);
       }
-    } catch (err) {
-      console.error("Detection error:", err);
+    } catch {
       updateFaceStatus("unsupported");
     }
 
@@ -255,14 +254,13 @@ export default function Camera({
         try {
           await faceapi.nets.faceRecognitionNet.loadFromUri(`${MODEL_URL}/face_recognition`);
           recognitionAvailableRef.current = true;
-        } catch (e) {
-          console.warn("Face recognition model not available, using landmark fallback.", e);
+        } catch {
+          /* fallback to landmark mode */
         }
         try {
           await faceapi.nets.faceExpressionNet.loadFromUri(`${MODEL_URL}/face_expression`);
         } catch (_) {}
-      } catch (err) {
-        console.error("Critical: failed to load face-api models:", err);
+      } catch {
         updateFaceStatus("unsupported");
       }
     };
@@ -297,7 +295,7 @@ export default function Camera({
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
         if (videoRef.current) videoRef.current.srcObject = stream;
         streamRef.current = stream;
-      } catch (e) { console.error("Camera fallback error:", e); }
+      } catch { /* silent */ }
     }
   };
 

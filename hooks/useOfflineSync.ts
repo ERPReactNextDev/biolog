@@ -79,8 +79,7 @@ export function useOfflineSync(onSyncComplete?: () => void) {
           try {
             const uploadedUrl = await uploadToCloudinary(payload.PhotoURL);
             payload.PhotoURL = uploadedUrl;
-          } catch (cloudinaryErr) {
-            console.error("Cloudinary upload failed during sync:", cloudinaryErr);
+          } catch {
             await incrementRetry(log.id);
             failCount++;
             continue; // Skip this log for now; try again next sync

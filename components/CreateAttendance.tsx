@@ -98,8 +98,6 @@ export default function CreateAttendance({
       };
 
       const error = (err: GeolocationPositionError) => {
-        console.warn(`Geolocation error (${err.code}): ${err.message}`);
-        
         // Retry with lower accuracy if high accuracy fails
         if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
           navigator.geolocation.getCurrentPosition(success, 
@@ -136,8 +134,8 @@ export default function CreateAttendance({
           setLastStatus(null);
           setLastTime(null);
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+        /* silent */
       }
     };
     fetchLastStatus();
@@ -191,8 +189,7 @@ export default function CreateAttendance({
         setCapturedImage(null);
       }
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Error saving attendance.");
+      toast.error(err?.message || "Error saving attendance.");
     }
     setLoading(false);
   };

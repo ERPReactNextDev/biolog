@@ -117,8 +117,6 @@ export default function CreateSalesAttendance({
       };
 
       const error = (err: GeolocationPositionError) => {
-        console.warn(`Geolocation error (${err.code}): ${err.message}`);
-
         // Retry with lower accuracy if high accuracy fails
         if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
           navigator.geolocation.getCurrentPosition(success,
@@ -171,8 +169,7 @@ export default function CreateSalesAttendance({
         const nextAction = status === "Login" ? "Logout" : "Login";
         onChangeAction("Status", nextAction);
       })
-      .catch((err) => {
-        console.error("Error fetching last status:", err);
+      .catch(() => {
         setLastStatus(null);
         onChangeAction("Status", "Login");
         setLoginCountToday(0);
@@ -302,8 +299,7 @@ export default function CreateSalesAttendance({
         onOpenChangeAction(false);
       }
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Error saving attendance.");
+      toast.error(err?.message || "Error saving attendance.");
     }
     setLoading(false);
   };

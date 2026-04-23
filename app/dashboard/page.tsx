@@ -154,7 +154,6 @@ export default function Page() {
                     profilePicture: data.profilePicture ?? "",
                 });
             } catch (err) {
-                console.error(err);
                 setError("Failed to load user data.");
             } finally {
                 setLoadingUser(false);
@@ -178,7 +177,6 @@ export default function Page() {
                 const data = await res.json();
                 setUsers(Array.isArray(data) ? data : []);
             } catch (err) {
-                console.error(err);
                 setUsers([]);
             } finally {
                 setLoadingUsers(false);

@@ -77,7 +77,6 @@ export default function NavProfilePage() {
                     ContactPassword: "",
                 });
             } catch (e) {
-                console.error(e);
                 setError("Error loading user data");
             } finally {
                 setLoading(false);
@@ -158,7 +157,6 @@ export default function NavProfilePage() {
             }
         } catch (error) {
             toast.error("Error uploading image");
-            console.error(error);
         } finally {
             setUploading(false);
         }
@@ -215,7 +213,6 @@ export default function NavProfilePage() {
             );
             setPasswordStrength("");
         } catch (err) {
-            console.error(err);
             toast.error("Error updating profile");
         } finally {
             setSaving(false);

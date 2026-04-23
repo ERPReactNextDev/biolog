@@ -99,7 +99,6 @@ export default function Page() {
                     profilePicture: data.profilePicture ?? "",
                 });
             } catch (err) {
-                console.error("Error fetching user data:", err);
                 setError("Failed to load user data.");
             }
         };
@@ -180,7 +179,6 @@ export default function Page() {
             setIsModalOpen(false);
             resetForm();
         } catch (err) {
-            console.error(err);
             toast.error("May error sa pag-save ng job.", { id: toastId });
         } finally {
             setLoading(false);
@@ -204,7 +202,6 @@ export default function Page() {
             await deleteDoc(doc(db, "careers", id));
             toast.success("Job deleted successfully!", { id: toastId });
         } catch (err) {
-            console.error(err);
             toast.error("Failed to delete job.", { id: toastId });
         }
     };

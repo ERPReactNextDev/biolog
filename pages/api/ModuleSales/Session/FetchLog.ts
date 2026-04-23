@@ -15,7 +15,6 @@ export default async function fetchAccounts(req: NextApiRequest, res: NextApiRes
 
     res.status(200).json({ data: logs });
   } catch (error) {
-    console.error("Error fetching logs:", error);
     res.status(500).json({ error: "Failed to fetch logs" });
   }
 }

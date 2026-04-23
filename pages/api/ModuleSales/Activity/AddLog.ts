@@ -50,7 +50,6 @@ export default async function addActivityLog(
     try {
       db = await connectToDatabase();
     } catch (dbErr) {
-      console.error("DB connection error:", dbErr);
       return res.status(503).json({
         error: "Database connection failed. Please try again.",
       });
@@ -136,7 +135,6 @@ export default async function addActivityLog(
     });
 
   } catch (error) {
-    console.error("Error adding activity log:", error);
     return res.status(500).json({
       error: "Failed to add activity log. Please try again.",
     });

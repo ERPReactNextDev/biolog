@@ -159,7 +159,7 @@ function TimesheetPage() {
           });
         }
       })
-      .catch((err) => console.error("Failed to load system settings:", err));
+      .catch(() => { /* silent */ });
   }, []);
 
   // Back navigation — go back to activity planner with same userId

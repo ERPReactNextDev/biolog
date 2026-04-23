@@ -39,7 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const tokens = await tokenRes.json();
 
     if (!tokenRes.ok || !tokens.access_token) {
-      console.error("[google/callback] token exchange failed:", tokens);
       return res.redirect("/Login?error=google_token_failed");
     }
 
@@ -100,7 +99,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect("/pending-approval");
 
   } catch (err) {
-    console.error("[google/callback] error:", err);
     return res.redirect("/Login?error=google_server_error");
   }
 }

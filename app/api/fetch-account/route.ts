@@ -47,7 +47,6 @@ export async function GET(req: Request) {
       }
     );
   } catch (error: any) {
-    console.error("Accounts API error:", error);
 
     return NextResponse.json(
       {

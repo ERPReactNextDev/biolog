@@ -114,7 +114,6 @@ function GPSReportsPage() {
       const data = await res.json();
       setReports(data.reports || []);
     } catch (err) {
-      console.error("Error fetching reports:", err);
       toast.error("Failed to load GPS reports.");
     } finally {
       setLoading(false);

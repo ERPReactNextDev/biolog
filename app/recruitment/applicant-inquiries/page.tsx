@@ -120,7 +120,6 @@ export default function Page() {
                     profilePicture: data.profilePicture ?? "",
                 });
             } catch (err) {
-                console.error("Error fetching user data:", err);
                 setError("Failed to load user data.");
             }
         };
@@ -172,7 +171,6 @@ export default function Page() {
                 await updateDoc(doc(db, "inquiries", id), { status: "read" });
                 toast.success("Application marked as read");
             } catch (error) {
-                console.error("Error marking as read:", error);
                 toast.error("Failed to mark application as read");
             }
         }
@@ -193,7 +191,6 @@ export default function Page() {
             toast.success("Application deleted successfully");
             if (selectedApp?.id === deleteTargetId) setSelectedApp(null);
         } catch (error) {
-            console.error("Error deleting:", error);
             toast.error("Failed to delete application");
         } finally {
             setShowDeleteDialog(false);
@@ -214,7 +211,6 @@ export default function Page() {
             await updateDoc(doc(db, "inquiries", id), { internalStatus: nextStatus });
             toast.success(`Application status updated to ${nextStatus}`);
         } catch (error) {
-            console.error("Error updating status:", error);
             toast.error("Failed to update application status");
         }
     };

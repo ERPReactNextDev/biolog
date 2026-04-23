@@ -22,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: 'Activity logged successfully.' });
   } catch (error) {
-    console.error('Logging error:', error);
     return res.status(500).json({ message: 'Error logging activity.' });
   }
 }

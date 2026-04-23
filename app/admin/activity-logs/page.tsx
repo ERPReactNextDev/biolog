@@ -125,7 +125,6 @@ function ActivityLogsContent() {
                 }
                 setVerifying(false);
             } catch (err) {
-                console.error(err);
                 router.push("/Login");
             }
         };
@@ -173,7 +172,6 @@ function ActivityLogsContent() {
                 }
             }
         } catch (err) {
-            console.error(err);
             toast.error("Failed to load activity logs");
         } finally {
             setLoading(false);

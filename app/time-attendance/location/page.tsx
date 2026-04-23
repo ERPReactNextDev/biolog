@@ -149,7 +149,6 @@ export default function Page() {
           profilePicture: data.profilePicture ?? "",
         });
       } catch (err) {
-        console.error("Error fetching user data:", err);
         setError("Failed to load user data.");
       }
     };
@@ -202,7 +201,6 @@ export default function Page() {
 
         setPosts(allLogs);
       } catch (err) {
-        console.error("Error fetching activity logs:", err);
         toast.error("Error fetching activity logs.");
         setPosts([]);
       } finally {
@@ -236,7 +234,6 @@ export default function Page() {
 
         setUsersMap(map);
       } catch (err) {
-        console.error("Error fetching users:", err);
       }
     };
 

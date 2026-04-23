@@ -70,7 +70,7 @@ export function AppSidebar({
           Role: data.Role || "",
         })
       )
-      .catch((err) => console.error(err));
+      .catch(() => { /* silent */ });
   }, [userId]);
 
   React.useEffect(() => {
@@ -147,7 +147,6 @@ export function AppSidebar({
 
   function handleRaiseTicketClick(userId?: string) {
     if (!userId) {
-      console.warn("User ID is missing");
       return;
     }
     const url = `/ticket${userId ? `?id=${encodeURIComponent(userId)}` : ""}`;

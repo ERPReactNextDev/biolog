@@ -75,7 +75,6 @@ async function seedSuperAdmin() {
     });
 
     if (exists) {
-      console.log("[seed] Super Admin already exists – skipping.");
       return;
     }
 
@@ -87,13 +86,8 @@ async function seedSuperAdmin() {
       createdAt: new Date(),
     });
 
-    console.log("[seed] ✅ Super Admin created successfully.");
-    console.log(`       Email       : ${SUPER_ADMIN.Email}`);
-    console.log(`       Password    : ${SUPER_ADMIN.Password}`);
-    console.log(`       ReferenceID : ${SUPER_ADMIN.ReferenceID}`);
   } catch (err) {
     // Non-fatal: log the error but don't crash the app
-    console.error("[seed] ⚠️  Failed to seed Super Admin:", err);
   }
 }
 

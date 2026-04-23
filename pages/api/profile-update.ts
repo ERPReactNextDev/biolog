@@ -72,7 +72,6 @@ export default async function updateProfile(req: NextApiRequest, res: NextApiRes
       return res.status(404).json({ error: "User not found or no changes made" });
     }
   } catch (error) {
-    console.error("Error updating profile:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }

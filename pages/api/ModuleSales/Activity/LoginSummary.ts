@@ -34,7 +34,6 @@ export default async function loginSummary(
     try {
       db = await connectToDatabase();
     } catch (dbErr) {
-      console.error("DB connection error:", dbErr);
       return res.status(503).json({
         error: "Database connection failed. Please try again.",
       });
@@ -79,7 +78,6 @@ export default async function loginSummary(
     return res.status(200).json(response);
 
   } catch (error) {
-    console.error("Error fetching login summary:", error);
     return res.status(500).json({ error: "Failed to fetch login summary" });
   }
 }

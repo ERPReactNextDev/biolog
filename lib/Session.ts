@@ -13,7 +13,6 @@ export async function destroySession(req: NextApiRequest, res: NextApiResponse) 
       const sessionsCollection = db.collection("sessions");
       await sessionsCollection.deleteOne({ token: sessionToken });
     } catch (e) {
-      console.error("Failed to delete session from DB", e);
     }
   }
 

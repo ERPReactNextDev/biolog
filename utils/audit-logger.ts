@@ -15,6 +15,5 @@ export async function recordAuditLog(adminId: string, adminName: string, action:
             date_created: new Date()
         });
     } catch (error) {
-        console.error("Failed to record audit log:", error);
     }
 }

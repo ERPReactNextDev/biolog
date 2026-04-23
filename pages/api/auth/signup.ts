@@ -76,7 +76,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error("[signup] error:", error);
     return res.status(500).json({ message: "An unexpected error occurred. Please try again." });
   }
 }

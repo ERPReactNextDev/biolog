@@ -66,7 +66,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
   } catch (error) {
-    console.error("Setup error:", error);
     return res.status(500).json({ error: "Failed to create super admin" });
   }
 }

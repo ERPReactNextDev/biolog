@@ -11,7 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(401).json({ isLoggedIn: false });
     }
   } catch (error) {
-    console.error("Error during session check:", error);
     res.status(500).json({ isLoggedIn: false });
   }
 }

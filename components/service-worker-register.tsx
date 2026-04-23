@@ -14,7 +14,6 @@ export default function ServiceWorkerRegister() {
     navigator.serviceWorker
       .register("/service-worker.js", { scope: "/" })
       .then((reg) => {
-        console.log("[SW] Registered, scope:", reg.scope);
 
         // Request a Background Sync tag so the SW can wake the page
         // when the network returns (Chrome / Edge).
@@ -24,7 +23,7 @@ export default function ServiceWorkerRegister() {
             .catch(() => {/* Background Sync not permitted — fall back to online event */});
         }
       })
-      .catch((err) => console.warn("[SW] Registration failed:", err));
+      .catch(() => { /* silent */ });
 
     // ── Bridge SW messages → window custom events ────────────────────────
     // The service worker posts { type: "SW_SYNC_TRIGGER" } via Background Sync.

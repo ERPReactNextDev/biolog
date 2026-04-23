@@ -107,7 +107,6 @@ function GPSReportPage() {
         toast.success("Location captured successfully!");
       },
       (error) => {
-        console.error("Geolocation error:", error);
         toast.error("Failed to get location. Please enable location services.");
         setGettingLocation(false);
       },
@@ -194,14 +193,6 @@ function GPSReportPage() {
       gpsLocation,
     };
     
-    console.log("[GPS Report] Submitting payload:", {
-      ReferenceID: payload.ReferenceID,
-      Email: payload.Email,
-      photosCount: payload.photos.length,
-      loginDate: payload.loginDate,
-      logoutDate: payload.logoutDate,
-      gpsLocation: payload.gpsLocation,
-    });
     
     try {
       const res = await fetch("/api/gps-report", {
@@ -210,11 +201,9 @@ function GPSReportPage() {
         body: JSON.stringify(payload),
       });
 
-      console.log("[GPS Report] Response status:", res.status);
       
       if (res.ok) {
         const data = await res.json();
-        console.log("[GPS Report] Success response:", data);
         toast.success("GPS Report submitted successfully!");
         // Reset form
         setPhotos([]);
@@ -228,11 +217,9 @@ function GPSReportPage() {
         }, 1500);
       } else {
         const errorData = await res.json();
-        console.error("[GPS Report] Error response:", errorData);
         toast.error(errorData.error || `Failed to submit report (${res.status}).`);
       }
     } catch (err) {
-      console.error("[GPS Report] Submit error:", err);
       toast.error("Network error. Please check your connection and try again.");
     } finally {
       setSubmitting(false);

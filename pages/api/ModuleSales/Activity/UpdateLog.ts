@@ -31,7 +31,6 @@ export default async function updateActivityLog(
     try {
       db = await connectToDatabase();
     } catch (dbErr) {
-      console.error("DB connection error:", dbErr);
       return res.status(503).json({ error: "Database connection failed. Please try again." });
     }
 
@@ -53,7 +52,6 @@ export default async function updateActivityLog(
 
     return res.status(200).json({ message: "Activity log updated successfully" });
   } catch (error) {
-    console.error("Error updating activity log:", error);
     return res.status(500).json({ error: "Failed to update activity log" });
   }
 }

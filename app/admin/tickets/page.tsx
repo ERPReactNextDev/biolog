@@ -148,7 +148,6 @@ function AdminTicketsContent() {
                 }
                 setVerifying(false);
             } catch (err) {
-                console.error(err);
                 router.push("/Login");
             }
         };
@@ -169,7 +168,6 @@ function AdminTicketsContent() {
             if (error) throw error;
             setTickets(data || []);
         } catch (err: any) {
-            console.error(err);
             toast.error(err.message || "Failed to fetch tickets");
         } finally {
             setLoading(false);

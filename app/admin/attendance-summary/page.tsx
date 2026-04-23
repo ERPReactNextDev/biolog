@@ -143,7 +143,6 @@ function AttendanceSummaryContent() {
                 }
                 setVerifying(false);
             } catch (err) {
-                console.error(err);
                 router.push("/Login");
             }
         };
@@ -175,7 +174,6 @@ function AttendanceSummaryContent() {
             setLogs(logsData.data || []);
 
         } catch (err) {
-            console.error(err);
             toast.error("Failed to load attendance data");
         } finally {
             setLoading(false);

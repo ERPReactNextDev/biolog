@@ -21,7 +21,6 @@ export default async function lastStatus(
     try {
       db = await connectToDatabase();
     } catch (dbErr) {
-      console.error("DB connection error:", dbErr);
       return res.status(503).json({ error: "Database connection failed. Please try again." });
     }
 
@@ -66,7 +65,6 @@ export default async function lastStatus(
       date_created: lastActivityToday.date_created ?? null,
     });
   } catch (error) {
-    console.error("Error fetching last status:", error);
     return res.status(500).json({ error: "Failed to fetch last status" });
   }
 }

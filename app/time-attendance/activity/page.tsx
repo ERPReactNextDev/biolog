@@ -115,7 +115,6 @@ export default function Page() {
                     profilePicture: data.profilePicture ?? "",
                 });
             } catch (err) {
-                console.error("Error fetching user data:", err);
                 toast.error("Failed to load user data.");
                 setError("Failed to load user data.");
             } finally {
@@ -170,7 +169,6 @@ export default function Page() {
 
                 setPosts(allLogs);
             } catch (err) {
-                console.error("Error fetching activity logs:", err);
                 toast.error("Error fetching activity logs.");
                 setPosts([]);
             } finally {
@@ -204,7 +202,6 @@ export default function Page() {
 
                 setUsersMap(map);
             } catch (error) {
-                console.error("Error fetching users:", error);
             }
         }
         fetchUsersForPosts();
@@ -291,7 +288,6 @@ export default function Page() {
 
             if (!res.ok) {
                 const errorBody = await res.json();
-                console.error("Update failed:", errorBody);
                 throw new Error(errorBody.error || "Failed to update log");
             }
 
@@ -304,7 +300,6 @@ export default function Page() {
             setEditingPost(null);
         } catch (error: any) {
             toast.error(error.message || "Failed to update activity log");
-            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -387,7 +382,6 @@ export default function Page() {
 
             toast.success("Export successful!");
         } catch (error) {
-            console.error("Export error:", error);
             toast.error("Failed to export data.");
         } finally {
             setLoading(false);
@@ -696,7 +690,6 @@ export default function Page() {
                                                             a.remove();
                                                             window.URL.revokeObjectURL(url);
                                                         } catch (err) {
-                                                            console.error("Download failed:", err);
                                                             toast.error("Failed to download photo.");
                                                         }
                                                     }}

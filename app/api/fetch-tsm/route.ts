@@ -36,7 +36,6 @@ export async function GET(req: Request) {
       }
     );
   } catch (error) {
-    console.error("Fetch accounts by TSM API error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch accounts" },
       { status: 500 }

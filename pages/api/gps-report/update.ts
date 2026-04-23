@@ -49,7 +49,6 @@ export default async function handler(
       return res.status(400).json({ error: "Report was not updated" });
     }
 
-    console.log(`[GPS Report] Report ${reportId} updated to ${status} by ${reviewedBy}`);
 
     return res.status(200).json({
       message: `Report ${status} successfully`,
@@ -57,7 +56,6 @@ export default async function handler(
       status,
     });
   } catch (error) {
-    console.error("[GPS Report Update] Error:", error);
     return res.status(500).json({
       error: "Failed to update report status. Please try again.",
     });

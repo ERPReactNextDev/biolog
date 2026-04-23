@@ -140,7 +140,6 @@ function LiveTrackingContent() {
                 }
                 setVerifying(false);
             } catch (err) {
-                console.error(err);
                 router.push("/Login");
             }
         };
@@ -178,7 +177,6 @@ function LiveTrackingContent() {
 
             setUsersWithLocation(usersWithLoc);
         } catch (err) {
-            console.error(err);
             toast.error("Failed to load tracking data");
         } finally {
             setLoading(false);

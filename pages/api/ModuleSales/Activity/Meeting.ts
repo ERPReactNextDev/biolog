@@ -46,7 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = await meetingsCollection.insertOne(newMeeting);
       return res.status(201).json({ message: "Meeting created successfully", id: result.insertedId });
     } catch (error) {
-      console.error("Failed to create meeting:", error);
       return res.status(500).json({ error: "Internal Server Error" });
     }
   }
@@ -70,7 +69,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const meetings = await meetingsCollection.find(query).sort({ StartDate: 1 }).toArray();
       return res.status(200).json(meetings);
     } catch (error) {
-      console.error("Failed to fetch meetings:", error);
       return res.status(500).json({ error: "Internal Server Error" });
     }
   }

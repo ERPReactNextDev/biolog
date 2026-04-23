@@ -23,7 +23,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         res.status(404).json({ error: "User not found" });
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
       res.status(500).json({ error: "Invalid user ID format or server error" });
     }
   } else {

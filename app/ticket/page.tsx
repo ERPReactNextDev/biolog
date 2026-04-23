@@ -114,7 +114,6 @@ export default function Page() {
           profilePicture: data.profilePicture ?? "",
         });
       } catch (err) {
-        console.error("Error fetching user data:", err);
         setError("Failed to load user data.");
         setUserDetails(null);
       } finally {

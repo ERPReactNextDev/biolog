@@ -108,7 +108,6 @@ function AuditLogsContent() {
                 }
                 setVerifying(false);
             } catch (err) {
-                console.error(err);
                 router.push("/Login");
             }
         };
@@ -126,7 +125,6 @@ function AuditLogsContent() {
             const data = await res.json();
             setLogs(data || []);
         } catch (err) {
-            console.error(err);
             toast.error("Failed to load audit logs");
         } finally {
             setLoading(false);

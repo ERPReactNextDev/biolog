@@ -21,7 +21,6 @@ export default async function handler(
         reports: reports,
       });
     } catch (error) {
-      console.error("[GPS Report] GET Error:", error);
       return res.status(500).json({ error: "Failed to fetch reports" });
     }
   }
@@ -82,9 +81,7 @@ export default async function handler(
     let db;
     try {
       db = await connectToDatabase();
-      console.log("[GPS Report] Connected to database:", db.databaseName);
     } catch (dbErr) {
-      console.error("[GPS Report] DB connection error:", dbErr);
       return res.status(503).json({
         error: "Database connection failed. Please try again.",
       });
@@ -92,7 +89,6 @@ export default async function handler(
 
     // List all collections before insert
     const collectionsBefore = await db.listCollections().toArray();
-    console.log("[GPS Report] Collections before insert:", collectionsBefore.map(c => c.name));
 
     const collection = db.collection("GPSReports");
 
@@ -115,18 +111,11 @@ export default async function handler(
     };
 
     /* ── Insert ─────────────────────────── */
-    console.log("[GPS Report] Inserting to collection: GPSReports in database:", db.databaseName);
-    console.log("[GPS Report] Document:", { ReferenceID, Email, Type: newReport.Type, Status: newReport.Status });
     
     let result;
     try {
       result = await collection.insertOne(newReport);
-      console.log("[GPS Report] Insert result:", {
-        acknowledged: result.acknowledged,
-        insertedId: result.insertedId?.toString(),
-      });
     } catch (insertErr) {
-      console.error("[GPS Report] INSERT ERROR:", insertErr);
       throw insertErr;
     }
 
@@ -138,23 +127,13 @@ export default async function handler(
     let verifyDoc;
     try {
       verifyDoc = await collection.findOne({ _id: result.insertedId });
-      console.log("[GPS Report] Verified document found:", !!verifyDoc);
       if (verifyDoc) {
-        console.log("[GPS Report] Verified doc details:", {
-          _id: verifyDoc._id?.toString(),
-          ReferenceID: verifyDoc.ReferenceID,
-          Type: verifyDoc.Type,
-          date_created: verifyDoc.date_created,
-        });
       }
     } catch (verifyErr) {
-      console.error("[GPS Report] Verification error:", verifyErr);
     }
     
     // List collections after insert to confirm GPSReports exists
     const collectionsAfter = await db.listCollections().toArray();
-    console.log("[GPS Report] Collections after insert:", collectionsAfter.map(c => c.name));
-    console.log("[GPS Report] GPSReports collection exists:", collectionsAfter.some(c => c.name === "GPSReports"));
 
     return res.status(201).json({
       message: "GPS Report submitted successfully",
@@ -165,7 +144,6 @@ export default async function handler(
     });
 
   } catch (error) {
-    console.error("[GPS Report] Error:", error);
     return res.status(500).json({
       error: "Failed to submit GPS report. Please try again.",
     });

@@ -105,7 +105,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 html: `<p>Multiple failed login attempts detected on your account from ${deviceModel} (${osName}) at IP ${ip}.</p>`,
               });
             } catch (e) {
-              console.error("Failed to send alert", e);
             }
           }
 
@@ -182,7 +181,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `,
       });
     } catch (e) {
-      console.error("Failed to send 2FA email", e);
     }
 
     return res.status(200).json({ twoFactorRequired: true, message: "OTP sent to your email." });

@@ -25,6 +25,9 @@ import {
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OfflineBanner from "@/components/OfflineBanner";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { useSwipeToRefresh } from "@/hooks/useSwipeToRefresh";
 
 
 // ── Weather Component ────────────────────────────────────────────────────────
@@ -294,7 +297,7 @@ function TimesheetNavCard({ userId }: { userId: string | null | undefined }) {
 // ── Home Tab ──────────────────────────────────────────────────────────────────
 
 function HomeTab({
-  userDetails, todayLogs, monthlyStats, onCreateAttendance, onCreateSiteVisit, onSetTab, userId,
+  userDetails, todayLogs, monthlyStats, onCreateAttendance, onCreateSiteVisit, onSetTab, userId, scrollRef,
 }: {
   userDetails: UserDetails | null;
   todayLogs: ActivityLog[];
@@ -303,6 +306,7 @@ function HomeTab({
   onCreateSiteVisit: () => void;
   onSetTab: (tab: ActiveTab) => void;
   userId: string | null | undefined;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const router = useRouter();
   const today = new Date();
@@ -426,7 +430,7 @@ function HomeTab({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28 scroll-smooth">
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28 scroll-smooth" ref={scrollRef}>
         {/* Global Announcement */}
         {systemSettings.announcement && (
           <motion.div 
@@ -1631,11 +1635,54 @@ function ActivityPage() {
         page++;
       } while (page <= totalPages);
       setPosts(allLogs);
-    } catch { setPosts([]); }
+      // Cache for offline use
+      try {
+        const { cacheLogs } = await import("@/lib/offline-logs-cache");
+        await cacheLogs(allLogs as any);
+      } catch { /* non-critical */ }
+    } catch {
+      // Network failed — load from offline cache
+      try {
+        const { getCachedLogs } = await import("@/lib/offline-logs-cache");
+        const cached = await getCachedLogs();
+        if (cached.length > 0) {
+          setPosts(cached as unknown as ActivityLog[]);
+        } else {
+          setPosts([]);
+        }
+      } catch {
+        setPosts([]);
+      }
+    }
     finally { setLoading(false); }
   }, [userDetails, dateCreatedFilterRange]);
 
   const { pendingCount, isOnline, isSyncing, syncNow } = useOfflineSync(fetchAccountAction);
+
+  // ── Notifications (ticket status changes) ────────────────────────────────
+  const { unreadCount: notifUnreadCount, markAllRead: markNotifsRead } = useNotifications(userDetails?.ReferenceID);
+
+  // ── Session timeout warning ───────────────────────────────────────────────
+  const { showWarning: showSessionWarning, secondsLeft: sessionSecondsLeft, refresh: refreshSession, dismiss: dismissSessionWarning } = useSessionTimeout();
+
+  // ── Swipe to refresh (home tab) ───────────────────────────────────────────
+  const { containerRef: swipeContainerRef, pullDistance, isRefreshing: isPullRefreshing } = useSwipeToRefresh(
+    async () => { await fetchAccountAction(); await fetchMeetings(); },
+    activeTab === "home"
+  );
+
+  // ── Push notifications init ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!userDetails?.UserId) return;
+    import("@/lib/push-notifications").then(({ initPushNotifications, onForegroundMessage }) => {
+      initPushNotifications(userDetails.UserId).catch(() => {});
+      const unsub = onForegroundMessage(({ title, body }) => {
+        toast.info(`${title}: ${body}`, { duration: 6000 });
+        if ("vibrate" in navigator) navigator.vibrate([50, 30, 50]);
+      });
+      return unsub;
+    }).catch(() => {});
+  }, [userDetails?.UserId]);
 
   const fetchMeetings = useCallback(async () => {
     if (!userDetails) return;
@@ -1889,7 +1936,7 @@ function ActivityPage() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "home":
-        return <HomeTab userDetails={userDetails} todayLogs={todayLogs} monthlyStats={monthlyStats} onCreateAttendance={() => setCreateAttendanceOpen(true)} onCreateSiteVisit={() => setCreateSalesAttendanceOpen(true)} onSetTab={setActiveTab} userId={userId} />;
+        return <HomeTab userDetails={userDetails} todayLogs={todayLogs} monthlyStats={monthlyStats} onCreateAttendance={() => setCreateAttendanceOpen(true)} onCreateSiteVisit={() => setCreateSalesAttendanceOpen(true)} onSetTab={setActiveTab} userId={userId} scrollRef={swipeContainerRef} />;
       case "calendar":
         return <CalendarTab 
           currentMonth={currentMonth} 
@@ -2015,21 +2062,34 @@ function ActivityPage() {
           {NAV.map((item) => {
             const isActive = activeTab === item.id;
             const isMiddle = item.id === "home";
+            // Show notification badge on profile tab
+            const showBadge = item.id === "profile" && notifUnreadCount > 0;
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (item.id === "profile") markNotifsRead();
+                  // Haptic feedback
+                  if ("vibrate" in navigator) navigator.vibrate(30);
+                }}
                 className={[
                   "flex-1 flex flex-col items-center gap-1 py-3 relative transition-all",
-                  // Push home tab items down slightly to hug the curve
                   isMiddle && activeTab === "home" ? "pt-5" : "",
                 ].join(" ")}
               >
-                <item.icon
-                  size={20}
-                  className={isActive ? "text-[#CC1318]" : "text-gray-400"}
-                  strokeWidth={isActive ? 2.5 : 1.8}
-                />
+                <div className="relative">
+                  <item.icon
+                    size={20}
+                    className={isActive ? "text-[#CC1318]" : "text-gray-400"}
+                    strokeWidth={isActive ? 2.5 : 1.8}
+                  />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#CC1318] rounded-full flex items-center justify-center text-[8px] font-bold text-white">
+                      {notifUnreadCount > 9 ? "9+" : notifUnreadCount}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-[10px] font-semibold ${isActive ? "text-[#CC1318]" : "text-gray-400"}`}>
                   {item.label}
                 </span>
@@ -2066,6 +2126,56 @@ function ActivityPage() {
           </div>
         )}
       </div>
+
+      {/* ── Swipe-to-refresh indicator ── */}
+      {(pullDistance > 0 || isPullRefreshing) && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[90] flex items-center justify-center pointer-events-none"
+          style={{ paddingTop: `${Math.min(pullDistance, 60)}px`, transition: pullDistance === 0 ? "padding 0.3s ease" : "none" }}
+        >
+          <div className={`w-8 h-8 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center ${isPullRefreshing ? "animate-spin" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={isPullRefreshing ? "" : ""} style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
+              <path d="M8 2a6 6 0 1 0 6 6" stroke="#CC1318" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M14 2l-2 2 2 2" stroke="#CC1318" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* ── Session timeout warning modal ── */}
+      {showSessionWarning && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
+          <div className="w-full max-w-sm bg-white rounded-t-[32px] p-6 pb-10 shadow-2xl">
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-5" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-[14px] bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Clock size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold text-gray-900">Session Expiring Soon</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">You'll be logged out in {sessionSecondsLeft}s</p>
+              </div>
+            </div>
+            <p className="text-[13px] text-gray-500 mb-5 leading-relaxed">
+              Your session is about to expire. Stay logged in to continue using the app.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={dismissSessionWarning}
+                className="flex-1 py-3.5 rounded-2xl border border-gray-200 text-[13px] font-semibold text-gray-500 hover:bg-gray-50 transition-all"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={refreshSession}
+                className="flex-1 py-3.5 rounded-2xl bg-[#CC1318] text-white text-[13px] font-bold hover:bg-[#A8100F] active:scale-95 transition-all"
+              >
+                Stay Logged In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialogs */}
       <CreateAttendance

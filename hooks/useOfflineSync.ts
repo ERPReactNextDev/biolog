@@ -27,18 +27,12 @@ export function useOfflineSync(onSyncComplete?: () => void) {
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
 
-  // ── Refresh badge count ───────────────────────────────────────────────────
-
   const refreshCount = useCallback(async () => {
     try {
       const count = await getPendingCount();
       setPendingCount(count);
-    } catch {
-      // IndexedDB unavailable (SSR, private mode) — fail silently
-    }
+    } catch { /* IndexedDB unavailable */ }
   }, []);
-
-  // ── Core sync loop ────────────────────────────────────────────────────────
 
   const syncNow = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
@@ -49,8 +43,8 @@ export function useOfflineSync(onSyncComplete?: () => void) {
     let logs;
     try {
       logs = await getAllPendingLogs();
-    } catch {
-      // Always release the lock — even if reading the queue fails
+    } catch (err) {
+      console.error("[sync] Failed to read pending logs:", err);
       syncingRef.current = false;
       setIsSyncing(false);
       return;
@@ -66,70 +60,96 @@ export function useOfflineSync(onSyncComplete?: () => void) {
     let failCount    = 0;
 
     for (const log of logs) {
-      // Permanently discard logs that have failed too many times
       if (log.retries >= MAX_RETRIES) {
+        console.warn(`[sync] Discarding log ${log.id} after ${log.retries} retries`);
         await removePendingLog(log.id).catch(() => {});
         continue;
       }
 
       try {
-        const payload = { ...log.payload } as any;
+        const payload = { ...log.payload } as Record<string, any>;
 
-        // ① Upload base64 photo to Cloudinary if not yet uploaded
-        if (payload.PhotoURL && typeof payload.PhotoURL === "string" && payload.PhotoURL.startsWith("data:image/")) {
+        // ── Preserve the original offline timestamp ──────────────────────
+        // The API sets date_created = new Date() on insert, which would use
+        // the sync time instead of when the user actually submitted.
+        // Pass the original createdAt so the API can use it.
+        if (!payload.date_created) {
+          payload.date_created = new Date(log.createdAt).toISOString();
+        }
+
+        // ── Upload base64 photo to Cloudinary ────────────────────────────
+        if (
+          payload.PhotoURL &&
+          typeof payload.PhotoURL === "string" &&
+          payload.PhotoURL.startsWith("data:image/")
+        ) {
           try {
+            console.log(`[sync] Uploading photo for log ${log.id}...`);
             const uploadedUrl = await uploadToCloudinary(payload.PhotoURL);
             payload.PhotoURL = uploadedUrl;
-          } catch {
-            // Cloudinary upload failed — increment retry and skip
+            console.log(`[sync] Photo uploaded: ${uploadedUrl.slice(0, 60)}...`);
+          } catch (uploadErr) {
+            console.error(`[sync] Cloudinary upload failed for log ${log.id}:`, uploadErr);
             await incrementRetry(log.id).catch(() => {});
             failCount++;
             continue;
           }
         }
 
-        // ② Submit to the API
+        // ── Submit to API ────────────────────────────────────────────────
+        console.log(`[sync] Submitting log ${log.id}:`, {
+          ReferenceID: payload.ReferenceID,
+          Type: payload.Type,
+          Status: payload.Status,
+          date_created: payload.date_created,
+        });
+
         const res = await fetch("/api/ModuleSales/Activity/AddLog", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify(payload),
         });
 
-        if (res.ok || res.status === 409) {
-          // 409 = duplicate already on server — safe to remove
+        if (res.ok) {
+          console.log(`[sync] Log ${log.id} synced successfully`);
+          await removePendingLog(log.id).catch(() => {});
+          successCount++;
+        } else if (res.status === 409) {
+          // Duplicate — already on server, safe to remove
+          const body = await res.json().catch(() => ({}));
+          console.log(`[sync] Log ${log.id} is a duplicate (409), removing:`, body);
           await removePendingLog(log.id).catch(() => {});
           successCount++;
         } else {
+          const body = await res.json().catch(() => ({}));
+          console.error(`[sync] Log ${log.id} failed with ${res.status}:`, body);
           await incrementRetry(log.id).catch(() => {});
           failCount++;
         }
-      } catch {
-        // Network error mid-loop — increment retry, keep going
+      } catch (err) {
+        console.error(`[sync] Network error for log ${log.id}:`, err);
         await incrementRetry(log.id).catch(() => {});
         failCount++;
       }
     }
 
-    // Always release the lock
     syncingRef.current = false;
     setIsSyncing(false);
     await refreshCount();
 
     if (successCount > 0) {
       toast.success(
-        `${successCount} offline log${successCount > 1 ? "s" : ""} synced!`
+        `${successCount} offline record${successCount > 1 ? "s" : ""} synced successfully!`
       );
       onSyncCompleteRef.current?.();
     }
 
     if (failCount > 0) {
       toast.error(
-        `${failCount} log${failCount > 1 ? "s" : ""} failed to sync. Will retry when online.`
+        `${failCount} record${failCount > 1 ? "s" : ""} failed to sync — check console for details.`
       );
     }
   }, [refreshCount]);
-
-  // ── Event listeners ───────────────────────────────────────────────────────
 
   useEffect(() => {
     refreshCount();
@@ -142,7 +162,6 @@ export function useOfflineSync(onSyncComplete?: () => void) {
     window.addEventListener("offline",      handleOffline);
     window.addEventListener("acculog:sync", handleSWSync);
 
-    // Attempt sync on mount if already online
     if (navigator.onLine) syncNow();
 
     return () => {

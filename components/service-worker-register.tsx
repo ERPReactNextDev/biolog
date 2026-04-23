@@ -1,6 +1,5 @@
 // components/ServiceWorkerRegister.tsx
-// Registers the service worker and bridges SW → window custom events.
-// Drop this into your root layout once: <ServiceWorkerRegister />
+// Registers the main service worker and the Firebase messaging service worker.
 "use client";
 
 import { useEffect } from "react";
@@ -8,37 +7,34 @@ import { useEffect } from "react";
 export default function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator))  return;
+    if (!("serviceWorker" in navigator)) return;
 
-    // Only register in production builds. The Next.js dev server hot-reloads
-    // chunks and HMR endpoints constantly, which a service worker should not
-    // intercept or cache.
     if (process.env.NODE_ENV !== "production") {
-      // Proactively unregister any stale dev-mode SW to keep things clean.
+      // Unregister stale dev-mode SWs
       navigator.serviceWorker.getRegistrations().then((regs) => {
         regs.forEach((r) => r.unregister().catch(() => {}));
       }).catch(() => {});
       return;
     }
 
-    // ── Register ────────────────────────────────────────────────────────────
+    // ── Main PWA service worker ──────────────────────────────────────────
     navigator.serviceWorker
       .register("/service-worker.js", { scope: "/" })
       .then((reg) => {
-
-        // Request a Background Sync tag so the SW can wake the page
-        // when the network returns (Chrome / Edge).
         if ("sync" in reg) {
           (reg as any).sync
             .register("sync-activity-logs")
-            .catch(() => {/* Background Sync not permitted — fall back to online event */});
+            .catch(() => {});
         }
       })
-      .catch(() => { /* silent */ });
+      .catch(() => {});
+
+    // ── Firebase Messaging service worker ────────────────────────────────
+    navigator.serviceWorker
+      .register("/firebase-messaging-sw.js", { scope: "/" })
+      .catch(() => {});
 
     // ── Bridge SW messages → window custom events ────────────────────────
-    // The service worker posts { type: "SW_SYNC_TRIGGER" } via Background Sync.
-    // useOfflineSync listens for the "acculog:sync" window event.
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "SW_SYNC_TRIGGER") {
         window.dispatchEvent(new CustomEvent("acculog:sync"));
@@ -52,5 +48,5 @@ export default function ServiceWorkerRegister() {
     };
   }, []);
 
-  return null; // renders nothing
+  return null;
 }

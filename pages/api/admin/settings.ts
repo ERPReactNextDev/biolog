@@ -43,7 +43,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     gracePeriod, 
                     themeColor,
                     logoUrl,
-                    announcement, 
+                    announcement,
+                    geofenceLat,
+                    geofenceLng,
+                    geofenceRadius,
                     adminId, 
                     adminName 
                 } = req.body;
@@ -59,7 +62,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             gracePeriod, 
                             themeColor,
                             logoUrl,
-                            announcement, 
+                            announcement,
+                            geofenceLat:    geofenceLat    ?? null,
+                            geofenceLng:    geofenceLng    ?? null,
+                            geofenceRadius: geofenceRadius ?? null,
                             updatedAt: new Date() 
                         } 
                     },

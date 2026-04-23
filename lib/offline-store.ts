@@ -42,7 +42,16 @@ export async function enqueuePendingLog(
 ): Promise<string> {
   const db  = await openDB();
   const id  = `log_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const entry: PendingLog = { id, payload, createdAt: Date.now(), retries: 0 };
+  const now = Date.now();
+
+  // Stamp the original submission time into the payload so the API can
+  // use it as date_created instead of the sync time.
+  const stampedPayload = {
+    ...payload,
+    date_created: payload.date_created ?? new Date(now).toISOString(),
+  };
+
+  const entry: PendingLog = { id, payload: stampedPayload, createdAt: now, retries: 0 };
 
   return new Promise((resolve, reject) => {
     const tx    = db.transaction(STORE_NAME, "readwrite");

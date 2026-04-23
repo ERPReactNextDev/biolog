@@ -24,6 +24,7 @@ export default async function addActivityLog(
       TSM,
       SiteVisitAccount,
       FaceData,
+      date_created: clientDateCreated, // offline timestamp from client
     } = req.body ?? {};
 
     /* ── Validation ───────────────────────── */
@@ -45,29 +46,41 @@ export default async function addActivityLog(
       });
     }
 
+    /* ── Resolve the actual timestamp ─────────────────────────────────────
+     * For offline submissions the client sends the original timestamp so the
+     * record lands on the correct work-day. Fall back to now() if absent or
+     * invalid (e.g. online submissions that don't send date_created).
+     */
+    let resolvedDate: Date;
+    if (clientDateCreated) {
+      const parsed = new Date(clientDateCreated);
+      resolvedDate = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else {
+      resolvedDate = new Date();
+    }
+
     /* ── DB connection ───────────────────── */
     let db;
     try {
       db = await connectToDatabase();
-    } catch (dbErr) {
+    } catch {
       return res.status(503).json({
         error: "Database connection failed. Please try again.",
       });
     }
 
-    const collection = db.collection("TaskLog");
+    const collection         = db.collection("TaskLog");
     const settingsCollection = db.collection("system_settings");
 
-    // Fetch dynamic work day start
-    const settings = await settingsCollection.findOne({ type: "global" });
+    // Fetch dynamic work-day start
+    const settings        = await settingsCollection.findOne({ type: "global" });
     const officeStartTime = settings?.officeStartTime || "08:00";
     const [startH, startM] = officeStartTime.split(":").map(Number);
 
-    /* ── Day window (Dynamic start → Dynamic start) ─────────── */
-    const now = new Date();
-    const startOfDay = new Date(now);
+    /* ── Day window based on the RESOLVED date ──────────────────────────── */
+    const startOfDay = new Date(resolvedDate);
     startOfDay.setHours(startH, startM, 0, 0);
-    if (now < startOfDay) {
+    if (resolvedDate < startOfDay) {
       startOfDay.setDate(startOfDay.getDate() - 1);
     }
 
@@ -75,7 +88,7 @@ export default async function addActivityLog(
     endOfDay.setDate(endOfDay.getDate() + 1);
     endOfDay.setMilliseconds(-1);
 
-    /* ── Duplicate check (KEEP THIS) ───── */
+    /* ── Duplicate check ────────────────────────────────────────────────── */
     const lastActivityToday = await collection.findOne(
       {
         ReferenceID,
@@ -89,19 +102,19 @@ export default async function addActivityLog(
       lastActivityToday?.Type === Type
     ) {
       return res.status(409).json({
-        error: `You are already ${Status.toLowerCase()} for ${Type}.`,
+        error: `Duplicate: already ${Status.toLowerCase()} for ${Type} on this work day.`,
       });
     }
 
     /* ── Build document ─────────────────── */
     const newLog: Record<string, unknown> = {
-      ReferenceID: ReferenceID.trim(),
-      Email: Email.trim(),
-      Type: Type.trim(),
-      Status: Status.trim(),
-      Remarks: typeof Remarks === "string" ? Remarks.trim() : "",
-      TSM: typeof TSM === "string" ? TSM.trim() : "",
-      date_created: new Date(),
+      ReferenceID:  ReferenceID.trim(),
+      Email:        Email.trim(),
+      Type:         Type.trim(),
+      Status:       Status.trim(),
+      Remarks:      typeof Remarks === "string" ? Remarks.trim() : "",
+      TSM:          typeof TSM === "string" ? TSM.trim() : "",
+      date_created: resolvedDate,   // use original offline time, not server time
     };
 
     if (typeof Location === "string" && Location.trim())
@@ -130,11 +143,13 @@ export default async function addActivityLog(
     }
 
     return res.status(201).json({
-      message: `${Status} recorded successfully`,
-      id: result.insertedId.toString(),
+      message:      `${Status} recorded successfully`,
+      id:           result.insertedId.toString(),
+      date_created: resolvedDate.toISOString(),
     });
 
   } catch (error) {
+    console.error("[AddLog] Unhandled error:", error);
     return res.status(500).json({
       error: "Failed to add activity log. Please try again.",
     });

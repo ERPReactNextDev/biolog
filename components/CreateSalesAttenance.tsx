@@ -14,6 +14,8 @@ import Select from "react-select";
 const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { compressImage } from "@/lib/image-compress";
+import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
 interface FormData {
@@ -236,6 +238,23 @@ export default function CreateSalesAttendance({
 
     setLoading(true);
 
+    // ── Geofence check ────────────────────────────────────────────────────
+    if ((manualLat ?? latitude) !== null && (manualLng ?? longitude) !== null) {
+      try {
+        const geofence = await fetchGeofenceConfig();
+        const within = isWithinGeofence(manualLat ?? latitude!, manualLng ?? longitude!, geofence);
+        if (within === false) {
+          toast.error("⚠️ You are outside the allowed area. Please move closer to the office.", { duration: 6000 });
+          setLoading(false);
+          return;
+        }
+      } catch { /* non-critical */ }
+    }
+
+    // ── Compress photo ────────────────────────────────────────────────────
+    let photo = capturedImage!;
+    try { photo = await compressImage(capturedImage!); } catch { /* use original */ }
+
     const basePayload = {
       ...formData,
       Type: "Client Visit",
@@ -264,7 +283,7 @@ export default function CreateSalesAttendance({
     try {
       if (!navigator.onLine) {
         // ── Offline: queue with base64 photo ──────────────────────────────
-        await enqueuePendingLog({ ...basePayload, PhotoURL: capturedImage });
+        await enqueuePendingLog({ ...basePayload, PhotoURL: photo });
         toast.success("Saved offline — will sync when you're back online.");
         resetForm();
         return;
@@ -273,10 +292,10 @@ export default function CreateSalesAttendance({
       // ── Online: upload photo first ─────────────────────────────────────
       let photoURL: string;
       try {
-        photoURL = await uploadToCloudinary(capturedImage!);
+        photoURL = await uploadToCloudinary(photo);
       } catch {
         // Upload failed — queue with base64 for later
-        await enqueuePendingLog({ ...basePayload, PhotoURL: capturedImage });
+        await enqueuePendingLog({ ...basePayload, PhotoURL: photo });
         toast.success("Photo upload failed — saved offline. Will sync when connection improves.");
         resetForm();
         return;
@@ -290,6 +309,7 @@ export default function CreateSalesAttendance({
         });
         if (!res.ok) throw new Error("Failed to save attendance");
         toast.success("Attendance created!");
+        if ("vibrate" in navigator) navigator.vibrate([50, 30, 50]);
         resetForm();
       } catch {
         // API failed after upload — queue with Cloudinary URL (no re-upload)

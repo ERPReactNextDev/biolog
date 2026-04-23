@@ -1,7 +1,7 @@
 // public/service-worker.js
-// Acculog PWA — Service Worker v7
+// Acculog PWA — Service Worker v8
 
-const CACHE_NAME     = "acculog-cache-v7";   // bump version → forces re-install
+const CACHE_NAME     = "acculog-cache-v8";   // bump version → forces re-install
 const OSM_CACHE_NAME = "acculog-osm-tiles-v1";
 const SYNC_TAG       = "sync-activity-logs";
 

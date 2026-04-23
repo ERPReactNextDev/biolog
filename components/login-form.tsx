@@ -459,17 +459,30 @@ export function LoginForm({
         }
 
         if (response.ok && result.userId) {
-          // Cache credentials so this device can log in offline next time.
-          try {
-            const { cacheCredential, setOfflineSession } = await import("@/lib/offline-auth");
+          // Cache credentials for offline login — do NOT silence errors here
+          // so we can see if caching fails during development.
+          const { cacheCredential, setOfflineSession } = await import("@/lib/offline-auth");
+
+          // Always cache the credential that was just used
+          await cacheCredential({
+            email:      loginEmail,
+            secret:     loginSecret,
+            isPinLogin,
+            userId:     result.userId,
+          }).catch(() => { /* storage unavailable — non-fatal */ });
+
+          // Also cache the other type if we have it (so both password and PIN work offline)
+          if (!isPinLogin && result.pin) {
             await cacheCredential({
               email:      loginEmail,
-              secret:     loginSecret,
-              isPinLogin,
+              secret:     result.pin,
+              isPinLogin: true,
               userId:     result.userId,
-            });
-            await setOfflineSession(result.userId);
-          } catch { /* silent */ }
+            }).catch(() => {});
+          }
+
+          await setOfflineSession(result.userId)
+            .catch(() => { /* non-fatal */ });
 
           toast.success("Login successful!");
           setTimeout(() => {
@@ -526,10 +539,8 @@ export function LoginForm({
       const result = await response.json();
       if (response.ok && result.userId) {
         // Store offline session for protected page access
-        try {
-          const { setOfflineSession } = await import("@/lib/offline-auth");
-          await setOfflineSession(result.userId);
-        } catch { /* silent */ }
+        const { setOfflineSession } = await import("@/lib/offline-auth");
+        await setOfflineSession(result.userId).catch(() => {});
         toast.success("Biometric login successful!");
         setTimeout(() => {
           router.push(`/activity-planner?id=${encodeURIComponent(result.userId)}`);

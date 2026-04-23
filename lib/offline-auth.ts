@@ -1,13 +1,11 @@
 // lib/offline-auth.ts
-// IndexedDB-based offline authentication cache.
-// Stores hashed credentials + user objects so the user can sign in
-// and load their profile while disconnected.
+// IndexedDB-based offline authentication + session cache.
 
 const DB_NAME       = "acculog-auth";
-const DB_VERSION    = 3;             // bumped: key now includes login type
+const DB_VERSION    = 4;             // v4: safe upgrade from any prior version
 const AUTH_STORE    = "credentials";
 const USER_STORE    = "users";
-const SESSION_STORE = "session";     // offline session (single record)
+const SESSION_STORE = "session";
 
 const CRED_TTL_MS    = 1000 * 60 * 60 * 24 * 30; // 30 days
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;  // 7 days
@@ -33,7 +31,7 @@ export interface OfflineSession {
   cachedAt: number;
 }
 
-// ── IndexedDB helpers ────────────────────────────────────────────────────────
+// ── IndexedDB open ────────────────────────────────────────────────────────────
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -41,19 +39,28 @@ function openDB(): Promise<IDBDatabase> {
       reject(new Error("IndexedDB unavailable"));
       return;
     }
+
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      // Drop old store if upgrading from v1/v2 (key format changed)
+      const oldVersion = event.oldVersion;
+
+      // ── credentials store ──────────────────────────────────────────────
+      // v1/v2 used key = email (no type suffix).
+      // v3+ uses key = "email:password" or "email:pin".
+      // Drop and recreate so old entries with wrong key format don't linger.
       if (db.objectStoreNames.contains(AUTH_STORE)) {
         db.deleteObjectStore(AUTH_STORE);
       }
       db.createObjectStore(AUTH_STORE, { keyPath: "key" });
 
+      // ── users store ────────────────────────────────────────────────────
       if (!db.objectStoreNames.contains(USER_STORE)) {
         db.createObjectStore(USER_STORE, { keyPath: "userId" });
       }
+
+      // ── session store ──────────────────────────────────────────────────
       if (!db.objectStoreNames.contains(SESSION_STORE)) {
         db.createObjectStore(SESSION_STORE, { keyPath: "id" });
       }
@@ -61,8 +68,15 @@ function openDB(): Promise<IDBDatabase> {
 
     req.onsuccess = () => resolve(req.result);
     req.onerror   = () => reject(req.error);
+    req.onblocked = () => {
+      // Another tab has the DB open at an older version.
+      // Reject so the caller can fall back gracefully.
+      reject(new Error("IndexedDB upgrade blocked by another tab"));
+    };
   });
 }
+
+// ── Crypto helpers ────────────────────────────────────────────────────────────
 
 async function sha256(input: string): Promise<string> {
   const enc = new TextEncoder().encode(input);
@@ -76,17 +90,15 @@ function hashCredential(email: string, secret: string): Promise<string> {
   return sha256(`${email.toLowerCase()}::${secret}`);
 }
 
-/** Composite key: one entry per email+loginType combination */
 function credKey(email: string, isPinLogin: boolean): string {
   return `${email.toLowerCase()}:${isPinLogin ? "pin" : "password"}`;
 }
 
-// ── Credential cache ─────────────────────────────────────────────────────────
+// ── Credential cache ──────────────────────────────────────────────────────────
 
 /**
- * Cache credentials after a successful online login.
- * Stores both password and PIN entries independently so either can be
- * used for offline login later.
+ * Cache credentials after a successful online login so the user can
+ * authenticate offline later. Stores password and PIN entries separately.
  */
 export async function cacheCredential(args: {
   email: string;
@@ -94,28 +106,25 @@ export async function cacheCredential(args: {
   isPinLogin: boolean;
   userId: string;
 }): Promise<void> {
-  try {
-    const db   = await openDB();
-    const hash = await hashCredential(args.email, args.secret);
-    const entry: CachedCredential = {
-      key:        credKey(args.email, args.isPinLogin),
-      email:      args.email,
-      hash,
-      isPinLogin: args.isPinLogin,
-      userId:     args.userId,
-      cachedAt:   Date.now(),
-    };
-    await new Promise<void>((resolve, reject) => {
-      const tx    = db.transaction(AUTH_STORE, "readwrite");
-      const store = tx.objectStore(AUTH_STORE);
-      const req   = store.put(entry);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror    = () => { db.close(); reject(tx.error); };
-      req.onerror   = () => reject(req.error);
-    });
-  } catch {
-    // Storage unavailable — fail silently, online login still works.
-  }
+  const db   = await openDB();
+  const hash = await hashCredential(args.email, args.secret);
+  const entry: CachedCredential = {
+    key:        credKey(args.email, args.isPinLogin),
+    email:      args.email,
+    hash,
+    isPinLogin: args.isPinLogin,
+    userId:     args.userId,
+    cachedAt:   Date.now(),
+  };
+
+  return new Promise<void>((resolve, reject) => {
+    const tx    = db.transaction(AUTH_STORE, "readwrite");
+    const store = tx.objectStore(AUTH_STORE);
+    const req   = store.put(entry);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+    req.onerror   = () => reject(req.error);
+  });
 }
 
 /** Verify credentials against the offline cache. Returns userId on match. */
@@ -125,7 +134,7 @@ export async function verifyOfflineCredential(args: {
   isPinLogin: boolean;
 }): Promise<{ userId: string } | null> {
   try {
-    const db = await openDB();
+    const db  = await openDB();
     const key = credKey(args.email, args.isPinLogin);
 
     const cached = await new Promise<CachedCredential | undefined>((resolve, reject) => {
@@ -149,7 +158,7 @@ export async function verifyOfflineCredential(args: {
   }
 }
 
-// ── User profile cache ───────────────────────────────────────────────────────
+// ── User profile cache ────────────────────────────────────────────────────────
 
 export async function cacheUser(userId: string, data: Record<string, unknown>): Promise<void> {
   try {
@@ -164,7 +173,7 @@ export async function cacheUser(userId: string, data: Record<string, unknown>): 
       req.onerror   = () => reject(req.error);
     });
   } catch {
-    // ignore
+    // ignore — non-critical
   }
 }
 
@@ -187,7 +196,7 @@ export async function getCachedUser(userId: string): Promise<Record<string, unkn
   }
 }
 
-// ── Offline Session Management ───────────────────────────────────────────────
+// ── Offline Session ───────────────────────────────────────────────────────────
 
 export async function setOfflineSession(userId: string): Promise<void> {
   try {
@@ -202,7 +211,7 @@ export async function setOfflineSession(userId: string): Promise<void> {
       req.onerror   = () => reject(req.error);
     });
   } catch {
-    // Storage unavailable — fail silently
+    // ignore — non-critical
   }
 }
 

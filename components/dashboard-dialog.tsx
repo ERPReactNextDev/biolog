@@ -122,7 +122,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
                   <div>
                     <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Time</p>
                     <p className="text-[13px] font-semibold text-gray-800">
-                      {new Date(selectedEvent.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(selectedEvent.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
                     </p>
                   </div>
                 </div>

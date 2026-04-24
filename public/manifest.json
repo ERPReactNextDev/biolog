@@ -29,13 +29,20 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
+  "shortcuts": [
     {
-      "src": "/fluxx-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Biolog Home Screen"
+      "name": "Create Attendance",
+      "short_name": "Attendance",
+      "description": "Log on-field attendance with photo",
+      "url": "/activity-planner?shortcut=attendance",
+      "icons": [{ "src": "/fluxx.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Create Site Visit",
+      "short_name": "Site Visit",
+      "description": "Log a client site visit",
+      "url": "/activity-planner?shortcut=sitevisit",
+      "icons": [{ "src": "/fluxx.png", "sizes": "192x192" }]
     }
   ]
 }

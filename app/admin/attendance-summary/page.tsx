@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker/dist/types";
+import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";

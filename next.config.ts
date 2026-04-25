@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" }]},
-  allowedDevOrigins: ["*.replit.dev", "*.repl.co", "*.worf.replit.dev", "*.kirk.replit.dev", "*.picard.replit.dev", "*.spock.replit.dev", "*.janeway.replit.dev", "*.riker.replit.dev"],
+  allowedDevOrigins: ["*.replit.dev", "*.repl.co", "*.worf.replit.dev", "*.kirk.replit.dev", "*.picard.replit.dev", "*.spock.replit.dev", "*.janeway.replit.dev", "*.riker.replit.dev", "biolog7091.builtwithrocket.new"],
 
   async headers() {
     return [

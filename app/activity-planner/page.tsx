@@ -13,13 +13,7 @@ import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import { toast } from "sonner";
 import { type DateRange } from "react-day-picker";
-import {
-  MapPin, X, CalendarCheck, ChevronLeft, ChevronRight,
-  MapPinCheck, Building2, Home, BarChart3, User,
-  LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone,
-  ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Wind, Info, Fingerprint,
-  Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, Search, MoreVertical, Edit2, ShieldAlert, History, Download
-} from "lucide-react";
+import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, History, Download } from "lucide-react";
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -625,7 +619,7 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto pt-4 pb-28">
+      <div className="flex-1 overflow-y-auto">
         <div className="bg-white mx-4 rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAY_NAMES.map((d, i) => <div key={i} className="text-center py-2.5 text-[10px] font-semibold text-gray-400 uppercase">{d}</div>)}
@@ -633,7 +627,7 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           <div className="grid grid-cols-7">
             {calendarDays.map((date, idx) => {
               const dateKey = toLocalDateKey(date);
-              const items = groupedByDate[dateKey] || [];
+              let items = groupedByDate[dateKey] || [];
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
               const isToday = isSameDay(date, today);
               const isSelected = selectedDate === dateKey;
@@ -686,11 +680,6 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           )}
         </div>
 
-        <div className="flex gap-2 px-4 mb-4 overflow-x-auto">
-          {(["All", "Login", "Logout", "Site Visit", "Meeting"] as const).map((f) => (
-            <button key={f} onClick={() => setActiveFilter(f)} className={["flex-shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all border", activeFilter === f ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-md shadow-red-100" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"].join(" ")}>{f}</button>
-          ))}
-        </div>
         <div className="px-4 flex flex-col gap-3">
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
@@ -830,7 +819,7 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
           ].map((row, i) => (
             <div key={row.label} className={`flex items-center justify-between px-4 py-3 ${i < 2 ? "border-b border-gray-50" : ""}`}>
               <div className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full" style={{ background: row.color }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: row.color }} />
                 <span className="text-[13px] text-gray-700 font-medium">{row.label}</span>
               </div>
               <span className="text-[13px] font-bold" style={{ color: row.color }}>{row.value}</span>
@@ -1260,8 +1249,25 @@ function ProfileTab({
               <p className="text-[11px] text-gray-400 mt-0.5">Protect account with email OTP</p>
             </div>
             <button
-              onClick={toggleTwoFactor}
-              disabled={twoFactorLoading}
+              onClick={async () => {
+                if (!userId) return;
+                const newStatus = !(userDetails?.twoFactorEnabled !== false);
+                try {
+                  const res = await fetch("/api/profile-update", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, twoFactorEnabled: newStatus }),
+                  });
+                  if (res.ok) {
+                    toast.success(`2FA ${newStatus ? "enabled" : "disabled"}`);
+                    onUpdateFaceVerification(newStatus);
+                  } else {
+                    toast.error("Failed to update face verification");
+                  }
+                } catch (e) {
+                  toast.error("An error occurred");
+                }
+              }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${userDetails?.twoFactorEnabled ? 'bg-[var(--brand-primary)]' : 'bg-gray-200'}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userDetails?.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -1477,7 +1483,7 @@ function ProfileTab({
 
 function CustomizePanel() {
   const { prefs, setPref } = usePreferences();
-  const items: { key: keyof typeof prefs; label: string; desc: string; emoji: string; sample?: () => void }[] = [
+  let items: { key: keyof typeof prefs; label: string; desc: string; emoji: string; sample?: () => void }[] = [
     { key: "haptics",             label: "Haptic Feedback",       desc: "Vibrate on taps and actions",          emoji: "📳", sample: () => haptic("medium") },
     { key: "notificationSound",   label: "Notification Sound",    desc: "Play a chime for new alerts",          emoji: "🔔", sample: () => playNotificationSound() },
     { key: "notificationVibrate", label: "Vibrate on Notification", desc: "Buzz when a new notification arrives", emoji: "📲" },
@@ -1624,9 +1630,7 @@ function InstallAppSection({
           ))}
         </div>
         <p className="text-[10px] text-gray-400 text-center mt-3 leading-relaxed">
-          {platform === "ios"
-            ? "iOS only supports installation from Safari — not Chrome or other browsers."
-            : "After installing, long-press the Biolog icon for quick shortcuts to Attendance and Site Visit."}
+          {platform === "ios" ?"iOS only supports installation from Safari — not Chrome or other browsers." :"After installing, long-press the Biolog icon for quick shortcuts to Attendance and Site Visit."}
         </p>
       </div>
     </div>
@@ -2465,7 +2469,12 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
       <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
         <div className="bg-purple-600 px-6 pt-8 pb-10 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4">
-            <button onClick={() => onOpenChange(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><X size={15} /></button>
+            <button
+                onClick={() => onOpenChange(false)}
+                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              >
+                <X size={15} />
+              </button>
           </div>
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 border border-white/20">

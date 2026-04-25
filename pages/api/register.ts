@@ -1,7 +1,8 @@
 //pages/api/register.ts
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { registerUser } from "../../lib/MongoDB"; // Ensure this path is correct
+import { registerUser } from "../../lib/MongoDB"
+; // Ensure this path is correct
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "POST") {

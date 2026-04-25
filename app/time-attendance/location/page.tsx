@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -21,15 +21,7 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-    Table,
-    TableCaption,
-    TableHeader,
-    TableRow,
-    TableHead,
-    TableBody,
-    TableCell,
-} from "@/components/ui/table";
+import fileSaver from "file-saver";
 import {
     Pagination,
     PaginationContent,
@@ -39,13 +31,7 @@ import {
     PaginationLink,
     PaginationEllipsis,
 } from "@/components/ui/pagination";
-import {
-    Item,
-    ItemContent,
-    ItemTitle,
-    ItemDescription,
-    ItemActions,
-} from "@/components/ui/item";
+import { Item, ItemContent, ItemTitle, ItemActions } from "@/components/ui/item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +47,7 @@ import {
 
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { type DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 
@@ -438,7 +424,8 @@ export default function Page() {
         if (
             !(
                 userDetails.Role === "SuperAdmin" ||
-                userDetails.Department === "Human Resources"
+                userDetails.Department ===
+                                            "Human Resources"
             )
         ) {
             toast.error("You do not have permission to export data.");
@@ -488,7 +475,7 @@ export default function Page() {
                 type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             });
 
-            saveAs(
+            fileSaver.saveAs(
                 blob,
                 `ActivityLogs_${new Date().toISOString().slice(0, 10)}.xlsx`,
             );
@@ -719,8 +706,7 @@ export default function Page() {
                                                     }}
                                                     className={
                                                         currentPage === 1
-                                                            ? "pointer-events-none opacity-50"
-                                                            : ""
+                                                            ? "pointer-events-none opacity-50" :""
                                                     }
                                                 />
                                             </PaginationItem>
@@ -732,15 +718,10 @@ export default function Page() {
                                                         e.preventDefault();
                                                         setCurrentPage(1);
                                                     }}
-                                                    aria-current={
-                                                        currentPage === 1
-                                                            ? "page"
-                                                            : undefined
-                                                    }
+                                                    isActive={currentPage === 1}
                                                     className={
                                                         currentPage === 1
-                                                            ? "font-bold underline"
-                                                            : ""
+                                                            ? "font-bold underline" : ""
                                                     }
                                                 >
                                                     1
@@ -780,17 +761,11 @@ export default function Page() {
                                                                     page,
                                                                 );
                                                             }}
-                                                            aria-current={
-                                                                currentPage ===
-                                                                page
-                                                                    ? "page"
-                                                                    : undefined
-                                                            }
+                                                            isActive={currentPage === page}
                                                             className={
                                                                 currentPage ===
                                                                 page
-                                                                    ? "font-bold underline"
-                                                                    : ""
+                                                                    ? "font-bold underline" : ""
                                                             }
                                                         >
                                                             {page}
@@ -814,17 +789,11 @@ export default function Page() {
                                                                 pageCount,
                                                             );
                                                         }}
-                                                        aria-current={
-                                                            currentPage ===
-                                                            pageCount
-                                                                ? "page"
-                                                                : undefined
-                                                        }
+                                                        isActive={currentPage === pageCount}
                                                         className={
                                                             currentPage ===
                                                             pageCount
-                                                                ? "font-bold underline"
-                                                                : ""
+                                                                ? "font-bold underline" : ""
                                                         }
                                                     >
                                                         {pageCount}
@@ -852,8 +821,7 @@ export default function Page() {
                                                     className={
                                                         currentPage ===
                                                         pageCount
-                                                            ? "pointer-events-none opacity-50"
-                                                            : ""
+                                                            ? "pointer-events-none opacity-50" :""
                                                     }
                                                 />
                                             </PaginationItem>

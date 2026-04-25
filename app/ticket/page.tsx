@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker";
+import { DateRange } from "react-day-picker";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { Received } from "@/components/tickets";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 import { TicketRaiseSuggestion } from "@/components/ticket-raise-suggestion";
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
+import FileSaver from "file-saver";
+const { saveAs } = FileSaver;
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import {
@@ -18,11 +19,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
-import {
-  Search, DownloadCloud, Info, Clock, AlertCircle,
-  ArrowDownLeft, ArrowUpRight, ArrowLeft, Calendar as CalendarIcon,
-  Filter,
-} from "lucide-react";
+import { Search, DownloadCloud, Info, Clock, AlertCircle, ArrowDownLeft, ArrowUpRight, ArrowLeft, Calendar as CalendarIcon,  } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -734,7 +731,7 @@ function TimesheetPage() {
 
       {/* ── Computation Details Dialog ── */}
       {selectedRef && details && (
-        <Dialog open={true} onOpenChange={() => setSelectedRef(null)}>
+        <Dialog open onOpenChange={() => setSelectedRef(null)}>
           <DialogContent className="p-0 rounded-[28px] max-w-sm w-full border-0 shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="bg-brand-primary px-6 pt-5 pb-5">

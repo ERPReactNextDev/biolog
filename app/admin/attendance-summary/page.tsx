@@ -4,24 +4,12 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker";
+import { type DateRange } from "react-day-picker/dist/types";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
-import { 
-    Search, 
-    Calendar as CalendarIcon,
-    ArrowLeft,
-    Loader2,
-    FileSpreadsheet,
-    Download,
-    Filter,
-    Users,
-    Building2,
-    Clock,
-    RefreshCcw
-} from "lucide-react";
+import { saveAs } from "file-saver/dist/FileSaver";
+import { Search, Calendar as CalendarIcon, ArrowLeft, Loader2, Download, Filter, Users, Building2, RefreshCcw } from "lucide-react";
 
 import {
     Breadcrumb,

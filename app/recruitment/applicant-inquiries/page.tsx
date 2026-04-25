@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
@@ -20,21 +20,7 @@ import {
     updateDoc,
     where
 } from "firebase/firestore";
-import {
-    Mail,
-    Phone,
-    FileText,
-    Calendar,
-    Briefcase,
-    Trash2,
-    ExternalLink,
-    Search,
-    User,
-    CheckCircle,
-    Clock,
-    X,
-    ChevronRight
-} from "lucide-react";
+import { Mail, Phone, FileText, Calendar, Briefcase, Trash2, ExternalLink, Search, User, CheckCircle, X, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 

@@ -1,7 +1,9 @@
 "use client";
 
+
+import React, { useState, useEffect, useMemo } from 'react';
 import * as React from "react";
-import { Plus, LayoutDashboard, FileText, Clock, MapPin, Briefcase, Users, CalendarCheck, ShieldCheck } from "lucide-react";
+import { Plus, LayoutDashboard, FileText, Clock, MapPin, Briefcase, Users, CalendarCheck } from "lucide-react";
 
 import { Calendars } from "@/components/calendars";
 import { DatePicker } from "@/components/date-picker";

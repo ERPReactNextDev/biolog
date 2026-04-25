@@ -4,9 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "res.cloudinary.com" },
-    ],
-  },
+      { protocol: "https", hostname: "res.cloudinary.com" }]},
   allowedDevOrigins: ["*.replit.dev", "*.repl.co", "*.worf.replit.dev", "*.kirk.replit.dev", "*.picard.replit.dev", "*.spock.replit.dev", "*.janeway.replit.dev", "*.riker.replit.dev"],
 
   async headers() {
@@ -17,28 +15,20 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cache-Control",        value: "no-cache, no-store, must-revalidate" },
           { key: "Content-Type",         value: "application/javascript" },
-          { key: "Service-Worker-Allowed", value: "/" },
-        ],
-      },
+          { key: "Service-Worker-Allowed", value: "/" }]},
       // Manifest
       {
         source: "/manifest.json",
         headers: [
           { key: "Content-Type", value: "application/manifest+json" },
-          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
-        ],
-      },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" }]},
       // Security headers for all routes
       {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options",        value: "SAMEORIGIN" },
-          { key: "Referrer-Policy",        value: "strict-origin-when-cross-origin" },
-        ],
-      },
-    ];
-  },
-};
+          
+          { key: "Referrer-Policy",        value: "strict-origin-when-cross-origin" }]}];
+  }};
 
 export default nextConfig;

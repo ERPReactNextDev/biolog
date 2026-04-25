@@ -9,7 +9,7 @@ import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { MapPin, ArrowLeft, CheckCircle2, Clock, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
+import { MapPin, ArrowLeft, CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
 
 const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 
@@ -386,8 +386,7 @@ export default function CreateAttendance({
                   disabled={isSubmitDisabled}
                   className={`w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all ${
                     isSubmitDisabled
-                      ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                      : "bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
+                      ? "bg-gray-100 text-gray-300 cursor-not-allowed" :"bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
                   }`}
                 >
                   {loading ? (
@@ -405,8 +404,7 @@ export default function CreateAttendance({
 
                 <p className="text-center text-[11px] text-gray-300 pb-2">
                   {navigator.onLine
-                    ? "Submission will be recorded with timestamp & GPS location"
-                    : "Will sync automatically when you're back online"}
+                    ? "Submission will be recorded with timestamp & GPS location" :"Will sync automatically when you're back online"}
                 </p>
               </>
             )}

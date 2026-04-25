@@ -4,24 +4,10 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { 
-    Search, 
-    Calendar as CalendarIcon,
-    ArrowLeft,
-    Loader2,
-    MapPin,
-    Building2,
-    Info,
-    LogIn,
-    LogOut,
-    Filter,
-    X,
-    FileSpreadsheet,
-    RefreshCcw
-} from "lucide-react";
+import { Search, Calendar as CalendarIcon, ArrowLeft, Loader2, MapPin, Building2, LogIn, LogOut, Filter, X, FileSpreadsheet, RefreshCcw } from "lucide-react";
 
 import {
     Breadcrumb,
@@ -32,7 +18,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
     Table,
     TableBody,
@@ -47,7 +33,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
+
 
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 

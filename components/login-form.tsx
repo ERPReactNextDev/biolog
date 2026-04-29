@@ -1,6 +1,5 @@
-"use client"
-
-import React, { useState, useCallback } from "react";
+"use client";
+import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -398,7 +397,7 @@ export function LoginForm({
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
-      const deviceId = getDeviceId();
+      let deviceId = getDeviceId();
       e.preventDefault();
       if (!isPinLogin && (!Email || !Password)) {
         toast.error("Email and Password are required!");
@@ -519,7 +518,7 @@ export function LoginForm({
 
   const handleBiometricLogin = useCallback(async () => {
     setBiometricLoading(true);
-    const deviceId = getDeviceId();
+    let deviceId = getDeviceId();
     try {
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
@@ -736,8 +735,7 @@ export function LoginForm({
                 className={[
                   "mt-2 w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all",
                   loading || biometricLoading
-                    ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                    : "bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20",
+                    ? "bg-gray-100 text-gray-300 cursor-not-allowed" :"bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20",
                 ].join(" ")}
               >
                 {loading ? (
@@ -784,8 +782,7 @@ export function LoginForm({
                     className={[
                       "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
                       loading || biometricLoading || googleLoginLoading
-                        ? "bg-gray-50 text-gray-300 cursor-not-allowed"
-                        : "bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
                     ].join(" ")}
                   >
                     {googleLoginLoading ? (
@@ -805,8 +802,7 @@ export function LoginForm({
                     className={[
                       "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
                       loading || biometricLoading || googleLoginLoading
-                        ? "bg-gray-50 text-gray-300 cursor-not-allowed"
-                        : "bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
                     ].join(" ")}
                   >
                     {biometricLoading ? (

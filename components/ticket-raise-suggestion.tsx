@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+
 import { Card } from "@/components/ui/card";
 import { Info, CheckCircle, AlertTriangle, Phone, Zap } from "lucide-react";
 

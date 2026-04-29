@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -12,19 +12,19 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/c
 import { Separator } from "@/components/ui/separator";
 
 import { SidebarInset, SidebarProvider, SidebarTrigger, } from "@/components/ui/sidebar";
-import { Table, TableCaption, TableHeader, TableRow, TableHead, TableBody, TableCell, } from "@/components/ui/table";
+import {  } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink, PaginationEllipsis, } from "@/components/ui/pagination";
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, } from "@/components/ui/item";
+import { Item, ItemContent, ItemTitle, ItemActions,  } from "@/components/ui/item";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Search, DownloadCloud } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, } from "@/components/ui/dialog";
 
 import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
-import { type DateRange } from "react-day-picker";
+import fileSaver from "file-saver";
+import type { DateRange } from "react-day-picker";
 
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 
@@ -378,7 +378,7 @@ export default function Page() {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             });
 
-            saveAs(blob, `ActivityLogs_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            fileSaver.saveAs(blob, `ActivityLogs_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
             toast.success("Export successful!");
         } catch (error) {
@@ -553,7 +553,7 @@ export default function Page() {
                                                         e.preventDefault();
                                                         setCurrentPage(1);
                                                     }}
-                                                    aria-current={currentPage === 1 ? "page" : undefined}
+                                                    isActive={currentPage === 1}
                                                     className={currentPage === 1 ? "font-bold underline" : ""}
                                                 >
                                                     1
@@ -579,7 +579,7 @@ export default function Page() {
                                                                 e.preventDefault();
                                                                 setCurrentPage(page);
                                                             }}
-                                                            aria-current={currentPage === page ? "page" : undefined}
+                                                            isActive={currentPage === page}
                                                             className={currentPage === page ? "font-bold underline" : ""}
                                                         >
                                                             {page}
@@ -601,7 +601,7 @@ export default function Page() {
                                                             e.preventDefault();
                                                             setCurrentPage(pageCount);
                                                         }}
-                                                        aria-current={currentPage === pageCount ? "page" : undefined}
+                                                        isActive={currentPage === pageCount}
                                                         className={currentPage === pageCount ? "font-bold underline" : ""}
                                                     >
                                                         {pageCount}

@@ -7,22 +7,7 @@ import { FormatProvider } from "@/contexts/FormatContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase";
-import { 
-    Search, 
-    ArrowLeft,
-    Loader2,
-    ShieldAlert,
-    CheckCircle2,
-    Clock,
-    AlertCircle,
-    MoreHorizontal,
-    MessageSquare,
-    Filter,
-    X,
-    User,
-    Building2,
-    Pencil
-} from "lucide-react";
+import { Search, ArrowLeft, Loader2, CheckCircle2, Clock, AlertCircle, MoreHorizontal, MessageSquare, Filter, Pencil } from "lucide-react";
 
 import {
     Breadcrumb,
@@ -42,22 +27,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,  } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,  } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
     Select,
@@ -382,22 +353,16 @@ function AdminTicketsContent() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge className={`rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest ${
-                                                        ticket.priority === "Urgent" 
-                                                        ? "bg-red-50 text-red-600 border-red-100" 
-                                                        : ticket.priority === "High"
-                                                        ? "bg-orange-50 text-orange-600 border-orange-100"
-                                                        : "bg-blue-50 text-blue-600 border-blue-100"
+                                                        ticket.priority === "Urgent" ?"bg-red-50 text-red-600 border-red-100" 
+                                                        : ticket.priority === "High" ?"bg-orange-50 text-orange-600 border-orange-100" :"bg-blue-50 text-blue-600 border-blue-100"
                                                     }`} variant="outline">
                                                         {ticket.priority || "Normal"}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge className={`rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest ${
-                                                        ticket.status === "Resolved" 
-                                                        ? "bg-green-50 text-green-600 border-green-100" 
-                                                        : ticket.status === "In Progress"
-                                                        ? "bg-blue-50 text-blue-600 border-blue-100"
-                                                        : "bg-orange-50 text-orange-600 border-orange-100"
+                                                        ticket.status === "Resolved" ?"bg-green-50 text-green-600 border-green-100" 
+                                                        : ticket.status === "In Progress" ?"bg-blue-50 text-blue-600 border-blue-100" :"bg-orange-50 text-orange-600 border-orange-100"
                                                     }`} variant="outline">
                                                         {ticket.status === "Resolved" ? <CheckCircle2 size={10} className="mr-1.5" /> : ticket.status === "In Progress" ? <Clock size={10} className="mr-1.5" /> : <AlertCircle size={10} className="mr-1.5" />}
                                                         {ticket.status}

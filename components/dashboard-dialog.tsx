@@ -1,6 +1,6 @@
 import React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { MapPin, Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera } from "lucide-react";
+import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera } from "lucide-react";
 
 interface ActivityLog {
   ReferenceID: string;

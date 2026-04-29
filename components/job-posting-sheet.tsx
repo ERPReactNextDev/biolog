@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Briefcase, Clock, MapPin, ListChecks, Plus, Save, X } from "lucide-react";
-import { Loader2 } from "lucide-react"; // Adjust import for Loader2 if needed
+import { Loader2 } from "lucide-react"
+; // Adjust import for Loader2 if needed
 import React from "react";
 
 interface JobSheetProps {

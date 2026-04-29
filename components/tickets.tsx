@@ -2,19 +2,20 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircleIcon, CheckCircle2Icon, Clock3 } from "lucide-react";
+import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell, } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious, } from "@/components/ui/pagination";
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 import { ReceivedDialog } from "@/components/tickets-dialog";
-import { supabase } from "@/utils/supabase"; // adjust path if needed
+import { supabase as _supabase } from "@/utils/supabase"
+const supabase = _supabase!;
 
 interface RequestItem {
     id: string; // Supabase uses `id` not `_id`
@@ -96,6 +97,7 @@ export const Received: React.FC<RequestProps> = ({
         setErrorActivities(null);
 
         try {
+            if (!supabase) throw new Error("Supabase not initialized");
             const { data, error } = await supabase
                 .from("tickets")
                 .select("*")
@@ -120,6 +122,7 @@ export const Received: React.FC<RequestProps> = ({
     useEffect(() => {
         if (!referenceid) return;
 
+        if (!supabase) return;
         const channel = supabase
             .channel(`public:tickets:referenceid=eq.${referenceid}`)
             .on(
@@ -153,7 +156,7 @@ export const Received: React.FC<RequestProps> = ({
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            if (supabase) supabase.removeChannel(channel);
         };
     }, [referenceid]);
 
@@ -194,6 +197,7 @@ export const Received: React.FC<RequestProps> = ({
 
     async function handleSubmit() {
         try {
+            if (!supabase) throw new Error("Supabase not initialized");
             const { data, error } = await supabase
                 .from("tickets")
                 .insert([{ ...form, referenceid }]);
@@ -219,6 +223,10 @@ export const Received: React.FC<RequestProps> = ({
             }),
         };
 
+        if (!supabase) {
+            toast.error("Supabase not initialized");
+            return;
+        }
         const { error } = await supabase
             .from("tickets")
             .update(payload)
@@ -297,6 +305,7 @@ export const Received: React.FC<RequestProps> = ({
 
     async function confirmDeletion() {
         try {
+            if (!supabase) throw new Error("Supabase not initialized");
             const { data, error } = await supabase
                 .from("tickets")
                 .delete()

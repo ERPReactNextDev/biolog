@@ -7,7 +7,7 @@ import { TrendingUp } from "lucide-react";
 
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { type DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -38,7 +38,7 @@ import {
     ChartTooltipContent,
     type ChartConfig,
 } from "@/components/ui/chart";
-import { Badge } from "@/components/ui/badge"
+
 
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 

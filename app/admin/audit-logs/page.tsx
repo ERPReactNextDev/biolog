@@ -6,22 +6,7 @@ import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { 
-    Search, 
-    ArrowLeft,
-    Loader2,
-    ShieldCheck,
-    User,
-    Clock,
-    Filter,
-    X,
-    History,
-    FileText,
-    Settings,
-    UserPlus,
-    Trash2,
-    ShieldAlert
-} from "lucide-react";
+import { Search, ArrowLeft, Loader2, ShieldCheck, User, X, History, Settings, UserPlus, Trash2, ShieldAlert } from "lucide-react";
 
 import {
     Breadcrumb,

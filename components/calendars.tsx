@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { useState, useEffect } from 'react';
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 

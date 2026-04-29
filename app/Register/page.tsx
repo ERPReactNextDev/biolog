@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ToastContainer, toast, Slide } from "react-toastify";
 import { useRouter } from "next/navigation";
-import { CiDark, CiSun } from "react-icons/ci";
+
 import { VscEye, VscEyeClosed } from "react-icons/vsc";
 import Link from "next/link";
 import Image from "next/image";

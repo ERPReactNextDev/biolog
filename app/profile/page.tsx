@@ -5,17 +5,17 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { UserProvider } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppSidebar } from "@/components/app-sidebar";
 import Image from "next/image";
 
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger, } from "@/components/ui/sidebar";
-import { AspectRatio } from "@/components/ui/aspect-ratio"
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { type DateRange } from "react-day-picker";
+import { DateRange } from "react-day-picker";
 
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 
@@ -399,11 +399,8 @@ export default function NavProfilePage() {
                                                     </div>
                                                     {passwordStrength && (
                                                         <p
-                                                            className={`text-sm ${passwordStrength === "strong"
-                                                                ? "text-green-600"
-                                                                : passwordStrength === "medium"
-                                                                    ? "text-yellow-600"
-                                                                    : "text-red-600"
+                                                            className={`text-sm ${passwordStrength === "strong" ?"text-green-600"
+                                                                : passwordStrength === "medium" ?"text-yellow-600" :"text-red-600"
                                                                 }`}
                                                         >
                                                             Password strength: {passwordStrength}
@@ -440,8 +437,7 @@ export default function NavProfilePage() {
                                                     {saving
                                                         ? "Saving..."
                                                         : uploading
-                                                            ? "Uploading..."
-                                                            : "Save Changes"}
+                                                            ? "Uploading..." :"Save Changes"}
                                                 </Button>
                                             </form>
                                         </div>

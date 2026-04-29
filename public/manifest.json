@@ -1,4 +1,5 @@
 {
+  "id": "/activity-planner",
   "name": "Biolog - Attendance & Time Tracking",
   "short_name": "Biolog",
   "description": "Biometric attendance and activity logging",
@@ -8,6 +9,7 @@
   "background_color": "#F9F6F4",
   "theme_color": "#CC1318",
   "orientation": "portrait",
+  "prefer_related_applications": false,
   "categories": ["business", "productivity"],
   "icons": [
     {

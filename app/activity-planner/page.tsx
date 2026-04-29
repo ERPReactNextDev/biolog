@@ -566,43 +566,190 @@ function HomeTab({
 
 // ── Calendar Tab ──────────────────────────────────────────────────────────────
 
-function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, monthlyStats, allLogs, allMeetings, onEventClick, onMeetingClick, onCreateMeeting, goToPrevMonth, goToNextMonth, startHour }: {
+// Lightweight metadata for calendar dots (no full details)
+interface DateMeta {
+  dateKey: string;
+  hasLogin: boolean;
+  hasLogout: boolean;
+  hasMeeting: boolean;
+}
+
+function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMeetingClick, onCreateMeeting, goToPrevMonth, goToNextMonth, startHour, userDetails }: {
   currentMonth: Date; calendarDays: Date[];
-  groupedByDate: Record<string, (ActivityLog | Meeting)[]>; usersMap: Record<string, UserInfo>;
-  monthlyStats: { present: number; absent: number; visits: number; total: number };
-  allLogs: ActivityLog[];
-  allMeetings: Meeting[];
+  usersMap: Record<string, UserInfo>;
   onEventClick: (log: ActivityLog) => void;
   onMeetingClick: (meeting: Meeting) => void;
   onCreateMeeting: () => void;
   goToPrevMonth: () => void; goToNextMonth: () => void;
   startHour: number;
+  userDetails: UserDetails | null;
 }) {
   const today = new Date();
   const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
   const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit" | "Meeting">("All");
   const [selectedDate, setSelectedDate] = useState<string>(toLocalDateKey(today, startHour));
+  
+  // Data states - fetched on demand
+  const [selectedDateLogs, setSelectedDateLogs] = useState<ActivityLog[]>([]);
+  const [selectedDateMeetings, setSelectedDateMeetings] = useState<Meeting[]>([]);
+  const [monthlyMeta, setMonthlyMeta] = useState<DateMeta[]>([]);
+  const [monthlyStats, setMonthlyStats] = useState({ present: 0, absent: 0, visits: 0, total: 0 });
+  const [loadingDate, setLoadingDate] = useState(false);
+  const [loadingMeta, setLoadingMeta] = useState(false);
+
+  // Fetch monthly metadata (lightweight - for dots and stats only)
+  const fetchMonthlyMeta = useCallback(async () => {
+    if (!userDetails) return;
+    setLoadingMeta(true);
+    try {
+      const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      
+      const params = new URLSearchParams();
+      params.append("page", "1");
+      params.append("limit", "1000"); // Get all for the month
+      params.append("role", userDetails.Role);
+      if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
+        params.append("referenceID", userDetails.ReferenceID);
+      }
+      params.append("startDate", startOfMonth.toISOString());
+      params.append("endDate", endOfMonth.toISOString());
+      params.append("metaOnly", "true"); // Request lightweight metadata
+
+      // Fetch logs metadata
+      const logsRes = await fetch(`/api/ModuleSales/Activity/FetchLog?${params.toString()}`);
+      const logsData = logsRes.ok ? await logsRes.json() : { data: [] };
+      
+      // Fetch meetings for the month
+      const meetingParams = new URLSearchParams();
+      meetingParams.append("role", userDetails.Role);
+      if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
+        meetingParams.append("referenceID", userDetails.ReferenceID);
+      }
+      meetingParams.append("startDate", startOfMonth.toISOString());
+      meetingParams.append("endDate", endOfMonth.toISOString());
+      const meetingsRes = await fetch(`/api/ModuleSales/Activity/Meeting?${meetingParams.toString()}`);
+      const meetingsData = meetingsRes.ok ? await meetingsRes.json() : [];
+
+      // Build metadata map
+      const metaMap = new Map<string, DateMeta>();
+      
+      // Process logs
+      (logsData.data || []).forEach((log: ActivityLog) => {
+        const key = toLocalDateKey(log.date_created, startHour);
+        const existing = metaMap.get(key) || { dateKey: key, hasLogin: false, hasLogout: false, hasMeeting: false };
+        if (log.Status === "Login") existing.hasLogin = true;
+        if (log.Status === "Logout") existing.hasLogout = true;
+        metaMap.set(key, existing);
+      });
+      
+      // Process meetings
+      (meetingsData || []).forEach((meeting: Meeting) => {
+        const key = toLocalDateKey(meeting.StartDate, startHour);
+        const existing = metaMap.get(key) || { dateKey: key, hasLogin: false, hasLogout: false, hasMeeting: false };
+        existing.hasMeeting = true;
+        metaMap.set(key, existing);
+      });
+      
+      setMonthlyMeta(Array.from(metaMap.values()));
+      
+      // Calculate monthly stats
+      const loginDays = new Set((logsData.data || []).filter((l: ActivityLog) => l.Status === "Login").map((l: ActivityLog) => toLocalDateKey(l.date_created)));
+      const visits = (logsData.data || []).filter((l: ActivityLog) => l.Type === "Client Visit").length;
+      const workDays = calendarDays.filter((d) => d.getMonth() === currentMonth.getMonth() && d.getDay() !== 0 && d.getDay() !== 6).length;
+      const present = loginDays.size;
+      setMonthlyStats({ present, absent: Math.max(0, workDays - present), visits, total: workDays });
+    } catch {
+      // silent
+    } finally {
+      setLoadingMeta(false);
+    }
+  }, [currentMonth, userDetails, startHour, calendarDays]);
+
+  // Fetch details for selected date only
+  const fetchDateDetails = useCallback(async (dateKey: string) => {
+    if (!userDetails) return;
+    setLoadingDate(true);
+    try {
+      const date = new Date(dateKey);
+      const nextDay = new Date(date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      const params = new URLSearchParams();
+      params.append("page", "1");
+      params.append("limit", "100");
+      params.append("role", userDetails.Role);
+      if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
+        params.append("referenceID", userDetails.ReferenceID);
+      }
+      params.append("startDate", date.toISOString());
+      params.append("endDate", nextDay.toISOString());
+
+      // Fetch logs for date
+      const logsRes = await fetch(`/api/ModuleSales/Activity/FetchLog?${params.toString()}`);
+      const logsData = logsRes.ok ? await logsRes.json() : { data: [] };
+      
+      // Filter to exact date (API returns range)
+      const dateLogs = (logsData.data || []).filter((log: ActivityLog) => 
+        toLocalDateKey(log.date_created, startHour) === dateKey
+      );
+      setSelectedDateLogs(dateLogs);
+      
+      // Fetch meetings for date
+      const meetingParams = new URLSearchParams();
+      meetingParams.append("role", userDetails.Role);
+      if (userDetails.Role !== "SuperAdmin" && userDetails.Role !== "Human Resources") {
+        meetingParams.append("referenceID", userDetails.ReferenceID);
+      }
+      const meetingsRes = await fetch(`/api/ModuleSales/Activity/Meeting?${meetingParams.toString()}`);
+      const allMeetings = meetingsRes.ok ? await meetingsRes.json() : [];
+      
+      // Filter meetings to selected date
+      const dateMeetings = (allMeetings || []).filter((m: Meeting) => 
+        toLocalDateKey(m.StartDate, startHour) === dateKey
+      );
+      setSelectedDateMeetings(dateMeetings);
+    } catch {
+      setSelectedDateLogs([]);
+      setSelectedDateMeetings([]);
+    } finally {
+      setLoadingDate(false);
+    }
+  }, [userDetails, startHour]);
+
+  // Initial load - fetch monthly meta and today's details
+  useEffect(() => {
+    if (!userDetails) return;
+    fetchMonthlyMeta();
+    fetchDateDetails(toLocalDateKey(today, startHour));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDetails?.ReferenceID, currentMonth.getMonth(), currentMonth.getFullYear()]);
+
+  // Handle date selection
+  const handleDateSelect = useCallback((dateKey: string) => {
+    setSelectedDate(dateKey);
+    fetchDateDetails(dateKey);
+  }, [fetchDateDetails]);
 
   const filteredItems = useMemo(() => {
-    let items: (ActivityLog | Meeting)[] = [...allLogs, ...allMeetings];
-
-    // Filter by selected date
-    if (selectedDate) {
-      items = items.filter(item => {
-        const date = 'date_created' in item ? item.date_created : item.StartDate;
-        return toLocalDateKey(date, startHour) === selectedDate;
-      });
-    }
-
+    let items: (ActivityLog | Meeting)[] = [...selectedDateLogs, ...selectedDateMeetings];
+    
     if (activeFilter === "All") return items;
-    if (activeFilter === "Login") return items.filter((l) => 'Status' in l && l.Status === "Login");
-    if (activeFilter === "Logout") return items.filter((l) => 'Status' in l && l.Status === "Logout");
-    if (activeFilter === "Site Visit") return items.filter((l) => 'Type' in l && l.Type === "Client Visit");
-    if (activeFilter === "Meeting") return items.filter((l) => 'Title' in l);
+    if (activeFilter === "Login") return items.filter((l): l is ActivityLog => 'Status' in l && l.Status === "Login");
+    if (activeFilter === "Logout") return items.filter((l): l is ActivityLog => 'Status' in l && l.Status === "Logout");
+    if (activeFilter === "Site Visit") return items.filter((l): l is ActivityLog => 'Type' in l && l.Type === "Client Visit");
+    if (activeFilter === "Meeting") return items.filter((l): l is Meeting => 'Title' in l);
     return items;
-  }, [allLogs, allMeetings, activeFilter, selectedDate, startHour]);
+  }, [selectedDateLogs, selectedDateMeetings, activeFilter]);
 
   const presentRate = monthlyStats.total > 0 ? Math.round((monthlyStats.present / monthlyStats.total) * 100) : 0;
+  
+  // Build meta lookup for quick access
+  const metaLookup = useMemo(() => {
+    const map = new Map<string, DateMeta>();
+    monthlyMeta.forEach(m => map.set(m.dateKey, m));
+    return map;
+  }, [monthlyMeta]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -635,23 +782,25 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
           <div className="grid grid-cols-7">
             {calendarDays.map((date, idx) => {
               const dateKey = toLocalDateKey(date);
-              let items = groupedByDate[dateKey] || [];
+              const meta = metaLookup.get(dateKey);
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
               const isToday = isSameDay(date, today);
               const isSelected = selectedDate === dateKey;
-              const hasLogin = items.some((l) => 'Status' in l && l.Status === "Login");
-              const hasLogout = items.some((l) => 'Status' in l && l.Status === "Logout");
-              const hasMeeting = items.some((l) => 'Title' in l);
+              const hasLogin = meta?.hasLogin ?? false;
+              const hasLogout = meta?.hasLogout ?? false;
+              const hasMeeting = meta?.hasMeeting ?? false;
 
               return (
                 <button
                   key={idx}
-                  onClick={() => setSelectedDate(dateKey)}
+                  onClick={() => handleDateSelect(dateKey)}
+                  disabled={loadingMeta}
                   className={[
                     "aspect-square flex flex-col items-center justify-start pt-1.5 pb-1 transition-all active:scale-95",
                     isToday ? "ring-2 ring-inset ring-[var(--brand-primary)]" : "",
                     isSelected ? "bg-[var(--brand-light)]" : "",
-                    isCurrentMonth ? "" : "opacity-30"
+                    isCurrentMonth ? "" : "opacity-30",
+                    loadingMeta ? "opacity-50" : ""
                   ].join(" ")}
                 >
                   <span className={[
@@ -689,7 +838,14 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
         </div>
 
         <div className="px-4 flex flex-col gap-3">
-          {filteredItems.length === 0 ? (
+          {loadingDate ? (
+            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300 animate-pulse">
+                <CalendarCheck size={20} />
+              </div>
+              <p className="text-[12px] text-gray-400">Loading activities...</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
               <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
                 <CalendarCheck size={20} />
@@ -697,7 +853,7 @@ function CalendarTab({ currentMonth, calendarDays, groupedByDate, usersMap, mont
               <p className="text-[12px] text-gray-400">No activity recorded for this date.</p>
             </div>
           ) : (
-            filteredItems.map((item) => {
+            filteredItems.map((item: ActivityLog | Meeting) => {
               if ('Title' in item) {
                 // Render Meeting
                 const meeting = item as Meeting;
@@ -1711,7 +1867,13 @@ function ActivityPage() {
   }, [queryUserId, userId, setUserId]);
 
   useEffect(() => {
-    if (!queryUserId) { setError("User ID is missing."); setLoading(false); return; }
+    if (!queryUserId) { 
+      setError("User ID is missing."); 
+      setLoading(false); 
+      // Auto-redirect to login after short delay
+      setTimeout(() => router.replace("/Login"), 1500);
+      return; 
+    }
 
     const applyData = (data: any) => {
       setUserDetails({
@@ -2160,17 +2322,14 @@ function ActivityPage() {
         return <CalendarTab 
           currentMonth={currentMonth} 
           calendarDays={calendarDays} 
-          groupedByDate={groupedByDate} 
           usersMap={usersMap} 
-          monthlyStats={monthlyStats} 
-          allLogs={allVisibleAccounts} 
-          allMeetings={allVisibleMeetings}
           onEventClick={onEventClick} 
           onMeetingClick={(meeting) => { setSelectedMeeting(meeting); setMeetingDialogOpen(true); }}
           onCreateMeeting={() => setCreateMeetingOpen(true)}
           goToPrevMonth={goToPrevMonth} 
           goToNextMonth={goToNextMonth} 
-          startHour={startHour} 
+          startHour={startHour}
+          userDetails={userDetails}
         />;
       case "reports":
         return <ReportsTab monthlyStats={monthlyStats} allLogs={allVisibleAccounts} userId={userId} />;

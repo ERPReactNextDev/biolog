@@ -8,7 +8,7 @@ import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
-import { saveAs } from "file-saver/dist/FileSaver";
+import { saveAs } from "file-saver";
 import { Search, Calendar as CalendarIcon, ArrowLeft, Loader2, Download, Filter, Users, Building2, RefreshCcw } from "lucide-react";
 
 import {

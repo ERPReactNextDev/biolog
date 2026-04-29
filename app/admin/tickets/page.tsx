@@ -6,7 +6,8 @@ import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { supabase } from "@/utils/supabase";
+import { supabase as _supabase } from "@/utils/supabase";
+const supabase = _supabase!;
 import { Search, ArrowLeft, Loader2, CheckCircle2, Clock, AlertCircle, MoreHorizontal, MessageSquare, Filter, Pencil } from "lucide-react";
 
 import {

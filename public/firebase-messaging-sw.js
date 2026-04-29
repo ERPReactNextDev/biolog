@@ -19,8 +19,8 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title ?? "Biolog";
   const body  = payload.notification?.body  ?? "";
-  const icon  = "/fluxx-512.png";
-  const badge = "/fluxx.png";
+  const icon  = "/icon-512.png";
+  const badge = "/icon-192.png";
   const data  = payload.data ?? {};
 
   self.registration.showNotification(title, {

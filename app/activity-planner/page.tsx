@@ -10,7 +10,7 @@ import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import { toast } from "sonner";
 import { type DateRange } from "react-day-picker";
-import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, History, Download } from "lucide-react";
+import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download } from "lucide-react";
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -475,11 +475,6 @@ function HomeTab({
                 <p className="text-gray-800 text-[13px] font-semibold">Live Tracking</p>
                 <p className="text-gray-400 text-[11px] mt-0.5">Monitor field</p>
               </button>
-              <button onClick={() => router.push(`/admin/activity-logs${userId ? `?id=${encodeURIComponent(userId)}` : ""}`)} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
-                <div className="w-9 h-9 rounded-[10px] bg-gray-50 flex items-center justify-center mb-3 border border-gray-100"><Clock size={18} className="text-gray-600" /></div>
-                <p className="text-gray-800 text-[13px] font-semibold">Activity Logs</p>
-                <p className="text-gray-400 text-[11px] mt-0.5">Full audit trail</p>
-              </button>
             </>
           )}
           {(userDetails?.Role !== "SuperAdmin") ? (
@@ -870,13 +865,6 @@ function AdminTab({ userId }: { userId: string | null | undefined }) {
 
   const adminTools = [
     {
-      title: "User Management",
-      description: "Manage system users and permissions",
-      icon: <Users size={20} className="text-[var(--brand-primary)]" />,
-      href: `/admin/users${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-      color: "bg-[var(--brand-light)]",
-    },
-    {
       title: "GPS Reports",
       description: "Review offline attendance submissions",
       icon: <MapPin size={20} className="text-[#185FA5]" />,
@@ -896,13 +884,6 @@ function AdminTab({ userId }: { userId: string | null | undefined }) {
       icon: <MapPin size={20} className="text-[#A0611A]" />,
       href: `/admin/live-tracking${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
       color: "bg-[#FDF4E7]",
-    },
-    {
-      title: "Audit Trail",
-      description: "Full system activity audit trail",
-      icon: <History size={20} className="text-gray-600" />,
-      href: `/admin/audit-logs${userId ? `?id=${encodeURIComponent(userId)}` : ""}`,
-      color: "bg-gray-100",
     },
     {
       title: "System Settings",

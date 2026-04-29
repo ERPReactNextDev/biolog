@@ -1,7 +1,7 @@
 // public/service-worker.js
 // Acculog PWA — Service Worker v8
 
-const CACHE_NAME     = "acculog-cache-v8";   // bump version → forces re-install
+const CACHE_NAME     = "acculog-cache-v9";   // bump version → forces re-install
 const OSM_CACHE_NAME = "acculog-osm-tiles-v1";
 const SYNC_TAG       = "sync-activity-logs";
 
@@ -19,8 +19,8 @@ const STATIC_ASSETS = [
   "/profile",
   "/ticket",
   "/manifest.json",
-  "/fluxx.png",
-  "/fluxx-512.png",
+  "/icon-192.png",
+  "/icon-512.png",
   // face-api model manifests (weights are large — cached on first use)
   "/models/tiny_face_detector/tiny_face_detector_model.json",
   "/models/face_landmark68/face_landmark_68_model.json",

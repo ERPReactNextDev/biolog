@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import * as React from "react";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,

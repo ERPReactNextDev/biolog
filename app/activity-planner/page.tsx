@@ -2062,6 +2062,84 @@ function ActivityPage() {
   const [biometricRegistering, setBiometricRegistering] = useState(false);
   // Office start hour - kept for backward compatibility with other features
 
+  // ── PWA Update Detection ─────────────────────────────────────────────────────
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{ version?: string; timestamp?: string }>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+  const wbRef = useRef<any>(null);
+
+  // Check for PWA updates
+  useEffect(() => {
+    // Only run in browser and if service worker is supported
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const checkForUpdates = async () => {
+      try {
+        // Dynamic import workbox-window to avoid SSR issues
+        const { Workbox } = await import('workbox-window');
+        
+        // Check if WB is already registered
+        if (wbRef.current) return;
+
+        const wb = new Workbox('/sw.js');
+        wbRef.current = wb;
+
+        // Listen for waiting service worker (new version available)
+        wb.addEventListener('waiting', (event: any) => {
+          setUpdateAvailable(true);
+          setUpdateInfo({
+            version: event?.sw?.scriptURL || 'New Version',
+            timestamp: new Date().toLocaleString('en-PH')
+          });
+        });
+
+        // Listen for controlling event (update applied)
+        wb.addEventListener('controlling', () => {
+          setIsUpdating(false);
+          setUpdateAvailable(false);
+        });
+
+        // Register the service worker
+        await wb.register();
+      } catch (err) {
+        // Silent fail - not all browsers support workbox-window
+      }
+    };
+
+    checkForUpdates();
+
+    // Periodic check for updates (every 5 minutes)
+    const interval = setInterval(() => {
+      if (wbRef.current?.update) {
+        wbRef.current.update();
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handlePWAUpdate = async () => {
+    setIsUpdating(true);
+    
+    try {
+      if (wbRef.current?.messageSkipWaiting) {
+        // Tell the service worker to skip waiting
+        await wbRef.current.messageSkipWaiting();
+      }
+      
+      // Reload the page to activate the new service worker
+      window.location.reload();
+    } catch (err) {
+      setIsUpdating(false);
+      // Fallback: just reload
+      window.location.reload();
+    }
+  };
+
+  const dismissUpdate = () => {
+    setUpdateAvailable(false);
+  };
+
   const [formData, setFormData] = useState<FormData>({
     ReferenceID: "", Email: "", Type: "", Status: "", PhotoURL: "", Remarks: "", TSM: "",
   });
@@ -2783,6 +2861,53 @@ function ActivityPage() {
                 className="flex-1 py-3.5 rounded-2xl bg-[#CC1318] text-white text-[13px] font-bold hover:bg-[#A8100F] active:scale-95 transition-all"
               >
                 Stay Logged In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PWA Update Available Modal ── */}
+      {updateAvailable && (
+        <div className="fixed inset-0 z-[210] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}>
+          <div className="w-full max-w-sm bg-white rounded-t-[32px] p-6 pb-10 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-5" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-[14px] bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Download size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-[15px] font-bold text-gray-900">New Version Available</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">Update available at {updateInfo.timestamp}</p>
+              </div>
+            </div>
+            <p className="text-[13px] text-gray-500 mb-5 leading-relaxed">
+              A new version of Acculog has been applied. Update now to get the latest features and improvements on your device.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={dismissUpdate}
+                className="flex-1 py-3.5 rounded-2xl border border-gray-200 text-[13px] font-semibold text-gray-500 hover:bg-gray-50 transition-all"
+                disabled={isUpdating}
+              >
+                Later
+              </button>
+              <button
+                onClick={handlePWAUpdate}
+                disabled={isUpdating}
+                className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white text-[13px] font-bold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} />
+                    Update Now
+                  </>
+                )}
               </button>
             </div>
           </div>

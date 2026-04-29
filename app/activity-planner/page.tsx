@@ -181,14 +181,14 @@ interface FormData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toLocalDateKey(date: Date | string, startHour: number = 8) {
-  const d = typeof date === "string" ? new Date(date) : date;
-  // If before work day start, it belongs to the previous work day
-  if (d.getHours() < startHour) {
-    d.setDate(d.getDate() - 1);
-  }
+// Format date to YYYY-MM-DD key - uses actual calendar date (date-to-date)
+function toDateKey(date: Date | string) {
+  const d = typeof date === "string" ? new Date(date) : new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+// Alias for calendar-specific usage (same behavior now)
+const toCalendarDateKey = toDateKey;
 
 function generateCalendarDays(year: number, month: number): Date[] {
   const days: Date[] = [];
@@ -574,20 +574,20 @@ interface DateMeta {
   hasMeeting: boolean;
 }
 
-function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMeetingClick, onCreateMeeting, goToPrevMonth, goToNextMonth, startHour, userDetails }: {
+function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMeetingClick, onCreateMeeting, goToPrevMonth, goToNextMonth, userDetails }: {
   currentMonth: Date; calendarDays: Date[];
   usersMap: Record<string, UserInfo>;
   onEventClick: (log: ActivityLog) => void;
   onMeetingClick: (meeting: Meeting) => void;
   onCreateMeeting: () => void;
   goToPrevMonth: () => void; goToNextMonth: () => void;
-  startHour: number;
   userDetails: UserDetails | null;
 }) {
   const today = new Date();
-  const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const DAY_NAMES_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
   const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit" | "Meeting">("All");
-  const [selectedDate, setSelectedDate] = useState<string>(toLocalDateKey(today, startHour));
+  const [selectedDate, setSelectedDate] = useState<string>(toCalendarDateKey(today));
   
   // Data states - fetched on demand
   const [selectedDateLogs, setSelectedDateLogs] = useState<ActivityLog[]>([]);
@@ -596,6 +596,9 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
   const [monthlyStats, setMonthlyStats] = useState({ present: 0, absent: 0, visits: 0, total: 0 });
   const [loadingDate, setLoadingDate] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(false);
+  
+  // Horizontal scroll ref
+  const daysScrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch monthly metadata (lightweight - for dots and stats only)
   const fetchMonthlyMeta = useCallback(async () => {
@@ -636,7 +639,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
       
       // Process logs
       (logsData.data || []).forEach((log: ActivityLog) => {
-        const key = toLocalDateKey(log.date_created, startHour);
+        const key = toCalendarDateKey(new Date(log.date_created));
         const existing = metaMap.get(key) || { dateKey: key, hasLogin: false, hasLogout: false, hasMeeting: false };
         if (log.Status === "Login") existing.hasLogin = true;
         if (log.Status === "Logout") existing.hasLogout = true;
@@ -645,7 +648,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
       
       // Process meetings
       (meetingsData || []).forEach((meeting: Meeting) => {
-        const key = toLocalDateKey(meeting.StartDate, startHour);
+        const key = toCalendarDateKey(new Date(meeting.StartDate));
         const existing = metaMap.get(key) || { dateKey: key, hasLogin: false, hasLogout: false, hasMeeting: false };
         existing.hasMeeting = true;
         metaMap.set(key, existing);
@@ -654,7 +657,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
       setMonthlyMeta(Array.from(metaMap.values()));
       
       // Calculate monthly stats
-      const loginDays = new Set((logsData.data || []).filter((l: ActivityLog) => l.Status === "Login").map((l: ActivityLog) => toLocalDateKey(l.date_created)));
+      const loginDays = new Set((logsData.data || []).filter((l: ActivityLog) => l.Status === "Login").map((l: ActivityLog) => toCalendarDateKey(new Date(l.date_created))));
       const visits = (logsData.data || []).filter((l: ActivityLog) => l.Type === "Client Visit").length;
       const workDays = calendarDays.filter((d) => d.getMonth() === currentMonth.getMonth() && d.getDay() !== 0 && d.getDay() !== 6).length;
       const present = loginDays.size;
@@ -664,7 +667,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
     } finally {
       setLoadingMeta(false);
     }
-  }, [currentMonth, userDetails, startHour, calendarDays]);
+  }, [currentMonth, userDetails, calendarDays]);
 
   // Fetch details for selected date only
   const fetchDateDetails = useCallback(async (dateKey: string) => {
@@ -689,9 +692,9 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
       const logsRes = await fetch(`/api/ModuleSales/Activity/FetchLog?${params.toString()}`);
       const logsData = logsRes.ok ? await logsRes.json() : { data: [] };
       
-      // Filter to exact date (API returns range)
+      // Filter to exact date (API returns range) - use toCalendarDateKey for consistency
       const dateLogs = (logsData.data || []).filter((log: ActivityLog) => 
-        toLocalDateKey(log.date_created, startHour) === dateKey
+        toCalendarDateKey(new Date(log.date_created)) === dateKey
       );
       setSelectedDateLogs(dateLogs);
       
@@ -704,9 +707,9 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
       const meetingsRes = await fetch(`/api/ModuleSales/Activity/Meeting?${meetingParams.toString()}`);
       const allMeetings = meetingsRes.ok ? await meetingsRes.json() : [];
       
-      // Filter meetings to selected date
+      // Filter meetings to selected date - use toCalendarDateKey for consistency
       const dateMeetings = (allMeetings || []).filter((m: Meeting) => 
-        toLocalDateKey(m.StartDate, startHour) === dateKey
+        toCalendarDateKey(new Date(m.StartDate)) === dateKey
       );
       setSelectedDateMeetings(dateMeetings);
     } catch {
@@ -715,13 +718,13 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
     } finally {
       setLoadingDate(false);
     }
-  }, [userDetails, startHour]);
+  }, [userDetails]);
 
   // Initial load - fetch monthly meta and today's details
   useEffect(() => {
     if (!userDetails) return;
     fetchMonthlyMeta();
-    fetchDateDetails(toLocalDateKey(today, startHour));
+    fetchDateDetails(toCalendarDateKey(today));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDetails?.ReferenceID, currentMonth.getMonth(), currentMonth.getFullYear()]);
 
@@ -751,185 +754,395 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
     return map;
   }, [monthlyMeta]);
 
+  // Generate days for horizontal scroll (current month only)
+  const monthDays = useMemo(() => {
+    const days: Date[] = [];
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    
+    for (let day = 1; day <= lastDay; day++) {
+      days.push(new Date(year, month, day));
+    }
+    return days;
+  }, [currentMonth]);
+
+  // Scroll to selected date when month changes or on initial load
+  useEffect(() => {
+    if (daysScrollRef.current && monthDays.length > 0) {
+      const todayKey = toCalendarDateKey(today);
+      // If today is in the current month, select it and scroll to it
+      const todayInMonth = monthDays.find(d => toCalendarDateKey(d) === todayKey);
+      if (todayInMonth && selectedDate !== todayKey) {
+        setSelectedDate(todayKey);
+        fetchDateDetails(todayKey);
+        return; // Let the effect re-run after state update
+      }
+
+      const selectedIndex = monthDays.findIndex(d => toCalendarDateKey(d) === selectedDate);
+      if (selectedIndex >= 0) {
+        const scrollContainer = daysScrollRef.current;
+        const dayWidth = 68; // width (60px) + gap (8px)
+        const scrollPosition = selectedIndex * dayWidth - scrollContainer.clientWidth / 2 + dayWidth / 2;
+        // Use setTimeout to ensure layout is complete before scrolling
+        setTimeout(() => {
+          scrollContainer.scrollTo({ left: Math.max(0, scrollPosition), behavior: 'smooth' });
+        }, 100);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMonth, monthDays]);
+
+  // Check if date is today
+  const isTodayDate = (date: Date) => isSameDay(date, today);
+
+  // Get activity indicator for a date
+  const getDateIndicators = (dateKey: string) => {
+    const meta = metaLookup.get(dateKey);
+    if (!meta) return null;
+    return {
+      hasActivity: meta.hasLogin || meta.hasLogout || meta.hasMeeting,
+      hasLogin: meta.hasLogin,
+      hasLogout: meta.hasLogout,
+      hasMeeting: meta.hasMeeting
+    };
+  };
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-5 pt-12 pb-5 flex-shrink-0" style={{ background: "linear-gradient(145deg,var(--brand-primary) 0%,var(--brand-primary-hover) 100%)" }}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-white text-[17px] font-semibold">{currentMonth.toLocaleDateString("en-PH", { month: "long" })}</p>
-            <p className="text-white/60 text-[12px]">Activity Calendar · {currentMonth.getFullYear()}</p>
+    <div className="flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
+      {/* Header with Month Navigation */}
+      <div className="px-5 pt-12 pb-4 flex-shrink-0 bg-white border-b border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <button 
+            onClick={goToPrevMonth} 
+            className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors active:scale-95"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          
+          <div className="text-center">
+            <h2 className="text-[22px] font-bold text-gray-900">
+              {currentMonth.toLocaleDateString("en-PH", { month: "long" })}
+            </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onCreateMeeting} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors" title="Create Meeting"><Plus size={16} /></button>
-            <button onClick={goToPrevMonth} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><ChevronLeft size={14} /></button>
-            <button onClick={goToNextMonth} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"><ChevronRight size={14} /></button>
-          </div>
+          
+          <button 
+            onClick={goToNextMonth} 
+            className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors active:scale-95"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
-        <div className="flex gap-4">
-          {[{ label: "Present", value: monthlyStats.present }, { label: "Absent", value: monthlyStats.absent }, { label: "Visits", value: monthlyStats.visits }, { label: "Rate", value: `${presentRate}%` }].map((s) => (
-            <div key={s.label} className="flex-1 text-center">
-              <p className="text-white text-[20px] font-semibold leading-tight">{s.value}</p>
-              <p className="text-white/60 text-[9px] uppercase tracking-wider mt-0.5">{s.label}</p>
+
+        {/* Horizontal Scrollable Date Selector */}
+        <div 
+          ref={daysScrollRef}
+          className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {monthDays.map((date, idx) => {
+            const dateKey = toCalendarDateKey(date);
+            const isSelected = selectedDate === dateKey;
+            const isToday = isTodayDate(date);
+            const dayName = DAY_NAMES[date.getDay()];
+            const indicators = getDateIndicators(dateKey);
+            
+            return (
+              <button
+                key={idx}
+                onClick={() => handleDateSelect(dateKey)}
+                disabled={loadingMeta}
+                className={[
+                  "flex-shrink-0 flex flex-col items-center justify-center min-w-[60px] h-[75px] rounded-[20px] transition-all active:scale-95 relative",
+                  isSelected 
+                    ? "bg-[var(--brand-primary)] text-white shadow-lg shadow-red-200" 
+                    : isToday
+                      ? "bg-[var(--brand-light)] text-[var(--brand-primary)] border-2 border-[var(--brand-primary)]/20"
+                      : "bg-gray-50 text-gray-600 hover:bg-gray-100",
+                  loadingMeta ? "opacity-50" : ""
+                ].join(" ")}
+              >
+                {/* Date number */}
+                <span className={[
+                  "text-[20px] font-bold leading-none",
+                  isSelected ? "text-white" : isToday ? "text-[var(--brand-primary)]" : "text-gray-800"
+                ].join(" ")}>
+                  {date.getDate()}
+                </span>
+                
+                {/* Day name */}
+                <span className={[
+                  "text-[11px] font-medium mt-1",
+                  isSelected ? "text-white/80" : isToday ? "text-[var(--brand-primary)]/70" : "text-gray-400"
+                ].join(" ")}>
+                  {dayName}
+                </span>
+                
+                {/* Activity indicator dots */}
+                {indicators?.hasActivity && (
+                  <div className="flex gap-0.5 mt-1.5">
+                    {indicators.hasLogin && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-green-500"}`} />
+                    )}
+                    {indicators.hasLogout && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white/70" : "bg-[var(--brand-primary)]"}`} />
+                    )}
+                    {indicators.hasMeeting && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-purple-200" : "bg-purple-500"}`} />
+                    )}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Stats Row */}
+      <div className="px-5 py-3 flex-shrink-0 bg-white border-b border-gray-100">
+        <div className="flex gap-3">
+          {[
+            { label: "Present", value: monthlyStats.present, color: "#1A7A4A", bg: "#EEF7F2" },
+            { label: "Absent", value: monthlyStats.absent, color: "var(--brand-primary)", bg: "var(--brand-light)" },
+            { label: "Visits", value: monthlyStats.visits, color: "#A0611A", bg: "#FDF4E7" },
+            { label: "Rate", value: `${presentRate}%`, color: "#185FA5", bg: "#E6F1FB" }
+          ].map((s) => (
+            <div key={s.label} className="flex-1 bg-gray-50 rounded-2xl p-3 text-center">
+              <p className="text-[18px] font-bold leading-tight" style={{ color: s.color }}>{s.value}</p>
+              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="bg-white mx-4 rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-          <div className="grid grid-cols-7 border-b border-gray-100">
-            {DAY_NAMES.map((d, i) => <div key={i} className="text-center py-2.5 text-[10px] font-semibold text-gray-400 uppercase">{d}</div>)}
-          </div>
-          <div className="grid grid-cols-7">
-            {calendarDays.map((date, idx) => {
-              const dateKey = toLocalDateKey(date);
-              const meta = metaLookup.get(dateKey);
-              const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-              const isToday = isSameDay(date, today);
-              const isSelected = selectedDate === dateKey;
-              const hasLogin = meta?.hasLogin ?? false;
-              const hasLogout = meta?.hasLogout ?? false;
-              const hasMeeting = meta?.hasMeeting ?? false;
 
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handleDateSelect(dateKey)}
-                  disabled={loadingMeta}
-                  className={[
-                    "aspect-square flex flex-col items-center justify-start pt-1.5 pb-1 transition-all active:scale-95",
-                    isToday ? "ring-2 ring-inset ring-[var(--brand-primary)]" : "",
-                    isSelected ? "bg-[var(--brand-light)]" : "",
-                    isCurrentMonth ? "" : "opacity-30",
-                    loadingMeta ? "opacity-50" : ""
-                  ].join(" ")}
-                >
-                  <span className={[
-                    "text-[12px] font-semibold w-6 h-6 flex items-center justify-center rounded-lg transition-colors",
-                    isToday ? "bg-[var(--brand-primary)] text-white" : isSelected ? "text-[var(--brand-primary)]" : "text-gray-700"
-                  ].join(" ")}>{date.getDate()}</span>
-                  <div className="flex gap-0.5 mt-0.5">
-                    {hasLogin && <span className="w-1 h-1 rounded-full bg-[#1A7A4A]" />}
-                    {hasLogout && <span className="w-1 h-1 rounded-full bg-[var(--brand-primary)]" />}
-                    {hasMeeting && <span className="w-1 h-1 rounded-full bg-purple-500" />}
-                  </div>
-                </button>
-              );
-            })}
+      {/* Activities Section */}
+      <div className="flex-1 overflow-y-auto px-5 pt-4 pb-24">
+        {/* Date Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+              {isSameDay(new Date(selectedDate), today) ? "Today" : "Activities"}
+            </p>
+            <h3 className="text-[18px] font-bold text-gray-900">
+              {new Date(selectedDate).toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })}
+            </h3>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {filteredItems.length > 0 && (
+              <span className="text-[12px] font-semibold text-[var(--brand-primary)] bg-[var(--brand-light)] px-3 py-1.5 rounded-full">
+                {filteredItems.length}
+              </span>
+            )}
+            <button 
+              onClick={onCreateMeeting}
+              className="w-9 h-9 rounded-full bg-[var(--brand-primary)] flex items-center justify-center text-white hover:bg-[var(--brand-primary-hover)] transition-colors active:scale-95 shadow-md shadow-red-200"
+            >
+              <Plus size={18} />
+            </button>
           </div>
         </div>
-        <div className="flex gap-4 px-5 mt-3 mb-4 flex-wrap">
-          {[{ color: "#1A7A4A", label: "Login" }, { color: "var(--brand-primary)", label: "Logout" }, { color: "#A855F7", label: "Meeting" }, { color: "var(--brand-primary)", label: "Selected", rounded: true }].map((l) => (
-            <div key={l.label} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 flex-shrink-0 ${l.rounded ? "rounded-sm" : "rounded-full"}`} style={{ background: l.color }} />
-              <span className="text-[11px] text-gray-500">{l.label}</span>
-            </div>
+
+        {/* Filter Pills */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          {["All", "Login", "Logout", "Site Visit", "Meeting"].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter as any)}
+              className={[
+                "flex-shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all active:scale-95",
+                activeFilter === filter
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ].join(" ")}
+            >
+              {filter}
+            </button>
           ))}
         </div>
 
-        <div className="px-5 mb-3 flex items-center justify-between">
-          <p className="text-[13px] font-bold text-gray-800">
-            Activities for {new Date(selectedDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-          </p>
-          {filteredItems.length > 0 && (
-            <span className="text-[10px] font-semibold text-[var(--brand-primary)] bg-[var(--brand-light)] px-2 py-0.5 rounded-full">
-              {filteredItems.length} record{filteredItems.length !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        <div className="px-4 flex flex-col gap-3">
+        {/* Activity Cards */}
+        <div className="flex flex-col gap-3">
           {loadingDate ? (
-            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300 animate-pulse">
-                <CalendarCheck size={20} />
+            <div className="bg-white rounded-3xl border border-gray-100 px-4 py-10 text-center flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300 animate-pulse">
+                <CalendarCheck size={24} />
               </div>
-              <p className="text-[12px] text-gray-400">Loading activities...</p>
+              <p className="text-[13px] text-gray-400">Loading activities...</p>
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-8 text-center flex flex-col items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
-                <CalendarCheck size={20} />
+            <div className="bg-white rounded-3xl border border-gray-100 px-4 py-10 text-center flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300">
+                <CalendarCheck size={24} />
               </div>
-              <p className="text-[12px] text-gray-400">No activity recorded for this date.</p>
+              <p className="text-[13px] text-gray-400">No activity recorded for this date.</p>
+              <button 
+                onClick={onCreateMeeting}
+                className="mt-2 px-4 py-2 bg-[var(--brand-primary)] text-white rounded-full text-[12px] font-semibold hover:bg-[var(--brand-primary-hover)] transition-colors"
+              >
+                Schedule Activity
+              </button>
             </div>
           ) : (
-            filteredItems.map((item: ActivityLog | Meeting) => {
+            filteredItems.map((item: ActivityLog | Meeting, index: number) => {
               if ('Title' in item) {
-                // Render Meeting
+                // Render Meeting Card
                 const meeting = item as Meeting;
                 const user = usersMap[meeting.ReferenceID];
                 return (
-                  <button key={meeting._id ?? meeting.CreatedAt} onClick={() => onMeetingClick(meeting)} className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-purple-200 hover:bg-purple-50/30 transition-all active:scale-[0.98] shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-[14px] bg-purple-50 flex items-center justify-center flex-shrink-0">
-                        <Users size={18} className="text-purple-600" />
-                      </div>
+                  <motion.button
+                    key={meeting._id ?? meeting.CreatedAt}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => onMeetingClick(meeting)}
+                    className="w-full bg-[#6366F1] rounded-[24px] p-5 text-left text-white active:scale-[0.98] transition-all shadow-lg shadow-indigo-200"
+                  >
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-bold text-gray-800">{meeting.Title}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}</p>
+                        <p className="text-[10px] font-medium text-white/70 uppercase tracking-wider mb-1">Meeting</p>
+                        <h4 className="text-[17px] font-bold leading-tight">{meeting.Title}</h4>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-[13px] font-bold text-gray-700 tabular-nums">
-                          {new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                        </p>
-                        <p className="text-[10px] text-purple-600 font-bold">{meeting.Duration} mins</p>
+                      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <Users size={20} className="text-white" />
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 border-t border-gray-50 pt-3">
-                      <div className="flex items-start gap-2">
-                        <MapPin size={12} className="text-gray-400 mt-0.5" />
-                        <p className="text-[11px] text-gray-500 leading-snug">{meeting.Location || "No location set"}</p>
+                    
+                    <div className="flex items-center gap-2 mb-3">
+                      {user?.profilePicture ? (
+                        <img src={user.profilePicture} alt="" className="w-6 h-6 rounded-full border border-white/30 object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-[10px] font-bold text-white">
+                          {user ? `${user.Firstname[0]}${user.Lastname[0]}` : "?"}
+                        </div>
+                      )}
+                      <span className="text-[13px] font-medium text-white/90">
+                        {user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-[12px] text-white/80">
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={14} />
+                        <span>{new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <Info size={12} className="text-gray-400 mt-0.5" />
-                        <p className="text-[11px] text-gray-400 italic">
-                          {meeting.Remarks && meeting.Remarks !== "No remarks" ? `"${meeting.Remarks}"` : "No remarks added"}
-                        </p>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={14} />
+                        <span className="truncate max-w-[120px]">{meeting.Location || "No location"}</span>
                       </div>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               } else {
-                // Render ActivityLog
+                // Render Activity Log Card
                 const log = item as ActivityLog;
                 const user = usersMap[log.ReferenceID];
                 const isLogin = log.Status === "Login";
+                const isClientVisit = log.Type === "Client Visit";
+                
                 return (
-                  <button key={log._id ?? log.date_created} onClick={() => onEventClick(log)} className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:border-gray-200 hover:bg-gray-50 transition-all active:scale-[0.98] shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center flex-shrink-0 ${isLogin ? "bg-[#EEF7F2]" : log.Type === "Client Visit" ? "bg-[#FDF4E7]" : "bg-[#FEF0F0]"}`}>
-                        {isLogin ? <LogIn size={18} className="text-[#1A7A4A]" /> : log.Type === "Client Visit" ? <Building2 size={18} className="text-[#A0611A]" /> : <LogOut size={18} className="text-[#CC1318]" />}
-                      </div>
+                  <motion.button
+                    key={log._id ?? log.date_created}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => onEventClick(log)}
+                    className={[
+                      "w-full rounded-[24px] p-5 text-left active:scale-[0.98] transition-all shadow-sm",
+                      isLogin 
+                        ? "bg-[#1A7A4A] text-white shadow-lg shadow-green-200" 
+                        : isClientVisit
+                          ? "bg-[#A0611A] text-white shadow-lg shadow-amber-200"
+                          : "bg-white border border-gray-100 text-gray-900"
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-bold text-gray-800">{log.Status} – {log.Type}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{user ? `${user.Firstname} ${user.Lastname}` : log.Email}</p>
+                        <p className={[
+                          "text-[10px] font-medium uppercase tracking-wider mb-1",
+                          isLogin || isClientVisit ? "text-white/70" : "text-gray-400"
+                        ].join(" ")}>
+                          {log.Type}
+                        </p>
+                        <h4 className={[
+                          "text-[17px] font-bold leading-tight",
+                          isLogin || isClientVisit ? "text-white" : "text-gray-900"
+                        ].join(" ")}>
+                          {isClientVisit ? log.SiteVisitAccount || "Client Visit" : log.Status}
+                        </h4>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-[13px] font-bold text-gray-700 tabular-nums">{new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</p>
+                      <div className={[
+                        "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                        isLogin 
+                          ? "bg-white/20" 
+                          : isClientVisit
+                            ? "bg-white/20"
+                            : "bg-[#FEF0F0]"
+                      ].join(" ")}>
+                        {isLogin ? (
+                          <LogIn size={20} className="text-white" />
+                        ) : isClientVisit ? (
+                          <Building2 size={20} className="text-white" />
+                        ) : (
+                          <LogOut size={20} className="text-[#CC1318]" />
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-2 border-t border-gray-50 pt-3">
-                      <div className="flex items-start gap-2">
-                        <MapPin size={12} className="text-gray-400 mt-0.5" />
-                        <p className="text-[11px] text-gray-500 leading-snug">{log.Location || "No location captured"}</p>
-                      </div>
-
-                      {log.Type === "Client Visit" && log.SiteVisitAccount && (
-                        <div className="flex items-start gap-2">
-                          <Building2 size={12} className="text-gray-400 mt-0.5" />
-                          <p className="text-[11px] text-gray-600 font-semibold italic">Client: {log.SiteVisitAccount}</p>
+                    
+                    <div className="flex items-center gap-2 mb-3">
+                      {user?.profilePicture ? (
+                        <img 
+                          src={user.profilePicture} 
+                          alt="" 
+                          className={[
+                            "w-6 h-6 rounded-full object-cover",
+                            isLogin || isClientVisit ? "border border-white/30" : "border border-gray-200"
+                          ].join(" ")} 
+                        />
+                      ) : (
+                        <div className={[
+                          "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                          isLogin || isClientVisit ? "bg-white/30 text-white" : "bg-gray-100 text-gray-600"
+                        ].join(" ")}>
+                          {user ? `${user.Firstname[0]}${user.Lastname[0]}` : "?"}
                         </div>
                       )}
-
-                      <div className="flex items-start gap-2">
-                        <Info size={12} className="text-gray-400 mt-0.5" />
-                        <p className="text-[11px] text-gray-400 italic">
-                          {log.Remarks && log.Remarks !== "No remarks" ? `"${log.Remarks}"` : "No remarks added"}
-                        </p>
+                      <span className={[
+                        "text-[13px] font-medium",
+                        isLogin || isClientVisit ? "text-white/90" : "text-gray-600"
+                      ].join(" ")}>
+                        {user ? `${user.Firstname} ${user.Lastname}` : log.Email}
+                      </span>
+                    </div>
+                    
+                    <div className={[
+                      "flex items-center gap-4 text-[12px]",
+                      isLogin || isClientVisit ? "text-white/80" : "text-gray-500"
+                    ].join(" ")}>
+                      <div className="flex items-center gap-1.5">
+                        <Clock size={14} />
+                        <span>{new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={14} />
+                        <span className="truncate max-w-[120px]">{log.Location || "No location"}</span>
                       </div>
                     </div>
-                  </button>
+                    
+                    {log.Remarks && log.Remarks !== "No remarks" && (
+                      <div className={[
+                        "mt-3 pt-3 border-t",
+                        isLogin || isClientVisit ? "border-white/20" : "border-gray-100"
+                      ].join(" ")}>
+                        <p className={[
+                          "text-[12px] italic",
+                          isLogin || isClientVisit ? "text-white/70" : "text-gray-400"
+                        ].join(" ")}>
+                          "{log.Remarks}"
+                        </p>
+                      </div>
+                    )}
+                  </motion.button>
                 );
               }
             })
@@ -1834,10 +2047,7 @@ function ActivityPage() {
   const [faceRegisterOpen, setFaceRegisterOpen] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [biometricRegistering, setBiometricRegistering] = useState(false);
-  const [startHour, setStartHour] = useState(8);
-
-  // Office start hour comes from the same /api/admin/settings call already made
-  // higher up in the component — no need to refetch it here.
+  // Office start hour - kept for backward compatibility with other features
 
   const [formData, setFormData] = useState<FormData>({
     ReferenceID: "", Email: "", Type: "", Status: "", PhotoURL: "", Remarks: "", TSM: "",
@@ -2121,32 +2331,32 @@ function ActivityPage() {
   const groupedByDate = useMemo(() => {
     const g: Record<string, (ActivityLog | Meeting)[]> = {};
     allVisibleAccounts.forEach((p) => {
-      const k = toLocalDateKey(p.date_created, startHour);
+      const k = toCalendarDateKey(new Date(p.date_created));
       if (!g[k]) g[k] = [];
       g[k].push(p);
     });
     allVisibleMeetings.forEach((m) => {
-      const k = toLocalDateKey(m.StartDate, startHour);
+      const k = toCalendarDateKey(new Date(m.StartDate));
       if (!g[k]) g[k] = [];
       g[k].push(m);
     });
     return g;
-  }, [allVisibleAccounts, allVisibleMeetings, startHour]);
+  }, [allVisibleAccounts, allVisibleMeetings]);
 
   const calendarDays = useMemo(() => generateCalendarDays(currentMonth.getFullYear(), currentMonth.getMonth()), [currentMonth]);
-  const todayKey = toLocalDateKey(today, startHour);
+  const todayKey = toCalendarDateKey(today);
   const todayItems = groupedByDate[todayKey] || [];
   const todayLogs = todayItems.filter((item): item is ActivityLog => 'date_created' in item);
 
   const todayVisits = useMemo(() => {
     const visits = allVisibleAccounts.filter(
-      (p) => (p.Status.toLowerCase() === "login" || p.Status.toLowerCase() === "logout" || p.Type.toLowerCase() === "client visit") && toLocalDateKey(p.date_created, startHour) === todayKey
+      (p) => (p.Status.toLowerCase() === "login" || p.Status.toLowerCase() === "logout" || p.Type.toLowerCase() === "client visit") && toCalendarDateKey(new Date(p.date_created)) === todayKey
     );
     const todayMeetings = allVisibleMeetings.filter(
-      (m) => toLocalDateKey(m.StartDate, startHour) === todayKey
+      (m) => toCalendarDateKey(new Date(m.StartDate)) === todayKey
     );
     return [...visits, ...todayMeetings];
-  }, [allVisibleAccounts, allVisibleMeetings, todayKey, startHour]);
+  }, [allVisibleAccounts, allVisibleMeetings]);
 
   const timelineItems = useMemo<TimelineItem[]>(() => todayVisits.map((p) => {
     if ('Title' in p) {
@@ -2176,7 +2386,7 @@ function ActivityPage() {
       const d = new Date(p.date_created);
       return d.getFullYear() === currentMonth.getFullYear() && d.getMonth() === currentMonth.getMonth();
     });
-    const loginDays = new Set(thisMonthLogs.filter((l) => l.Status === "Login").map((l) => toLocalDateKey(l.date_created)));
+    const loginDays = new Set(thisMonthLogs.filter((l) => l.Status === "Login").map((l) => toCalendarDateKey(new Date(l.date_created))));
     const visits = thisMonthLogs.filter((l) => l.Type === "Client Visit").length;
     const workDays = calendarDays.filter((d) => d.getMonth() === currentMonth.getMonth() && d.getDay() !== 0 && d.getDay() !== 6).length;
     const present = loginDays.size;
@@ -2328,7 +2538,6 @@ function ActivityPage() {
           onCreateMeeting={() => setCreateMeetingOpen(true)}
           goToPrevMonth={goToPrevMonth} 
           goToNextMonth={goToNextMonth} 
-          startHour={startHour}
           userDetails={userDetails}
         />;
       case "reports":

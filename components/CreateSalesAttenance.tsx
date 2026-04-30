@@ -284,7 +284,11 @@ export default function CreateSalesAttendance({
       if (!navigator.onLine) {
         // ── Offline: queue with base64 photo ──────────────────────────────
         await enqueuePendingLog({ ...basePayload, PhotoURL: photo });
-        toast.success("Saved offline — will sync when you're back online.");
+        toast.success("Saved offline — will sync when you're back online.", {
+          duration: 4000,
+        });
+        // Dispatch custom event to trigger pending count refresh
+        window.dispatchEvent(new CustomEvent("acculog:sync"));
         resetForm();
         return;
       }
@@ -296,7 +300,11 @@ export default function CreateSalesAttendance({
       } catch {
         // Upload failed — queue with base64 for later
         await enqueuePendingLog({ ...basePayload, PhotoURL: photo });
-        toast.success("Photo upload failed — saved offline. Will sync when connection improves.");
+        toast.success("Photo upload failed — saved offline. Will sync when connection improves.", {
+          duration: 4000,
+        });
+        // Dispatch custom event to trigger pending count refresh
+        window.dispatchEvent(new CustomEvent("acculog:sync"));
         resetForm();
         return;
       }
@@ -314,7 +322,11 @@ export default function CreateSalesAttendance({
       } catch {
         // API failed after upload — queue with Cloudinary URL (no re-upload)
         await enqueuePendingLog({ ...basePayload, PhotoURL: photoURL });
-        toast.success("Saved offline — will sync when connection returns.");
+        toast.success("Saved offline — will sync when connection returns.", {
+          duration: 4000,
+        });
+        // Dispatch custom event to trigger pending count refresh
+        window.dispatchEvent(new CustomEvent("acculog:sync"));
         resetForm();
       }
     } catch (err: any) {

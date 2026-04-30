@@ -135,3 +135,18 @@ export async function getPendingCount(): Promise<number> {
     req.onerror   = () => { db.close(); reject(req.error); };
   });
 }
+
+/** Clear all pending logs from the queue. */
+export async function clearAllPendingLogs(): Promise<void> {
+  const db = await openDB();
+
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req   = store.clear();
+
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+    req.onerror   = () => reject(req.error);
+  });
+}

@@ -8,6 +8,7 @@ import {
   removePendingLog,
   incrementRetry,
   getPendingCount,
+  clearAllPendingLogs,
 } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
@@ -64,8 +65,13 @@ export function useOfflineSync(onSyncComplete?: () => void) {
 
     let successCount = 0;
     let failCount    = 0;
+    const syncedIds: string[] = [];
 
-    for (const log of logs) {
+    // Process logs sequentially to avoid race conditions
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      console.log(`[sync] Processing log ${i + 1}/${logs.length}: ${log.id}`);
+      
       if (log.retries >= MAX_RETRIES) {
         console.warn(`[sync] Discarding log ${log.id} after ${log.retries} retries`);
         await removePendingLog(log.id).catch(() => {});
@@ -76,9 +82,6 @@ export function useOfflineSync(onSyncComplete?: () => void) {
         const payload = { ...log.payload } as Record<string, any>;
 
         // ── Preserve the original offline timestamp ──────────────────────
-        // The API sets date_created = new Date() on insert, which would use
-        // the sync time instead of when the user actually submitted.
-        // Pass the original createdAt so the API can use it.
         if (!payload.date_created) {
           payload.date_created = new Date(log.createdAt).toISOString();
         }
@@ -118,13 +121,13 @@ export function useOfflineSync(onSyncComplete?: () => void) {
 
         if (res.ok) {
           console.log(`[sync] Log ${log.id} synced successfully`);
-          await removePendingLog(log.id).catch(() => {});
+          syncedIds.push(log.id);
           successCount++;
         } else if (res.status === 409) {
           // Duplicate — already on server, safe to remove
           const body = await res.json().catch(() => ({}));
           console.log(`[sync] Log ${log.id} is a duplicate (409), removing:`, body);
-          await removePendingLog(log.id).catch(() => {});
+          syncedIds.push(log.id);
           successCount++;
         } else {
           const body = await res.json().catch(() => ({}));
@@ -137,6 +140,19 @@ export function useOfflineSync(onSyncComplete?: () => void) {
         await incrementRetry(log.id).catch(() => {});
         failCount++;
       }
+      
+      // Small delay between logs to prevent overwhelming the server
+      if (i < logs.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
+    // ── Remove all synced logs from IndexedDB ───────────────────────────
+    console.log(`[sync] Removing ${syncedIds.length} synced logs from local storage`);
+    for (const id of syncedIds) {
+      await removePendingLog(id).catch((err) => {
+        console.error(`[sync] Failed to remove log ${id}:`, err);
+      });
     }
 
     syncingRef.current = false;
@@ -145,17 +161,70 @@ export function useOfflineSync(onSyncComplete?: () => void) {
 
     if (successCount > 0) {
       toast.success(
-        `${successCount} offline record${successCount > 1 ? "s" : ""} synced successfully!`
+        `${successCount} offline record${successCount > 1 ? "s" : ""} synced and cleared from local storage!`
       );
       onSyncCompleteRef.current?.();
     }
 
     if (failCount > 0) {
       toast.error(
-        `${failCount} record${failCount > 1 ? "s" : ""} failed to sync — check console for details.`
+        `${failCount} record${failCount > 1 ? "s" : ""} failed to sync — will retry automatically.`
       );
     }
   }, [refreshCount]);
+
+  // ── Notify about pending activities ─────────────────────────────────────────
+  useEffect(() => {
+    // Notify when coming back online with pending activities
+    const notifyPendingOnOnline = () => {
+      if (navigator.onLine && pendingCount > 0) {
+        toast.info(
+          `You have ${pendingCount} offline activity${pendingCount > 1 ? 'ies' : 'y'} pending to sync`,
+          {
+            duration: 5000,
+            action: {
+              label: "Sync Now",
+              onClick: () => syncNow()
+            }
+          }
+        );
+      }
+    };
+
+    // Notify when app becomes visible with pending activities
+    const notifyPendingOnVisible = () => {
+      if (document.visibilityState === 'visible' && pendingCount > 0) {
+        // Small delay to not interrupt the user immediately
+        setTimeout(() => {
+          if (navigator.onLine) {
+            toast.info(
+              `${pendingCount} offline activity${pendingCount > 1 ? 'ies' : 'y'} waiting to sync`,
+              {
+                duration: 4000,
+                action: {
+                  label: "Sync Now",
+                  onClick: () => syncNow()
+                }
+              }
+            );
+          } else {
+            toast.warning(
+              `You have ${pendingCount} offline activit${pendingCount > 1 ? 'ies' : 'y'} saved. Connect to internet to sync.`,
+              { duration: 5000 }
+            );
+          }
+        }, 2000);
+      }
+    };
+
+    window.addEventListener("online", notifyPendingOnOnline);
+    document.addEventListener("visibilitychange", notifyPendingOnVisible);
+
+    return () => {
+      window.removeEventListener("online", notifyPendingOnOnline);
+      document.removeEventListener("visibilitychange", notifyPendingOnVisible);
+    };
+  }, [pendingCount, syncNow]);
 
   useEffect(() => {
     refreshCount();
@@ -196,5 +265,18 @@ export function useOfflineSync(onSyncComplete?: () => void) {
     };
   }, [syncNow, refreshCount, pendingCount]);
 
-  return { pendingCount, isOnline, isSyncing, syncNow };
+  const clearAllPending = useCallback(async () => {
+    if (pendingCount === 0) return;
+    
+    try {
+      await clearAllPendingLogs();
+      await refreshCount();
+      toast.success("All pending records cleared from local storage");
+    } catch (err) {
+      console.error("[sync] Failed to clear pending logs:", err);
+      toast.error("Failed to clear pending records");
+    }
+  }, [pendingCount, refreshCount]);
+
+  return { pendingCount, isOnline, isSyncing, syncNow, clearAllPending };
 }

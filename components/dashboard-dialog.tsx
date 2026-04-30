@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera } from "lucide-react";
+import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2 } from "lucide-react";
 
 interface ActivityLog {
   ReferenceID: string;
@@ -12,6 +12,46 @@ interface ActivityLog {
   Remarks: string;
   SiteVisitAccount: string | null;
   _id?: string;
+}
+
+// Cache for reverse geocoding results
+const addressCache = new Map<string, string>();
+
+// Check if location is in coordinate format (lat, lng)
+function isCoordinateFormat(location: string): boolean {
+  if (!location) return false;
+  // Pattern: "14.12345, 121.12345" or similar coordinate formats
+  const coordPattern = /^-?\d+\.?\d*,\s*-?\d+\.?\d*$/;
+  return coordPattern.test(location.trim());
+}
+
+// Reverse geocode coordinates to address
+async function reverseGeocode(coords: string): Promise<string | null> {
+  if (addressCache.has(coords)) {
+    return addressCache.get(coords)!;
+  }
+  
+  try {
+    const [lat, lon] = coords.split(',').map(s => parseFloat(s.trim()));
+    if (isNaN(lat) || isNaN(lon)) return null;
+    
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const address = data.display_name || null;
+    
+    if (address) {
+      addressCache.set(coords, address);
+    }
+    return address;
+  } catch {
+    return null;
+  }
 }
 
 interface UserInfo {
@@ -37,6 +77,48 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
   const statusColor = isLogin ? "#1A7A4A" : isLogout ? "var(--brand-primary)" : "#888";
   const statusBg = isLogin ? "#EEF7F2" : isLogout ? "var(--brand-light)" : "#F5F5F5";
+
+  // State for resolved address (reverse geocoding)
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+
+  // Reverse geocode coordinates when dialog opens
+  useEffect(() => {
+    if (!open || !selectedEvent?.Location) {
+      setResolvedAddress(null);
+      return;
+    }
+
+    const location = selectedEvent.Location;
+    
+    // If it's already an address (not coordinates), use it directly
+    if (!isCoordinateFormat(location)) {
+      setResolvedAddress(null);
+      return;
+    }
+
+    // If we have it cached, use it
+    if (addressCache.has(location)) {
+      setResolvedAddress(addressCache.get(location)!);
+      return;
+    }
+
+    // Try to reverse geocode if online
+    if (navigator.onLine) {
+      setIsResolving(true);
+      reverseGeocode(location)
+        .then(address => {
+          if (address) {
+            setResolvedAddress(address);
+          }
+        })
+        .finally(() => setIsResolving(false));
+    }
+  }, [open, selectedEvent?.Location]);
+
+  // Get display location (resolved address or original)
+  const displayLocation = resolvedAddress || selectedEvent?.Location || "No location recorded";
+  const isCoords = isCoordinateFormat(selectedEvent?.Location || "");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,8 +216,25 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
                   <Navigation size={14} className="text-brand-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Location</p>
-                  <p className="text-[12px] text-gray-700 leading-snug">{selectedEvent.Location || "No location recorded"}</p>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
+                    Location
+                    {isCoords && !resolvedAddress && !isResolving && (
+                      <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Offline</span>
+                    )}
+                  </p>
+                  {isResolving ? (
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span className="text-[12px]">Resolving address...</span>
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-gray-700 leading-snug">{displayLocation}</p>
+                  )}
+                  {isCoords && resolvedAddress && (
+                    <p className="text-[10px] text-gray-400 mt-1 italic">
+                      Coordinates: {selectedEvent.Location}
+                    </p>
+                  )}
                 </div>
               </div>
 

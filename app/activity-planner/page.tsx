@@ -10,9 +10,11 @@ import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 import { toast } from "sonner";
 import { type DateRange } from "react-day-picker";
-import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download } from "lucide-react";
+import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, ArrowLeft, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, CloudUpload, WifiOff, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download, Loader2 } from "lucide-react";
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { getAllPendingLogs, removePendingLog, type PendingLog } from "@/lib/offline-store";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import OfflineBanner from "@/components/OfflineBanner";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
@@ -26,6 +28,91 @@ const ActivityDialog        = dynamic(() => import("@/components/dashboard-dialo
 const CreateAttendance      = dynamic(() => import("@/components/CreateAttendance"),     { ssr: false });
 const CreateSalesAttendance = dynamic(() => import("@/components/CreateSalesAttenance"), { ssr: false });
 const CameraLazy            = dynamic(() => import("@/components/camera"),              { ssr: false });
+
+// ── Location helpers for reverse geocoding ───────────────────────────────────
+
+const addressCache = new Map<string, string>();
+
+// Check if location is in coordinate format (lat, lng)
+function isCoordinateFormat(location: string): boolean {
+  if (!location) return false;
+  // Pattern: "14.12345, 121.12345" or similar coordinate formats
+  const coordPattern = /^-?\d+\.?\d*,\s*-?\d+\.?\d*$/;
+  return coordPattern.test(location.trim());
+}
+
+// Reverse geocode coordinates to address
+async function reverseGeocode(coords: string): Promise<string | null> {
+  if (addressCache.has(coords)) {
+    return addressCache.get(coords)!;
+  }
+  
+  try {
+    const [lat, lon] = coords.split(',').map(s => parseFloat(s.trim()));
+    if (isNaN(lat) || isNaN(lon)) return null;
+    
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const address = data.display_name || null;
+    
+    if (address) {
+      addressCache.set(coords, address);
+    }
+    return address;
+  } catch {
+    return null;
+  }
+}
+
+// Hook for resolving location (works for both logs and meetings)
+function useResolvedLocation(location: string | undefined | null, isOpen: boolean) {
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !location) {
+      setResolvedAddress(null);
+      return;
+    }
+
+    // If it's already an address (not coordinates), no need to resolve
+    if (!isCoordinateFormat(location)) {
+      setResolvedAddress(null);
+      return;
+    }
+
+    // If we have it cached, use it
+    if (addressCache.has(location)) {
+      setResolvedAddress(addressCache.get(location)!);
+      return;
+    }
+
+    // Try to reverse geocode if online
+    if (navigator.onLine) {
+      setIsResolving(true);
+      reverseGeocode(location)
+        .then(address => {
+          if (address) {
+            setResolvedAddress(address);
+          }
+        })
+        .finally(() => setIsResolving(false));
+    }
+  }, [isOpen, location]);
+
+  return { 
+    displayLocation: resolvedAddress || location || "Not specified", 
+    isResolving, 
+    isCoords: isCoordinateFormat(location || ""),
+    originalCoords: location 
+  };
+}
 
 
 // ── Weather Component ────────────────────────────────────────────────────────
@@ -548,7 +635,12 @@ function HomeTab({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-gray-800 truncate">{log.Status} – {log.Type}</p>
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5">{log.Location || "—"}</p>
+                      <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                        {log.Location || "—"}
+                        {log.Location && isCoordinateFormat(log.Location) && (
+                          <span className="ml-1 text-[8px] bg-amber-100 text-amber-700 px-1 rounded">offline</span>
+                        )}
+                      </p>
                     </div>
                     <p className="text-[11px] font-semibold text-gray-500 flex-shrink-0">
                       {new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
@@ -1041,7 +1133,12 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin size={14} />
-                        <span className="truncate max-w-[120px]">{meeting.Location || "No location"}</span>
+                        <span className="truncate max-w-[120px]">
+                          {meeting.Location || "No location"}
+                          {meeting.Location && isCoordinateFormat(meeting.Location) && (
+                            <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-200 px-1 rounded">offline</span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   </motion.button>
@@ -1138,7 +1235,12 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin size={14} />
-                        <span className="truncate max-w-[120px]">{log.Location || "No location"}</span>
+                        <span className="truncate max-w-[120px]">
+                          {log.Location || "No location"}
+                          {log.Location && isCoordinateFormat(log.Location) && (
+                            <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-200 px-1 rounded">offline</span>
+                          )}
+                        </span>
                       </div>
                     </div>
                     
@@ -1235,8 +1337,241 @@ function ReportsTab({ monthlyStats, allLogs, userId }: {
             <ChevronRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
           </div>
         </button>
+
+        {/* Offline Activities Card */}
+        <OfflineActivitiesCard userId={userId} />
       </div>
     </div>
+  );
+}
+
+// ── Offline Activities Card ─────────────────────────────────────────────────
+
+function OfflineActivitiesCard({ userId }: { userId: string | null | undefined }) {
+  const [pendingLogs, setPendingLogs] = useState<PendingLog[]>([]);
+  const [showDialog, setShowDialog] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  // Load pending logs from IndexedDB
+  const loadPendingLogs = useCallback(async () => {
+    try {
+      const logs = await getAllPendingLogs();
+      setPendingLogs(logs);
+    } catch {
+      setPendingLogs([]);
+    }
+  }, []);
+
+  // Sync single log to server
+  const syncSingleLog = async (log: PendingLog) => {
+    if (!navigator.onLine) {
+      toast.error("You are offline. Please connect to internet first.");
+      return;
+    }
+
+    setSyncingId(log.id);
+    try {
+      const payload = { ...log.payload } as Record<string, any>;
+
+      // Preserve original timestamp
+      if (!payload.date_created) {
+        payload.date_created = new Date(log.createdAt).toISOString();
+      }
+
+      // Upload photo if needed
+      if (payload.PhotoURL && typeof payload.PhotoURL === "string" && payload.PhotoURL.startsWith("data:image/")) {
+        try {
+          const uploadedUrl = await uploadToCloudinary(payload.PhotoURL);
+          payload.PhotoURL = uploadedUrl;
+        } catch (err) {
+          console.error("Photo upload failed:", err);
+          toast.error("Photo upload failed. Will retry.");
+          setSyncingId(null);
+          return;
+        }
+      }
+
+      // Submit to API
+      const res = await fetch("/api/ModuleSales/Activity/AddLog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok || res.status === 409) {
+        // Success or duplicate - remove from local storage
+        await removePendingLog(log.id);
+        toast.success("Activity synced to server!");
+        await loadPendingLogs(); // Refresh the list
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.message || "Failed to sync activity");
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast.error("Network error. Please try again.");
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  // Load logs when dialog opens
+  useEffect(() => {
+    if (showDialog) {
+      loadPendingLogs();
+    }
+  }, [showDialog, loadPendingLogs]);
+
+  // Auto-refresh count when component mounts
+  useEffect(() => {
+    loadPendingLogs();
+    const interval = setInterval(loadPendingLogs, 5000); // Refresh every 5 seconds
+    return () => clearInterval(interval);
+  }, [loadPendingLogs]);
+
+  const count = pendingLogs.length;
+
+  return (
+    <>
+      {/* Card Button */}
+      <button
+        onClick={() => setShowDialog(true)}
+        className="w-full flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-4 py-4 text-left hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)] active:scale-[0.98] transition-all group shadow-sm mt-3 relative"
+      >
+        <div className="w-11 h-11 rounded-[14px] bg-[#E6F1FB] flex items-center justify-center flex-shrink-0 group-hover:bg-[#185FA5] transition-colors relative">
+          <Cloud size={20} className="text-[#185FA5] group-hover:text-white transition-colors" />
+          {count > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[var(--brand-primary)] text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+              {count > 9 ? '9+' : count}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-gray-800">Offline Activities</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            {count > 0 ? `${count} pending to sync` : "No pending activities"}
+          </p>
+        </div>
+        <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-[#185FA5] transition-colors">
+          <ChevronRight size={13} className="text-gray-400 group-hover:text-white transition-colors" />
+        </div>
+      </button>
+
+      {/* Dialog */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col">
+          <div className="bg-[var(--brand-primary)] px-6 pt-5 pb-6 flex-shrink-0">
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                onClick={() => setShowDialog(false)}
+                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              >
+                <ArrowLeft size={15} />
+              </button>
+              <div>
+                <h2 className="text-white font-semibold text-base">Offline Activities</h2>
+                <p className="text-white/65 text-[11px]">{count} pending in local storage</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 bg-[#F9F6F4]">
+            {count === 0 ? (
+              <div className="text-center py-12">
+                <Cloud size={48} className="text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">No offline activities</p>
+                <p className="text-gray-300 text-[11px] mt-1">Activities saved offline will appear here</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {pendingLogs.map((log, index) => {
+                  const payload = log.payload as any;
+                  const isSyncing = syncingId === log.id;
+                  
+                  return (
+                    <div key={log.id} className="bg-white rounded-2xl border border-gray-100 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          payload.Status === "Login" ? "bg-[#EEF7F2]" : "bg-[var(--brand-light)]"
+                        }`}>
+                          {payload.Status === "Login" ? (
+                            <LogIn size={16} className="text-[#1A7A4A]" />
+                          ) : (
+                            <LogOut size={16} className="text-[var(--brand-primary)]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-gray-800">
+                            {payload.Status} – {payload.Type}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {new Date(log.createdAt).toLocaleString("en-PH")}
+                          </p>
+                          <p className="text-[11px] text-gray-500 mt-1 truncate">
+                            {payload.Location || "No location"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Photo Preview if available */}
+                      {payload.PhotoURL && payload.PhotoURL.startsWith("data:image/") && (
+                        <div className="mb-3 rounded-xl overflow-hidden border border-gray-100">
+                          <img 
+                            src={payload.PhotoURL} 
+                            alt="Activity photo"
+                            className="w-full h-32 object-cover"
+                          />
+                        </div>
+                      )}
+
+                      {/* Push to Online Button */}
+                      <button
+                        onClick={() => syncSingleLog(log)}
+                        disabled={isSyncing || !navigator.onLine}
+                        className={[
+                          "w-full py-3 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all",
+                          isSyncing
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : navigator.onLine
+                              ? "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] active:scale-[0.98]"
+                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        ].join(" ")}
+                      >
+                        {isSyncing ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Syncing...
+                          </>
+                        ) : !navigator.onLine ? (
+                          <>
+                            <WifiOff size={16} />
+                            Offline
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload size={16} />
+                            Push to Online
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 bg-white border-t border-gray-100 flex-shrink-0">
+            <button
+              onClick={() => setShowDialog(false)}
+              className="w-full py-3.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-[14px] hover:bg-gray-200 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1337,6 +1672,7 @@ function ProfileTab({
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [faceVerificationLoading, setFaceVerificationLoading] = useState(false);
   const [secondaryEmail, setSecondaryEmail] = useState(userDetails?.SecondaryEmail || "");
   const [pin, setPin] = useState(userDetails?.pin || "");
   const [emailUpdating, setEmailUpdating] = useState(false);
@@ -1628,25 +1964,40 @@ function ProfileTab({
             </div>
             <button
               onClick={async () => {
-                if (!userId) return;
-                const newStatus = !(userDetails?.twoFactorEnabled !== false);
+                if (!userId || !userDetails || twoFactorLoading) return;
+                
+                const newStatus = !userDetails.twoFactorEnabled;
+                setTwoFactorLoading(true);
+                
                 try {
                   const res = await fetch("/api/profile-update", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ userId, twoFactorEnabled: newStatus }),
                   });
+                  
                   if (res.ok) {
-                    toast.success(`2FA ${newStatus ? "enabled" : "disabled"}`);
-                    onUpdateFaceVerification(newStatus);
+                    toast.success(`2-Step Verification ${newStatus ? "enabled" : "disabled"}`);
+                    // Update local state through callback if provided
+                    if (onUpdateFaceVerification) {
+                      onUpdateFaceVerification(newStatus);
+                    }
                   } else {
-                    toast.error("Failed to update face verification");
+                    const errorData = await res.json().catch(() => ({}));
+                    toast.error(errorData.message || "Failed to update 2-Step Verification");
                   }
                 } catch (e) {
-                  toast.error("An error occurred");
+                  toast.error("An error occurred while updating 2-Step Verification");
+                } finally {
+                  setTwoFactorLoading(false);
                 }
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${userDetails?.twoFactorEnabled ? 'bg-[var(--brand-primary)]' : 'bg-gray-200'}`}
+              disabled={twoFactorLoading}
+              className={[
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                userDetails?.twoFactorEnabled ? 'bg-[var(--brand-primary)]' : 'bg-gray-200',
+                twoFactorLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              ].join(" ")}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userDetails?.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -1665,8 +2016,9 @@ function ProfileTab({
             </div>
             <button
               onClick={async () => {
-                if (!userId) return;
+                if (!userId || faceVerificationLoading) return;
                 const newStatus = !(userDetails?.faceVerificationEnabled !== false);
+                setFaceVerificationLoading(true);
                 try {
                   const res = await fetch("/api/profile-update", {
                     method: "POST",
@@ -1681,9 +2033,16 @@ function ProfileTab({
                   }
                 } catch (e) {
                   toast.error("An error occurred");
+                } finally {
+                  setFaceVerificationLoading(false);
                 }
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${userDetails?.faceVerificationEnabled !== false ? 'bg-[var(--brand-primary)]' : 'bg-gray-200'}`}
+              disabled={faceVerificationLoading}
+              className={[
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                userDetails?.faceVerificationEnabled !== false ? 'bg-[var(--brand-primary)]' : 'bg-gray-200',
+                faceVerificationLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              ].join(" ")}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userDetails?.faceVerificationEnabled !== false ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -3059,6 +3418,10 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
 }) {
   if (!meeting) return null;
   const user = usersMap[meeting.ReferenceID];
+  
+  // Use reverse geocoding for coordinate-based locations
+  const { displayLocation, isResolving, isCoords, originalCoords } = useResolvedLocation(meeting.Location, open);
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
@@ -3112,9 +3475,26 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
             </div>
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><MapPin size={18} className="text-purple-600" /></div>
-              <div>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Location</p>
-                <p className="text-[14px] font-semibold text-gray-800">{meeting.Location || "Not specified"}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                  Location
+                  {isCoords && !isResolving && (
+                    <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Offline</span>
+                  )}
+                </p>
+                {isResolving ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Clock size={12} className="animate-pulse" />
+                    <span className="text-[12px]">Resolving address...</span>
+                  </div>
+                ) : (
+                  <p className="text-[14px] font-semibold text-gray-800 leading-snug">{displayLocation}</p>
+                )}
+                {isCoords && originalCoords && (
+                  <p className="text-[10px] text-gray-400 mt-0.5 italic">
+                    Coordinates: {originalCoords}
+                  </p>
+                )}
               </div>
             </div>
             <div className="border-t border-gray-100 pt-4">

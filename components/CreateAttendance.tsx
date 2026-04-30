@@ -183,7 +183,11 @@ export default function CreateAttendance({
     try {
       if (!navigator.onLine) {
         await enqueuePendingLog({ ...basePayload, PhotoURL: photo });
-        toast.success("Saved offline — will sync when you're back online.");
+        toast.success("Saved offline — will sync when you're back online.", {
+          duration: 4000,
+        });
+        // Dispatch custom event to trigger pending count refresh
+        window.dispatchEvent(new CustomEvent("acculog:sync"));
         onOpenChangeAction(false);
         resetForm();
         return;

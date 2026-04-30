@@ -10,11 +10,3 @@ This system is protected under international copyright laws and is the sole prop
 DO NOT COPY, RESELL, OR CLAIM THIS PROJECT AS YOUR OWN.
 
 For permissions, collaboration, or licensing inquiries, please contact the original developers.
-
-
-MongoDB Connection Database
-
-phdevtechsolutions_db_user
-gUpn5Ip3PBTLM49E
-
-mongodb+srv://phdevtechsolutions_db_user:gUpn5Ip3PBTLM49E@biolog.cgll8w1.mongodb.net/?appName=biolog

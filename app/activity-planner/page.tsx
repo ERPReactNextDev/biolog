@@ -2068,41 +2068,54 @@ function ActivityPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const wbRef = useRef<any>(null);
 
-  // Check for PWA updates
+  // Check for PWA updates - Listen to existing service worker registration
   useEffect(() => {
-    // Only run in browser and if service worker is supported
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    let refreshing = false;
+
+    const handleControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      setIsUpdating(false);
+      setUpdateAvailable(false);
+      window.location.reload();
+    };
 
     const checkForUpdates = async () => {
       try {
-        // Dynamic import workbox-window to avoid SSR issues
-        const { Workbox } = await import('workbox-window');
+        const registration = await navigator.serviceWorker.ready;
         
-        // Check if WB is already registered
-        if (wbRef.current) return;
-
-        const wb = new Workbox('/sw.js');
-        wbRef.current = wb;
-
-        // Listen for waiting service worker (new version available)
-        wb.addEventListener('waiting', (event: any) => {
+        // Check if there's a waiting service worker
+        if (registration.waiting) {
           setUpdateAvailable(true);
           setUpdateInfo({
-            version: event?.sw?.scriptURL || 'New Version',
+            version: 'New Version',
             timestamp: new Date().toLocaleString('en-PH')
+          });
+        }
+
+        // Listen for new waiting service workers
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available
+              setUpdateAvailable(true);
+              setUpdateInfo({
+                version: 'New Version',
+                timestamp: new Date().toLocaleString('en-PH')
+              });
+            }
           });
         });
 
-        // Listen for controlling event (update applied)
-        wb.addEventListener('controlling', () => {
-          setIsUpdating(false);
-          setUpdateAvailable(false);
-        });
-
-        // Register the service worker
-        await wb.register();
+        // Listen for controller change (update applied)
+        navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
       } catch (err) {
-        // Silent fail - not all browsers support workbox-window
+        // Silent fail
       }
     };
 
@@ -2110,28 +2123,32 @@ function ActivityPage() {
 
     // Periodic check for updates (every 5 minutes)
     const interval = setInterval(() => {
-      if (wbRef.current?.update) {
-        wbRef.current.update();
-      }
+      navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
     }, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+    };
   }, []);
 
   const handlePWAUpdate = async () => {
     setIsUpdating(true);
     
     try {
-      if (wbRef.current?.messageSkipWaiting) {
-        // Tell the service worker to skip waiting
-        await wbRef.current.messageSkipWaiting();
+      const registration = await navigator.serviceWorker.ready;
+      if (registration.waiting) {
+        // Tell the waiting service worker to skip waiting
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
       
-      // Reload the page to activate the new service worker
-      window.location.reload();
+      // Reload will happen automatically via controllerchange event
+      // Fallback reload after 2 seconds if controllerchange doesn't fire
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       setIsUpdating(false);
-      // Fallback: just reload
       window.location.reload();
     }
   };

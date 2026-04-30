@@ -1,7 +1,7 @@
 // public/service-worker.js
-// Acculog PWA — Service Worker v8
+// Acculog PWA — Service Worker v10 - Fixed offline support
 
-const CACHE_NAME     = "acculog-cache-v9";   // bump version → forces re-install
+const CACHE_NAME     = "acculog-cache-v10";   // bump version → forces re-install
 const OSM_CACHE_NAME = "acculog-osm-tiles-v1";
 const SYNC_TAG       = "sync-activity-logs";
 
@@ -9,15 +9,6 @@ const SYNC_TAG       = "sync-activity-logs";
 
 const STATIC_ASSETS = [
   "/",
-  "/activity-planner",
-  "/Login",
-  "/dashboard",
-  "/gps-report",
-  "/time-attendance/timesheet",
-  "/time-attendance/activity",
-  "/time-attendance/location",
-  "/profile",
-  "/ticket",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -25,6 +16,9 @@ const STATIC_ASSETS = [
   "/models/tiny_face_detector/tiny_face_detector_model.json",
   "/models/face_landmark68/face_landmark_68_model.json",
 ];
+
+// ── Runtime cache for Next.js static assets ─────────────────────────────────
+const STATIC_RUNTIME_CACHE = "acculog-runtime-static-v1";
 
 // ── Cacheable API patterns (GET only) ────────────────────────────────────────
 
@@ -78,7 +72,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k !== CACHE_NAME && k !== OSM_CACHE_NAME)
+            .filter((k) => k !== CACHE_NAME && k !== OSM_CACHE_NAME && k !== STATIC_RUNTIME_CACHE)
             .map((k) => caches.delete(k))
         )
       )
@@ -130,19 +124,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ③ Cacheable API GETs — Network-First with cache fallback
+  // ③ Next.js static assets (JS/CSS bundles) — Runtime Cache-First
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(runtimeCacheFirst(request, STATIC_RUNTIME_CACHE));
+    return;
+  }
+
+  // ④ Cacheable API GETs — Network-First with cache fallback
   if (CACHEABLE_API_PATTERNS.some((p) => p.test(url.pathname))) {
     event.respondWith(networkFirstWithCache(request, CACHE_NAME));
     return;
   }
 
-  // ④ face-api / model weights — Cache-First (large binary, rarely changes)
+  // ⑤ face-api / model weights — Cache-First (large binary, rarely changes)
   if (url.pathname.startsWith("/models/")) {
     event.respondWith(cacheFirstWithNetwork(request, CACHE_NAME));
     return;
   }
 
-  // ⑤ Everything else (pages, JS, CSS, images) — Cache-First
+  // ⑥ Navigation requests (pages) — Serve cached shell, let SPA handle routing
+  if (request.mode === "navigate") {
+    event.respondWith(navigateWithFallback(request));
+    return;
+  }
+
+  // ⑦ Everything else (images, fonts, etc) — Cache-First
   event.respondWith(cacheFirstWithNetwork(request, CACHE_NAME));
 });
 
@@ -164,6 +170,15 @@ async function notifyClientsToSync() {
     client.postMessage({ type: "SW_SYNC_TRIGGER" })
   );
 }
+
+// ── Message Handler ───────────────────────────────────────────────────────────
+// Listen for messages from the client (e.g., skip waiting for updates)
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
 // ── Caching strategies ────────────────────────────────────────────────────────
 
@@ -240,11 +255,81 @@ async function cacheFirstWithNetwork(request, cacheName) {
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch {
-    // For navigation requests, serve the app shell so the SPA can render
-    if (request.mode === "navigate") {
-      const shell = await cache.match("/");
-      if (shell) return shell;
-    }
     return new Response("Offline", { status: 503 });
   }
+}
+
+/**
+ * Runtime Cache-First: For Next.js static assets that are generated at build time.
+ * These are immutable (hashed filenames), so we cache them aggressively.
+ */
+async function runtimeCacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      // Clone before putting to cache since we need to return the response too
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    // Return cached version or 503 if not available
+    if (cached) return cached;
+    return new Response("Offline - static asset unavailable", { status: 503 });
+  }
+}
+
+/**
+ * Navigation Fallback: For page navigation requests.
+ * Try network first, fall back to cached shell, or return offline page.
+ */
+async function navigateWithFallback(request) {
+  const cache = await caches.open(CACHE_NAME);
+  
+  try {
+    // Try network first for fresh content
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      // Cache successful navigation responses for offline use
+      // Clone the response before caching
+      const responseClone = networkResponse.clone();
+      
+      // Only cache same-origin successful HTML responses
+      if (request.url.startsWith(self.location.origin)) {
+        cache.put(request, responseClone);
+      }
+      return networkResponse;
+    }
+  } catch (err) {
+    // Network failed - try to serve from cache
+  }
+  
+  // Try to serve the cached version of this specific page
+  const cachedResponse = await cache.match(request);
+  if (cachedResponse) return cachedResponse;
+  
+  // Fall back to the main app shell (home page)
+  const shell = await cache.match("/");
+  if (shell) return shell;
+  
+  // Last resort - try the start URL from manifest
+  const startUrl = await cache.match("/activity-planner");
+  if (startUrl) return startUrl;
+  
+  // If nothing is cached, return offline error
+  return new Response(
+    `<!DOCTYPE html>
+    <html>
+    <head><title>Offline</title></head>
+    <body style="font-family:sans-serif;text-align:center;padding:50px;">
+      <h1>You're Offline</h1>
+      <p>Please check your internet connection and try again.</p>
+      <button onclick="location.reload()">Retry</button>
+    </body>
+    </html>`,
+    { status: 503, headers: { "Content-Type": "text/html" } }
+  );
 }

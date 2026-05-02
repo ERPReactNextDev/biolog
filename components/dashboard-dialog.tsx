@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2 } from "lucide-react";
+import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2, Download } from "lucide-react";
+import { toast } from "sonner";
 
 interface ActivityLog {
   ReferenceID: string;
@@ -119,6 +122,182 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
   // Get display location (resolved address or original)
   const displayLocation = resolvedAddress || selectedEvent?.Location || "No location recorded";
   const isCoords = isCoordinateFormat(selectedEvent?.Location || "");
+
+  // State for download loading
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Download photo with watermark
+  const downloadPhoto = useCallback(async () => {
+    if (!selectedEvent?.PhotoURL) return;
+
+    setIsDownloading(true);
+    try {
+      // Load the image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = selectedEvent.PhotoURL!;
+      });
+
+      // Create canvas
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
+
+      // Set canvas dimensions to match image
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw the original image
+      ctx.drawImage(img, 0, 0);
+
+      // Watermark configuration - smaller and professional
+      const padding = Math.max(10, canvas.width * 0.015);
+      const maxAvailableWidth = canvas.width - (padding * 2);
+      const fontSize = Math.max(10, Math.min(canvas.width / 35, 14));
+      const lineHeight = fontSize * 1.25;
+      
+      // Prepare text lines
+      const timeText = new Date(selectedEvent.date_created).toLocaleTimeString("en-PH", { 
+        hour: "2-digit", 
+        minute: "2-digit", 
+        hour12: true 
+      });
+      const statusTimeText = `${selectedEvent.Status} · ${timeText}`;
+      
+      // Truncate location if too long (max 2 lines worth)
+      let locationText = displayLocation;
+      ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+      
+      // Word wrap function for location - with strict max width
+      const wrapText = (text: string, maxW: number): string[] => {
+        const words = text.split(' ');
+        const lines: string[] = [];
+        let currentLine = '';
+        
+        for (const word of words) {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxW - 4 && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+            // Stop after 2 lines
+            if (lines.length >= 2) break;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine && lines.length < 2) lines.push(currentLine);
+        
+        // Add ellipsis to last line if text was truncated
+        if (lines.length === 2 && words.length > lines.join(' ').split(' ').length) {
+          const lastLine = lines[1];
+          if (lastLine.length > 5) {
+            lines[1] = lastLine.substring(0, lastLine.length - 3).trim() + '...';
+          }
+        }
+        return lines;
+      };
+      
+      const locationLines = wrapText(locationText, maxAvailableWidth);
+
+      // Calculate watermark dimensions based on actual wrapped text widths
+      ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+      const allLines = [...locationLines, statusTimeText];
+      let actualMaxWidth = 0;
+      for (const line of allLines) {
+        const width = ctx.measureText(line).width;
+        if (width > actualMaxWidth) actualMaxWidth = width;
+      }
+      
+      // Strictly constrain watermark within image
+      const boxPadding = 10;
+      const watermarkWidth = Math.min(actualMaxWidth + (boxPadding * 2), maxAvailableWidth - 4);
+      const watermarkHeight = (allLines.length * lineHeight) + (boxPadding * 1.5);
+      const startX = padding + boxPadding;
+      const startY = canvas.height - padding - watermarkHeight + boxPadding + fontSize;
+
+      // Draw elegant background with rounded corners
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.beginPath();
+      const cornerRadius = 5;
+      const x = padding;
+      const y = canvas.height - padding - watermarkHeight;
+      const w = watermarkWidth;
+      const h = watermarkHeight;
+      
+      ctx.moveTo(x + cornerRadius, y);
+      ctx.lineTo(x + w - cornerRadius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + cornerRadius);
+      ctx.lineTo(x + w, y + h - cornerRadius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - cornerRadius, y + h);
+      ctx.lineTo(x + cornerRadius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - cornerRadius);
+      ctx.lineTo(x, y + cornerRadius);
+      ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw watermark text
+      ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+
+      // Draw location lines
+      locationLines.forEach((line, index) => {
+        ctx.fillText(line, startX, startY + (index * lineHeight));
+      });
+
+      // Draw status and time with subtle accent color
+      ctx.fillStyle = "rgba(255, 200, 200, 0.9)";
+      ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+      ctx.fillText(statusTimeText, startX, startY + (locationLines.length * lineHeight));
+
+      // Draw Biolog footer watermark at bottom right (very small)
+      const footerFontSize = Math.max(8, Math.min(canvas.width / 45, 10));
+      const footerText = `Biolog · ${new Date().getFullYear()}`;
+      ctx.font = `600 ${footerFontSize}px system-ui, -apple-system, sans-serif`;
+      const footerMetrics = ctx.measureText(footerText);
+      const footerX = canvas.width - padding - footerMetrics.width;
+      const footerY = canvas.height - padding - 2;
+      
+      // Subtle shadow for readability
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      ctx.fillText(footerText, footerX + 1, footerY + 1);
+      // White text
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.fillText(footerText, footerX, footerY);
+
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.error("Failed to create image");
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const dateStr = new Date(selectedEvent.date_created).toISOString().split('T')[0];
+        link.href = url;
+        link.download = `attendance-${selectedEvent.Status.toLowerCase()}-${dateStr}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success("Photo downloaded with watermark");
+      }, "image/png");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download photo");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [selectedEvent, displayLocation]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -241,9 +420,23 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
               {/* Photo Verification */}
               {selectedEvent.PhotoURL && (
                 <div className="bg-white rounded-2xl border border-gray-100 p-1 flex flex-col">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-50">
-                    <Camera size={13} className="text-brand-primary" />
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Photo Verification</p>
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50">
+                    <div className="flex items-center gap-2">
+                      <Camera size={13} className="text-brand-primary" />
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Photo Verification</p>
+                    </div>
+                    <button
+                      onClick={downloadPhoto}
+                      disabled={isDownloading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white rounded-lg text-[11px] font-semibold hover:bg-brand-primary-hover transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      {isDownloading ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Download size={12} />
+                      )}
+                      {isDownloading ? "Downloading..." : "Download"}
+                    </button>
                   </div>
                   <div className="relative aspect-[4/3] rounded-xl overflow-hidden mt-1">
                     <img 

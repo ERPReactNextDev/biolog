@@ -8,7 +8,8 @@ import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { MapPin, ArrowLeft, CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
 
 const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
@@ -239,6 +240,9 @@ export default function CreateAttendance({
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col">
+        <VisuallyHidden>
+          <DialogTitle>Create Attendance</DialogTitle>
+        </VisuallyHidden>
 
         {/* ── Header ── */}
         <div className="bg-brand-primary px-6 pt-5 pb-6 flex-shrink-0">

@@ -1,19 +1,17 @@
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export async function recordAuditLog(adminId: string, adminName: string, action: string, targetId: string, targetName: string, details?: string) {
     try {
-        const db = await connectToDatabase();
-        const collection = db.collection("audit_logs");
-        
-        await collection.insertOne({
+        await supabase.from("audit_logs").insert({
             adminId,
             adminName,
             action,
             targetId,
             targetName,
             details,
-            date_created: new Date()
+            date_created: new Date().toISOString()
         });
     } catch (error) {
+        console.error("Failed to record audit log:", error);
     }
 }

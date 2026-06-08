@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { serialize, parse } from "cookie";
-import { connectToDatabase } from "./MongoDB";
+import { supabase } from "./supabase";
 
 // Function to destroy session
 export async function destroySession(req: NextApiRequest, res: NextApiResponse) {
@@ -9,10 +9,9 @@ export async function destroySession(req: NextApiRequest, res: NextApiResponse) 
 
   if (sessionToken) {
     try {
-      const db = await connectToDatabase();
-      const sessionsCollection = db.collection("sessions");
-      await sessionsCollection.deleteOne({ token: sessionToken });
+      await supabase.from("sessions").delete().eq("token", sessionToken);
     } catch (e) {
+      console.error("destroySession error:", e);
     }
   }
 

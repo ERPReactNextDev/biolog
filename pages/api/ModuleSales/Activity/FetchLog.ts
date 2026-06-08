@@ -1,16 +1,16 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 interface ActivityLog {
-  _id: string;
+  id: string;
   ReferenceID: string;
   Email: string;
   Type: string;
   Status: string;
   Location: string;
-  Latitude: number;
-  Longitude: number;
-  date_created: Date | string;
+  Latitude: string;
+  Longitude: string;
+  date_created: string;
   PhotoURL?: string;
   Remarks: string;
   SiteVisitAccount?: string;
@@ -35,85 +35,58 @@ export default async function fetchLogs(
     const role            = typeof req.query.role        === "string" ? req.query.role        : "";
     const userReferenceID = typeof req.query.referenceID === "string" ? req.query.referenceID : "";
 
-    const query: Record<string, unknown> = {};
+    let supabaseQuery = supabase
+      .from("tasklog")
+      .select("*", { count: "exact" });
 
     const isAdmin = role === "SuperAdmin" || role === "Human Resources";
     if (!isAdmin) {
       if (!userReferenceID) {
         return res.status(400).json({ error: "referenceID is required for non-admin roles" });
       }
-      query.ReferenceID = userReferenceID;
+      supabaseQuery = supabaseQuery.eq("ReferenceID", userReferenceID);
     }
 
     // ── Date filter ───────────────────────────────────────────────────────────
     const startDate = req.query.startDate as string | undefined;
     const endDate   = req.query.endDate   as string | undefined;
 
-    if (startDate || endDate) {
-      const dateFilter: Record<string, Date> = {};
-
-      if (startDate) {
-        const parsed = new Date(startDate);
-        if (isNaN(parsed.getTime())) {
-          return res.status(400).json({ error: "Invalid startDate format" });
-        }
-        dateFilter.$gte = parsed;
+    if (startDate) {
+      const parsed = new Date(startDate);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({ error: "Invalid startDate format" });
       }
+      supabaseQuery = supabaseQuery.gte("date_created", parsed.toISOString());
+    }
 
-      if (endDate) {
-        const parsed = new Date(endDate);
-        if (isNaN(parsed.getTime())) {
-          return res.status(400).json({ error: "Invalid endDate format" });
-        }
-        dateFilter.$lte = parsed;
+    if (endDate) {
+      const parsed = new Date(endDate);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({ error: "Invalid endDate format" });
       }
-
-      query.date_created = dateFilter;
+      supabaseQuery = supabaseQuery.lte("date_created", parsed.toISOString());
     }
 
     // ── DB ────────────────────────────────────────────────────────────────────
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch (dbErr) {
-      return res.status(503).json({ error: "Database connection failed. Please try again." });
+    const { data: rawLogs, count, error } = await supabaseQuery
+      .order("date_created", { ascending: false })
+      .range(skip, skip + limit - 1);
+
+    if (error) {
+      console.error("Supabase fetch error:", error);
+      return res.status(503).json({ error: "Failed to fetch logs from database." });
     }
 
-    const collection = db.collection("TaskLog");
-
-    const [rawLogs, totalLogs] = await Promise.all([
-      collection
-        .find(query, {
-          projection: {
-            ReferenceID:      1,
-            Email:            1,
-            Type:             1,
-            Status:           1,
-            Location:         1,
-            Latitude:         1,
-            Longitude:        1,
-            date_created:     1,
-            PhotoURL:         1,
-            Remarks:          1,
-            SiteVisitAccount: 1,
-          },
-        })
-        .sort({ date_created: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
-      collection.countDocuments(query),
-    ]);
-
-    const logs: ActivityLog[] = rawLogs.map((doc) => ({
-      _id:              doc._id.toString(),
+    const logs: ActivityLog[] = (rawLogs || []).map((doc) => ({
+      id:               doc.id.toString(),
+      _id:              doc.id.toString(), // for compatibility
       ReferenceID:      doc.ReferenceID      ?? "",
       Email:            doc.Email            ?? "",
       Type:             doc.Type             ?? "",
       Status:           doc.Status           ?? "",
       Location:         doc.Location         ?? "",
-      Latitude:         doc.Latitude         ?? 0,
-      Longitude:        doc.Longitude        ?? 0,
+      Latitude:         doc.Latitude         ?? "0",
+      Longitude:        doc.Longitude        ?? "0",
       date_created:     doc.date_created,
       PhotoURL:         doc.PhotoURL,
       Remarks:          doc.Remarks          ?? "",
@@ -125,11 +98,12 @@ export default async function fetchLogs(
       pagination: {
         page,
         limit,
-        total: totalLogs,
-        totalPages: Math.ceil(totalLogs / limit),
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
       },
     });
   } catch (error) {
+    console.error("[FetchLog] Unhandled error:", error);
     return res.status(500).json({ error: "Failed to fetch logs" });
   }
 }

@@ -1,39 +1,50 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
-import { ObjectId } from "mongodb";
+import { supabase } from "@/lib/supabase";
 import bcrypt from "bcrypt";
 import { recordAuditLog } from "@/utils/audit-logger";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const db = await connectToDatabase();
-  const usersCollection = db.collection("users");
-
   switch (req.method) {
     case "GET":
       try {
-        const users = await usersCollection.find({}).project({ Password: 0 }).toArray();
-        return res.status(200).json(users);
+        const { data: users, error } = await supabase
+          .from("users")
+          .select("*")
+          .order("createdAt", { ascending: false });
+        
+        if (error) throw error;
+
+        // Remove passwords from response and add _id for compatibility
+        const sanitizedUsers = users.map(({ Password, id, ...u }) => ({ ...u, id, _id: id }));
+        return res.status(200).json(sanitizedUsers);
       } catch (error) {
         return res.status(500).json({ error: "Failed to fetch users" });
       }
 
     case "POST":
       try {
-        const { Email, Password, Role, Department, Firstname, Lastname, ReferenceID, Status, adminId, adminName } = req.body;
+        const { 
+          Email, Password, Role, Department, Firstname, Lastname, ReferenceID, Status, 
+          Company, Manager, TSM, ContactNumber, Position, Address,
+          adminId, adminName 
+        } = req.body;
 
         if (!Email || !Password || !Role || !Department || !Firstname || !Lastname || !ReferenceID) {
           return res.status(400).json({ error: "Missing required fields" });
         }
 
-        const existingUser = await usersCollection.findOne({ 
-          $or: [{ Email }, { ReferenceID }] 
-        });
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("id")
+          .or(`Email.eq.${Email},ReferenceID.eq.${ReferenceID}`)
+          .maybeSingle();
 
         if (existingUser) {
           return res.status(400).json({ error: "Email or Reference ID already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(Password, 10);
+        const { permissions } = req.body;
         const newUser = {
           Email,
           Password: hashedPassword,
@@ -43,12 +54,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Lastname,
           ReferenceID,
           Status: Status || "Active",
-          createdAt: new Date(),
+          Company: Company || "",
+          Manager: Manager || "",
+          TSM: TSM || "",
+          ContactNumber: ContactNumber || "",
+          Position: Position || "",
+          Address: Address || "",
+          createdAt: new Date().toISOString(),
           LoginAttempts: 0,
-          Connection: "Offline"
+          Connection: "Offline",
+          permissions: permissions ?? { canCreateAttendance: true, canCreateSiteVisit: true },
         };
 
-        await usersCollection.insertOne(newUser);
+        const { error: insertError } = await supabase.from("users").insert(newUser);
+        if (insertError) throw insertError;
         
         if (adminId && adminName) {
             await recordAuditLog(adminId, adminName, "CREATE_USER", ReferenceID, `${Firstname} ${Lastname}`, `Created new ${Role} user in ${Department}`);
@@ -56,6 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         return res.status(201).json({ message: "User created successfully" });
       } catch (error) {
+        console.error("Create user error:", error);
         return res.status(500).json({ error: "Failed to create user" });
       }
 
@@ -64,17 +84,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { userId, adminId, adminName, ...updateData } = req.body;
         if (!userId) return res.status(400).json({ error: "User ID is required" });
 
-        const oldUser = await usersCollection.findOne({ _id: new ObjectId(userId) });
-        if (!oldUser) return res.status(404).json({ error: "User not found" });
+        const { data: oldUser, error: fetchError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single();
+
+        if (fetchError || !oldUser) return res.status(404).json({ error: "User not found" });
 
         if (updateData.Password) {
           updateData.Password = await bcrypt.hash(updateData.Password, 10);
         }
 
-        const result = await usersCollection.updateOne(
-          { _id: new ObjectId(userId) },
-          { $set: { ...updateData, updatedAt: new Date() } }
-        );
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ ...updateData })
+          .eq("id", userId);
+
+        if (updateError) throw updateError;
 
         if (adminId && adminName) {
             let action = "UPDATE_USER";
@@ -90,6 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         return res.status(200).json({ message: "User updated successfully" });
       } catch (error) {
+        console.error("Update user error:", error);
         return res.status(500).json({ error: "Failed to update user" });
       }
 
@@ -98,13 +126,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { userId, adminId, adminName } = req.body;
         if (!userId) return res.status(400).json({ error: "User ID is required" });
 
-        const oldUser = await usersCollection.findOne({ _id: new ObjectId(userId) });
-        if (!oldUser) return res.status(404).json({ error: "User not found" });
+        const { data: oldUser, error: fetchError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single();
 
-        const result = await usersCollection.deleteOne({ _id: new ObjectId(userId) });
+        if (fetchError || !oldUser) return res.status(404).json({ error: "User not found" });
+
+        const { error: deleteError } = await supabase.from("users").delete().eq("id", userId);
+        if (deleteError) throw deleteError;
         
         // Also delete sessions for this user
-        await db.collection("sessions").deleteMany({ userId });
+        await supabase.from("sessions").delete().eq("userId", userId);
 
         if (adminId && adminName) {
             await recordAuditLog(adminId, adminName, "DELETE_USER", oldUser.ReferenceID, `${oldUser.Firstname} ${oldUser.Lastname}`, `Permanently deleted user account`);
@@ -112,6 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         return res.status(200).json({ message: "User deleted successfully" });
       } catch (error) {
+        console.error("Delete user error:", error);
         return res.status(500).json({ error: "Failed to delete user" });
       }
 

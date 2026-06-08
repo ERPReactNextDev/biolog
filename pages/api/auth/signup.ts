@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 import bcrypt from "bcrypt";
 
 /*
@@ -33,16 +33,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: "Password must be at least 6 characters." });
     }
 
-    const db = await connectToDatabase();
-    const users = db.collection("users");
-
     /* ── Duplicate check (email OR referenceID) ── */
-    const existing = await users.findOne({
-      $or: [
-        { Email: { $regex: new RegExp(`^${Email}$`, "i") } },
-        { ReferenceID },
-      ],
-    });
+    const { data: existing, error: fetchError } = await supabase
+      .from("users")
+      .select("Email, ReferenceID")
+      .or(`Email.ilike.${Email},ReferenceID.eq.${ReferenceID}`)
+      .maybeSingle();
 
     if (existing) {
       const field = existing.Email?.toLowerCase() === Email.toLowerCase()
@@ -55,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hashedPassword = await bcrypt.hash(Password, 10);
 
     /* ── Insert with Status: "Revoked" ── */
-    await users.insertOne({
+    const { error: insertError } = await supabase.from("users").insert({
       Firstname,
       Lastname,
       Email,
@@ -67,15 +63,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Status: "Revoked",           // ← Pending admin approval
       LoginAttempts: 0,
       Connection: "Offline",
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       registrationMethod: "self-signup",
     });
+
+    if (insertError) throw insertError;
 
     return res.status(201).json({
       message: "Account created successfully. Please wait for admin approval before logging in.",
     });
 
   } catch (error) {
+    console.error("Signup error:", error);
     return res.status(500).json({ message: "An unexpected error occurred. Please try again." });
   }
 }

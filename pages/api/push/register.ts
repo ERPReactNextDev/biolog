@@ -1,8 +1,8 @@
 // pages/api/push/register.ts
-// Saves a user's FCM push token to MongoDB so we can send targeted notifications.
+// Saves a user's FCM push token to Supabase so we can send targeted notifications.
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -15,20 +15,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db = await connectToDatabase();
-    await db.collection("push_tokens").updateOne(
-      { userId },
-      {
-        $set: {
-          userId,
-          token,
-          updatedAt: new Date(),
-          platform: req.headers["user-agent"]?.includes("Mobile") ? "mobile" : "desktop",
-        },
-        $setOnInsert: { createdAt: new Date() },
-      },
-      { upsert: true }
-    );
+    const { error } = await supabase
+      .from("push_tokens")
+      .upsert({
+        userId,
+        token,
+        updatedAt: new Date().toISOString(),
+        platform: req.headers["user-agent"]?.includes("Mobile") ? "mobile" : "desktop",
+      }, { onConflict: 'userId' });
+
+    if (error) throw error;
+
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("[push/register]", err);

@@ -4,11 +4,9 @@ import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Camera from "./camera";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import {
-  ArrowLeft, MapPin, CheckCircle2, LogIn, LogOut,
-  UserPlus, Users, FileText, AlertCircle,
-} from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MapPin, ArrowLeft, CheckCircle2, LogIn, LogOut, FileText, UserPlus, Users, AlertCircle, FileText as FileTextIcon } from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Select from "react-select";
 
 const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
@@ -27,11 +25,19 @@ interface FormData {
   PhotoURL: string;
   Remarks: string;
   SiteVisitAccount?: string;
+  manager?: string; // Add manager field
+  // New Client Fields
+  company_name?: string;
+  contact_person?: string;
+  contact_number?: string;
+  email_address?: string;
+  address?: string;
 }
 
 interface UserDetails {
   ReferenceID: string;
   TSM: string;
+  Manager?: string; // Add Manager to UserDetails
   Email: string;
   Role: string;
   faceDescriptors?: number[][];
@@ -114,8 +120,18 @@ export default function CreateSalesAttendance({
           .then((d) => {
             const addr = d.display_name || "Location detected";
             setLocationAddress(addr);
+            // Auto-populate address field for New Client
+            if (clientType === "New Client") {
+              onChangeAction("address", addr);
+            }
           })
-          .catch(() => setLocationAddress("Location detected (GPS OK)"));
+          .catch(() => {
+            const fallback = "Location detected (GPS OK)";
+            setLocationAddress(fallback);
+            if (clientType === "New Client") {
+              onChangeAction("address", fallback);
+            }
+          });
       };
 
       const error = (err: GeolocationPositionError) => {
@@ -262,6 +278,8 @@ export default function CreateSalesAttendance({
       Latitude:  manualLat ?? latitude,
       Longitude: manualLng ?? longitude,
       FaceData:  faceData,
+      manager:   userDetails.Manager, // Pass manager from userDetails
+      type_client: clientType,
     };
 
     const resetForm = () => {
@@ -275,6 +293,11 @@ export default function CreateSalesAttendance({
         PhotoURL: "",
         Remarks: "",
         SiteVisitAccount: "",
+        company_name: "",
+        contact_person: "",
+        contact_number: "",
+        email_address: "",
+        address: "",
       });
       setCapturedImage(null);
       onOpenChangeAction(false);
@@ -346,7 +369,8 @@ export default function CreateSalesAttendance({
     loadingStatus ||
     locationAddress === "Fetching location..." ||
     locationAddress.includes("unavailable") ||
-    (clientType === "Existing Client" && !formData.SiteVisitAccount);
+    (clientType === "Existing Client" && !formData.SiteVisitAccount) ||
+    (clientType === "New Client" && (!formData.company_name || !formData.address));
 
   /* ── Render ── */
   return (
@@ -360,6 +384,9 @@ export default function CreateSalesAttendance({
           if (selectMenuOpen) e.preventDefault();
         }}
       >
+        <VisuallyHidden>
+          <DialogTitle>Site Visit Log</DialogTitle>
+        </VisuallyHidden>
         {/* ── Header ── */}
         <div className="bg-brand-primary px-6 pt-5 pb-5 flex-shrink-0">
           <div className="flex items-center gap-3 mb-5">
@@ -459,7 +486,15 @@ export default function CreateSalesAttendance({
                           key={t}
                           onClick={() => {
                             setClientType(t);
-                            if (t === "New Client") onChangeAction("SiteVisitAccount", "");
+                            if (t === "New Client") {
+                              onChangeAction("SiteVisitAccount", "");
+                              onChangeAction("Status", "For Approval");
+                              onChangeAction("address", locationAddress);
+                            } else {
+                              // Reset status to the one calculated for Login/Logout
+                              const next = lastStatus === "Login" ? "Logout" : "Login";
+                              onChangeAction("Status", next);
+                            }
                           }}
                           className={[
                             "rounded-2xl border-[1.5px] p-4 flex flex-col items-center gap-2 transition-all",
@@ -498,6 +533,74 @@ export default function CreateSalesAttendance({
                     })}
                   </div>
                 </div>
+
+                {/* New Client Fields */}
+                {clientType === "New Client" && (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                        Company Name
+                      </p>
+                      <input
+                        type="text"
+                        value={formData.company_name || ""}
+                        onChange={(e) => onChangeAction("company_name", e.target.value)}
+                        placeholder="Enter company name..."
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                          Contact Person
+                        </p>
+                        <input
+                          type="text"
+                          value={formData.contact_person || ""}
+                          onChange={(e) => onChangeAction("contact_person", e.target.value)}
+                          placeholder="Name..."
+                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                          Contact Number
+                        </p>
+                        <input
+                          type="text"
+                          value={formData.contact_number || ""}
+                          onChange={(e) => onChangeAction("contact_number", e.target.value)}
+                          placeholder="Phone..."
+                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                        Email Address
+                      </p>
+                      <input
+                        type="email"
+                        value={formData.email_address || ""}
+                        onChange={(e) => onChangeAction("email_address", e.target.value)}
+                        placeholder="client@email.com..."
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
+                        Address
+                      </p>
+                      <textarea
+                        value={formData.address || ""}
+                        onChange={(e) => onChangeAction("address", e.target.value)}
+                        placeholder="Company address..."
+                        rows={2}
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Existing Client — account selector */}
                 {clientType === "Existing Client" && (
@@ -645,7 +748,12 @@ export default function CreateSalesAttendance({
                         onChange={(lat, lng, addr) => {
                           setManualLat(lat);
                           setManualLng(lng);
-                          if (addr) setLocationAddress(addr);
+                          if (addr) {
+                            setLocationAddress(addr);
+                            if (clientType === "New Client") {
+                              onChangeAction("address", addr);
+                            }
+                          }
                         }}
                       />
                     </div>

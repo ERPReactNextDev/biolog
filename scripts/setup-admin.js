@@ -1,25 +1,23 @@
-const { MongoClient } = require('mongodb');
+const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
 const dotenv = require('dotenv');
 const path = require('path');
 
 // Load .env.local
-dotenv.config({ path: path.join(__dirname, '.env.local') });
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
-const uri = process.env.MONGODB_URI;
-if (!uri) {
-  console.error('MONGODB_URI is not defined in .env.local');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Supabase environment variables are not defined in .env.local');
   process.exit(1);
 }
 
-const client = new MongoClient(uri);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function createSuperAdmin() {
   try {
-    await client.connect();
-    const db = client.db('biolog');
-    const usersCollection = db.collection('users');
-
     const email = 'superadmin@biolog.com';
     const password = 'pass';
     const role = 'Super Admin';
@@ -29,9 +27,13 @@ async function createSuperAdmin() {
     const referenceID = 'ADMIN-001';
 
     // Check if the admin already exists
-    const existingUser = await usersCollection.findOne({ 
-      $or: [{ Email: email }, { ReferenceID: referenceID }] 
-    });
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .or(`Email.eq.${email},ReferenceID.eq.${referenceID}`)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
 
     if (existingUser) {
       console.log('Super Admin na account ay exist na.');
@@ -50,20 +52,20 @@ async function createSuperAdmin() {
       Lastname: lastname,
       ReferenceID: referenceID,
       Status: 'Active',
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       LoginAttempts: 0,
       Connection: 'Offline',
       pin: '123456' // Default pin
     };
 
-    await usersCollection.insertOne(newUser);
+    const { error: insertError } = await supabase.from('users').insert(newUser);
+    if (insertError) throw insertError;
+
     console.log('Super Admin account successfully created!');
     console.log('Email:', email);
     console.log('Password:', password);
   } catch (error) {
     console.error('Error creating super admin:', error);
-  } finally {
-    await client.close();
   }
 }
 

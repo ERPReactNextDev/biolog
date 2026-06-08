@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 import bcrypt from "bcrypt";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -9,9 +9,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db = await connectToDatabase();
-    const usersCollection = db.collection("users");
-
     const email = "superadmin@biolog.com";
     const password = "pass";
     const role = "Super Admin";
@@ -21,9 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const referenceID = "ADMIN-001";
 
     // Check if the admin already exists
-    const existingUser = await usersCollection.findOne({ 
-      $or: [{ Email: email }, { ReferenceID: referenceID }] 
-    });
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("*")
+      .or(`Email.eq.${email},ReferenceID.eq.${referenceID}`)
+      .maybeSingle();
 
     if (existingUser) {
       return res.status(400).json({ 
@@ -48,13 +47,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Lastname: lastname,
       ReferenceID: referenceID,
       Status: "Active",
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       LoginAttempts: 0,
       Connection: "Offline",
       pin: "123456" // Default pin
     };
 
-    await usersCollection.insertOne(newUser);
+    const { error } = await supabase.from("users").insert(newUser);
+    if (error) throw error;
 
     return res.status(201).json({ 
       message: "Super Admin account successfully created!",
@@ -66,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
   } catch (error) {
+    console.error("setup-admin error:", error);
     return res.status(500).json({ error: "Failed to create super admin" });
   }
 }

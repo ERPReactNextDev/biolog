@@ -1,16 +1,21 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 import { recordAuditLog } from "@/utils/audit-logger";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { method } = req;
-    const db = await connectToDatabase();
-    const collection = db.collection("system_settings");
 
     switch (method) {
         case "GET":
             try {
-                const settings = await collection.findOne({ type: "global" });
+                const { data: settings, error } = await supabase
+                    .from("system_settings")
+                    .select("*")
+                    .eq("type", "global")
+                    .maybeSingle();
+
+                if (error) throw error;
+
                 if (!settings) {
                     // Default settings if none exist
                     const defaultSettings = {
@@ -23,12 +28,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         themeColor: "red", // red, blue, black, green
                         logoUrl: "",
                         announcement: "",
-                        updatedAt: new Date()
+                        updatedAt: new Date().toISOString()
                     };
                     return res.status(200).json(defaultSettings);
                 }
                 res.status(200).json(settings);
             } catch (error) {
+                console.error("fetch settings error:", error);
                 res.status(500).json({ error: "Failed to fetch settings" });
             }
             break;
@@ -51,26 +57,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     adminName 
                 } = req.body;
 
-                const result = await collection.updateOne(
-                    { type: "global" },
-                    { 
-                        $set: { 
-                            officeStartTime,
-                            officeEndTime,
-                            lunchStart,
-                            lunchEnd,
-                            gracePeriod, 
-                            themeColor,
-                            logoUrl,
-                            announcement,
-                            geofenceLat:    geofenceLat    ?? null,
-                            geofenceLng:    geofenceLng    ?? null,
-                            geofenceRadius: geofenceRadius ?? null,
-                            updatedAt: new Date() 
-                        } 
-                    },
-                    { upsert: true }
-                );
+                const { error: upsertError } = await supabase
+                    .from("system_settings")
+                    .upsert({ 
+                        type: "global",
+                        officeStartTime,
+                        officeEndTime,
+                        lunchStart,
+                        lunchEnd,
+                        gracePeriod, 
+                        themeColor,
+                        logoUrl,
+                        announcement,
+                        geofenceLat:    geofenceLat    ?? null,
+                        geofenceLng:    geofenceLng    ?? null,
+                        geofenceRadius: geofenceRadius ?? null,
+                        updatedAt: new Date().toISOString()
+                    }, { onConflict: 'type' });
+
+                if (upsertError) throw upsertError;
 
                 if (adminId && adminName) {
                     await recordAuditLog(adminId, adminName, "UPDATE_SETTINGS", "SYSTEM", "Global Config", `Updated work rules and announcement`);
@@ -78,6 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 res.status(200).json({ message: "Settings updated successfully" });
             } catch (error) {
+                console.error("update settings error:", error);
                 res.status(500).json({ error: "Failed to update settings" });
             }
             break;

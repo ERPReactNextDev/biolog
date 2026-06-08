@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
-import { ObjectId } from "mongodb";
+import { supabase } from "@/lib/supabase";
 import { parse } from "cookie";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -11,12 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ message: "Not authenticated" });
   }
 
-  const db = await connectToDatabase();
-  const sessionsCollection = db.collection("sessions");
-  
   // Find current session to get userId
-  const currentSession = await sessionsCollection.findOne({ token: sessionToken });
-  if (!currentSession) {
+  const { data: currentSession, error: currentSessionError } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("token", sessionToken)
+    .single();
+
+  if (currentSessionError || !currentSession) {
     return res.status(401).json({ message: "Invalid session" });
   }
 
@@ -24,7 +25,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     // List all sessions for this user
-    const sessions = await sessionsCollection.find({ userId }).sort({ lastActive: -1 }).toArray();
+    const { data: sessions, error: fetchError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("userId", userId)
+      .order("lastActive", { ascending: false });
+
+    if (fetchError) throw fetchError;
     return res.status(200).json(sessions);
   }
 
@@ -35,11 +42,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Don't allow revoking the current session via this endpoint (should use logout)
-    if (sessionId === currentSession._id.toString()) {
+    if (sessionId.toString() === currentSession.id.toString()) {
         return res.status(400).json({ message: "Cannot revoke current session here. Use logout." });
     }
 
-    await sessionsCollection.deleteOne({ _id: new ObjectId(sessionId), userId });
+    const { error: deleteError } = await supabase
+      .from("sessions")
+      .delete()
+      .eq("id", sessionId)
+      .eq("userId", userId);
+
+    if (deleteError) throw deleteError;
     return res.status(200).json({ message: "Session revoked" });
   }
 

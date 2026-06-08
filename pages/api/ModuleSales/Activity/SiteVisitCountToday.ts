@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export default async function siteVisitCountToday(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== "GET") {
-    res.setHeader("Allow", ["GET"]);
+    res.setHeader("Allow", "GET");
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
@@ -14,33 +14,41 @@ export default async function siteVisitCountToday(
     const { referenceId } = req.query;
 
     if (!referenceId || typeof referenceId !== "string" || !referenceId.trim()) {
-      return res.status(400).json({ error: "referenceId query param is required" });
+      return res.status(400).json({ error: "referenceId is required" });
     }
 
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch (dbErr) {
-      return res.status(503).json({ error: "Database connection failed. Please try again." });
+    const ref = referenceId.trim();
+
+    /* ── Manila Time (UTC+8) ── */
+    const offset = 8 * 60 * 60 * 1000;
+    const now = new Date(Date.now() + offset);
+
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+
+    const startUTC = new Date(start.getTime() - offset);
+    const endUTC = new Date(end.getTime() - offset);
+
+    const { count, error } = await supabase
+      .from("tasklog")
+      .select("*", { count: "exact", head: true })
+      .eq("ReferenceID", ref)
+      .eq("Type", "Site Visit")
+      .gte("date_created", startUTC.toISOString())
+      .lte("date_created", endUTC.toISOString());
+
+    if (error) {
+      console.error("Supabase count error:", error);
+      throw error;
     }
 
-    const collection = db.collection("TaskLog");
+    return res.status(200).json({ count: count || 0 });
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-
-    // Count completed site visits (Type = "Client Visit", any Status)
-    const count = await collection.countDocuments({
-      ReferenceID: referenceId.trim(),
-      Type: "Client Visit",
-      date_created: { $gte: startOfToday, $lte: endOfToday },
-    });
-
-    return res.status(200).json({ count });
   } catch (error) {
-    return res.status(500).json({ error: "Failed to count site visits" });
+    console.error("[SiteVisitCountToday] error:", error);
+    return res.status(500).json({ error: "Failed to fetch site visit count" });
   }
 }

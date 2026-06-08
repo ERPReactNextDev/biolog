@@ -1,8 +1,5 @@
-import { MongoClient } from "mongodb";
-
-declare global {
-  var _mongoClient: MongoClient | undefined;
-}
-
 export {};
 
+declare global {
+  // Add any global types for Supabase if needed
+}

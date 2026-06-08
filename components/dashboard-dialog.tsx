@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 
@@ -301,7 +302,10 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl">
+      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col">
+        <VisuallyHidden>
+          <DialogTitle>Activity Details</DialogTitle>
+        </VisuallyHidden>
 
         {/* Header */}
         <div className="bg-brand-primary px-6 pt-5 pb-8">

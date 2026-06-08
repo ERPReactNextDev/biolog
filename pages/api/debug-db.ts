@@ -1,29 +1,23 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const db = await connectToDatabase();
+    const { data: tables, error: tablesError } = await supabase.rpc('get_tables'); // Custom RPC or just list some known tables
     
-    // Get all collections
-    const collections = await db.listCollections().toArray();
-    const collectionNames = collections.map(c => c.name);
-    
-    
-    // Check if GPSReports exists and count documents
-    let gpsReportsInfo = null;
-    if (collectionNames.includes("GPSReports")) {
-      const count = await db.collection("GPSReports").countDocuments();
-      const sample = await db.collection("GPSReports").find().limit(2).toArray();
-      gpsReportsInfo = { exists: true, count, sample };
-    } else {
-      gpsReportsInfo = { exists: false, count: 0 };
-    }
+    // Check if gps_reports exists and count documents
+    const { count: gpsCount, data: gpsSample, error: gpsError } = await supabase
+      .from("gps_reports")
+      .select("*", { count: "exact" })
+      .limit(2);
     
     return res.status(200).json({
-      database: db.databaseName,
-      collections: collectionNames,
-      gpsReports: gpsReportsInfo,
+      database: "Supabase",
+      gpsReports: {
+        exists: !gpsError,
+        count: gpsCount || 0,
+        sample: gpsSample,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

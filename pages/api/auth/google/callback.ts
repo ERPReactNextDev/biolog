@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
 
@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
   Fixes:
   1. Google users now get a bcrypt-hashed random password (not empty string)
      so bcrypt.compare never crashes.
-  2. Redirect uses MongoDB _id — same identifier as /api/login's result.userId.
+  2. Redirect uses Supabase id — same identifier as /api/login's result.userId.
   3. registrationMethod: "google" flags the account so the login API can
      return a clear message if the user tries email + password login.
 */
@@ -53,19 +53,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.redirect("/Login?error=google_no_email");
     }
 
-    const db    = await connectToDatabase();
-    const users = db.collection("users");
-
     /* ── 3a. Existing user ── */
-    const existing = await users.findOne({
-      Email: { $regex: new RegExp(`^${profile.email}$`, "i") },
-    });
+    const { data: existing, error: fetchError } = await supabase
+      .from("users")
+      .select("*")
+      .ilike("Email", profile.email)
+      .maybeSingle();
 
     if (existing) {
       if (existing.Status === "Active") {
-        // Use MongoDB _id string — same as what /api/login returns as userId
+        // Use Supabase id string
         return res.redirect(
-          `/activity-planner?id=${encodeURIComponent(existing._id.toString())}`
+          `/activity-planner?id=${encodeURIComponent(existing.id.toString())}`
         );
       }
       // Revoked / Resigned / Terminated
@@ -78,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // bcrypt.compare will always return false — can't log in via email+password.
     const randomPassword = await bcrypt.hash(uuidv4(), 10);
 
-    await users.insertOne({
+    const { error: insertError } = await supabase.from("users").insert({
       Firstname:          profile.given_name  || profile.name?.split(" ")[0] || "User",
       Lastname:           profile.family_name || profile.name?.split(" ").slice(1).join(" ") || "",
       Email:              profile.email,
@@ -93,12 +92,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Connection:         "Offline",
       registrationMethod: "google",           // flag for login API
       googleId:           profile.id,
-      createdAt:          new Date(),
+      createdAt:          new Date().toISOString(),
     });
+
+    if (insertError) throw insertError;
 
     return res.redirect("/pending-approval");
 
   } catch (err) {
+    console.error("Google callback error:", err);
     return res.redirect("/Login?error=google_server_error");
   }
 }

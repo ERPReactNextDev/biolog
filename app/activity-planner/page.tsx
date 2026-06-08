@@ -5,12 +5,13 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
-import { AnimatePresence, motion, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { toast } from "sonner";
 import { type DateRange } from "react-day-picker";
-import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, ArrowLeft, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, CloudUpload, WifiOff, Sun, CloudRain, CloudLightning, Info, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download, Loader2, FileDown } from "lucide-react";
+import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, ArrowLeft, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, CloudUpload, WifiOff, Sun, CloudRain, CloudLightning, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download, Loader2, FileDown } from "lucide-react";
 
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { getAllPendingLogs, removePendingLog, type PendingLog } from "@/lib/offline-store";
@@ -218,6 +219,8 @@ interface Meeting {
   TSM: string;
   Status: string;
   CreatedAt: string;
+  Manager?: string;
+  CompanyName?: string;
 }
 
 interface UserInfo {
@@ -245,11 +248,8 @@ interface UserDetails {
   SecondaryEmail?: string;
   pin?: string;
   TSM: string;
+  Manager?: string;
   Directories?: string[];
-  permissions?: {
-    canCreateAttendance: boolean;
-    canCreateSiteVisit: boolean;
-  };
   faceVerificationEnabled?: boolean;
 }
 
@@ -264,6 +264,12 @@ interface FormData {
   SitePhotoURL?: string;
   SiteVisitAccount?: string;
   _id?: string;
+  manager?: string;
+  company_name?: string;
+  contact_person?: string;
+  contact_number?: string;
+  email_address?: string;
+  address?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -559,37 +565,21 @@ function HomeTab({
               </button>
             </>
           )}
-          {(userDetails?.Role !== "SuperAdmin") ? (
-            <>
-              {userDetails?.permissions?.canCreateAttendance && (
-                <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-100">
-                  <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
-                  <p className="text-white text-[13px] font-semibold">Time In/Out</p>
-                  <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
-                </button>
-              )}
-              {userDetails?.permissions?.canCreateSiteVisit && (
-                <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
-                  <div className="w-9 h-9 rounded-[10px] bg-[var(--brand-light)] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[var(--brand-primary)]" /></div>
-                  <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
-                  <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
-                </button>
-              )}
-            </>
+          
+          {userDetails?.Department === "Sales" ? (
+            <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
+              <div className="w-9 h-9 rounded-[10px] bg-[var(--brand-light)] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[var(--brand-primary)]" /></div>
+              <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
+              <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
+            </button>
           ) : (
-            <>
-              <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-200">
-                <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
-                <p className="text-white text-[13px] font-semibold">Time In/Out</p>
-                <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
-              </button>
-              <button onClick={onCreateSiteVisit} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
-                <div className="w-9 h-9 rounded-[10px] bg-[var(--brand-light)] flex items-center justify-center mb-3 border border-gray-100"><Building2 size={18} className="text-[var(--brand-primary)]" /></div>
-                <p className="text-gray-800 text-[13px] font-semibold">Site Visit</p>
-                <p className="text-gray-400 text-[11px] mt-0.5">Record client visit</p>
-              </button>
-            </>
+            <button onClick={onCreateAttendance} className="bg-[var(--brand-primary)] rounded-[18px] p-4 text-left hover:bg-[var(--brand-primary-hover)] active:scale-[0.97] transition-all shadow-md shadow-red-100">
+              <div className="w-9 h-9 rounded-[10px] bg-white/20 flex items-center justify-center mb-3"><CalendarCheck size={18} className="text-white" /></div>
+              <p className="text-white text-[13px] font-semibold">Time In/Out</p>
+              <p className="text-white/65 text-[11px] mt-0.5">Log field attendance</p>
+            </button>
           )}
+
           <button onClick={() => onSetTab("calendar")} className="bg-white rounded-[18px] p-4 text-left border border-gray-100 hover:border-gray-200 hover:bg-gray-50 active:scale-[0.97] transition-all">
             <div className="w-9 h-9 rounded-[10px] bg-gray-50 flex items-center justify-center mb-3 border border-gray-100"><CalendarCheck size={18} className="text-gray-500" /></div>
             <p className="text-gray-800 text-[13px] font-semibold">Calendar</p>
@@ -672,7 +662,6 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
 }) {
   const today = new Date();
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const DAY_NAMES_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
   const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit" | "Meeting">("All");
   const [selectedDate, setSelectedDate] = useState<string>(toCalendarDateKey(today));
   
@@ -1512,7 +1501,7 @@ function ReportsTab({ monthlyStats, allLogs, userId, userDetails }: {
         </button>
 
         {/* Offline Activities Card */}
-        <OfflineActivitiesCard userId={userId} />
+        <OfflineActivitiesCard />
 
         {/* Export Data Section */}
         <div className="mt-5 bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -1649,7 +1638,7 @@ function ReportsTab({ monthlyStats, allLogs, userId, userDetails }: {
 
 // ── Offline Activities Card ─────────────────────────────────────────────────
 
-function OfflineActivitiesCard({ userId }: { userId: string | null | undefined }) {
+function OfflineActivitiesCard() {
   const [pendingLogs, setPendingLogs] = useState<PendingLog[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -1762,6 +1751,9 @@ function OfflineActivitiesCard({ userId }: { userId: string | null | undefined }
       {/* Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col">
+          <VisuallyHidden>
+            <DialogTitle>Offline Activities</DialogTitle>
+          </VisuallyHidden>
           <div className="bg-[var(--brand-primary)] px-6 pt-5 pb-6 flex-shrink-0">
             <div className="flex items-center gap-3 mb-2">
               <button
@@ -1786,7 +1778,7 @@ function OfflineActivitiesCard({ userId }: { userId: string | null | undefined }
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {pendingLogs.map((log, index) => {
+                {pendingLogs.map((log) => {
                   const payload = log.payload as any;
                   const isSyncing = syncingId === log.id;
                   
@@ -1968,7 +1960,7 @@ function ProfileTab({
   onLogout: () => void;
   onFaceRegister: () => void;
   onBiometricRegister: () => void;
-  onUpdateSecondaryEmail: (email: string) => void;
+  onUpdateSecondaryEmail: (email: string) => Promise<void>;
   onUpdateFaceVerification: (enabled: boolean) => void;
 }) {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -2056,6 +2048,22 @@ function ProfileTab({
     }
   }, []);
 
+  const revokeSession = async (sessionId: string) => {
+    try {
+      const res = await fetch("/api/auth/sessions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      if (res.ok) {
+        toast.success("Device session revoked");
+        fetchSessions();
+      }
+    } catch (e) {
+      toast.error("Failed to revoke session");
+    }
+  };
+
   useEffect(() => {
     if (isActive) fetchSessions();
   }, [fetchSessions, isActive]);
@@ -2105,51 +2113,9 @@ function ProfileTab({
     }
   };
 
-  const toggleTwoFactor = async () => {
-    if (!userDetails) return;
-    setTwoFactorLoading(true);
-    const newStatus = !userDetails.twoFactorEnabled;
-    try {
-      const res = await fetch("/api/auth/2fa-toggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: newStatus }),
-      });
-      if (res.ok) {
-        toast.success(`2FA ${newStatus ? "enabled" : "disabled"}`);
-        // We might want to refresh userDetails here, but for simplicity we'll just show the toast
-        // and wait for the next render/refresh
-      } else {
-        toast.error("Failed to update 2FA status");
-      }
-    } catch (e) {
-      toast.error("An error occurred");
-    } finally {
-      setTwoFactorLoading(false);
-    }
-  };
-
-  const revokeSession = async (sessionId: string) => {
-    try {
-      const res = await fetch("/api/auth/sessions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-      if (res.ok) {
-        toast.success("Device session revoked");
-        fetchSessions();
-      }
-    } catch (e) {
-      toast.error("Failed to revoke session");
-    }
-  };
-
   const initials = userDetails
     ? `${userDetails.Firstname[0] ?? ""}${userDetails.Lastname[0] ?? ""}`.toUpperCase()
     : "?";
-
-  const hasBiometrics = (userDetails?.faceDescriptors && userDetails.faceDescriptors.length > 0) || (userDetails?.credentials && userDetails.credentials.length > 0);
 
   const fields = userDetails ? [
     { label: "Email", value: userDetails.Email },
@@ -2705,154 +2671,40 @@ function ActivityPage() {
   useEffect(() => {
     const shortcut = searchParams?.get("shortcut");
     if (!shortcut) return;
-    if (shortcut === "attendance") {
+    // Both shortcuts now open based on Directories — resolved after userDetails loads
+    // Store the shortcut intent and open the correct dialog once userDetails is available
+    if (shortcut === "attendance" || shortcut === "sitevisit") {
       setActiveTab("home");
-      setCreateAttendanceOpen(true);
-      haptic("medium");
-    } else if (shortcut === "sitevisit") {
-      setActiveTab("home");
-      setCreateSalesAttendanceOpen(true);
+      // We defer opening until userDetails is ready (handled below)
+      sessionStorage.setItem("pendingShortcut", shortcut);
       haptic("medium");
     }
     // Clear the param so refresh doesn't reopen
     router.replace("/activity-planner");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Once userDetails loads, resolve any pending shortcut using Department
+  useEffect(() => {
+    if (!userDetails) return;
+    const shortcut = sessionStorage.getItem("pendingShortcut");
+    if (!shortcut) return;
+    sessionStorage.removeItem("pendingShortcut");
+
+    if (userDetails.Department === "Sales") {
+      setCreateSalesAttendanceOpen(true);
+    } else {
+      setCreateAttendanceOpen(true);
+    }
+  }, [userDetails]);
   const [faceRegisterOpen, setFaceRegisterOpen] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [biometricRegistering, setBiometricRegistering] = useState(false);
   // Office start hour - kept for backward compatibility with other features
 
-  // ── PWA Update Detection ─────────────────────────────────────────────────────
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<{ version?: string; timestamp?: string }>({});
-  const [isUpdating, setIsUpdating] = useState(false);
-  const dismissedVersionRef = useRef<string | null>(null);
-
-  // Check for PWA updates - Listen to existing service worker registration
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-
-    let refreshing = false;
-
-    const handleControllerChange = () => {
-      if (refreshing) return;
-      refreshing = true;
-      setIsUpdating(false);
-      setUpdateAvailable(false);
-      // Clear dismissed version on successful update
-      try { localStorage.removeItem('acculog_dismissed_version'); } catch {}
-      window.location.reload();
-    };
-
-    // Get dismissed version from localStorage
-    try {
-      dismissedVersionRef.current = localStorage.getItem('acculog_dismissed_version');
-    } catch {}
-
-    const checkForUpdates = async () => {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        
-        // Generate a version identifier from the waiting SW script URL
-        const getVersionId = () => {
-          if (registration.waiting) {
-            // Use the waiting SW URL or timestamp as version identifier
-            return registration.waiting.scriptURL + '_' + Date.now();
-          }
-          return null;
-        };
-
-        // Check if there's a waiting service worker
-        if (registration.waiting) {
-          const currentVersion = getVersionId();
-          // Only show if this version hasn't been dismissed
-          if (currentVersion && currentVersion !== dismissedVersionRef.current) {
-            setUpdateAvailable(true);
-            setUpdateInfo({
-              version: 'New Version',
-              timestamp: new Date().toLocaleString('en-PH')
-            });
-          }
-        }
-
-        // Listen for new waiting service workers
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available
-              const newVersionId = newWorker.scriptURL + '_' + Date.now();
-              // Only show if this version hasn't been dismissed
-              if (newVersionId !== dismissedVersionRef.current) {
-                setUpdateAvailable(true);
-                setUpdateInfo({
-                  version: 'New Version',
-                  timestamp: new Date().toLocaleString('en-PH')
-                });
-              }
-            }
-          });
-        });
-
-        // Listen for controller change (update applied)
-        navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-      } catch (err) {
-        // Silent fail
-      }
-    };
-
-    checkForUpdates();
-
-    // Periodic check for updates (every 5 minutes)
-    const interval = setInterval(() => {
-      navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
-    }, 5 * 60 * 1000);
-
-    return () => {
-      clearInterval(interval);
-      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-    };
-  }, []);
-
-  const handlePWAUpdate = async () => {
-    setIsUpdating(true);
-    
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      if (registration.waiting) {
-        // Tell the waiting service worker to skip waiting
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
-      
-      // Clear dismissed version on update
-      try { localStorage.removeItem('acculog_dismissed_version'); } catch {}
-      
-      // Reload will happen automatically via controllerchange event
-      // Fallback reload after 2 seconds if controllerchange doesn't fire
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } catch (err) {
-      setIsUpdating(false);
-      window.location.reload();
-    }
-  };
-
-  const dismissUpdate = () => {
-    setUpdateAvailable(false);
-    // Save this version as dismissed so it doesn't show again
-    try {
-      const versionToDismiss = updateInfo.timestamp || Date.now().toString();
-      localStorage.setItem('acculog_dismissed_version', 'dismissed_' + versionToDismiss);
-      dismissedVersionRef.current = 'dismissed_' + versionToDismiss;
-    } catch {}
-  };
-
   const [formData, setFormData] = useState<FormData>({
     ReferenceID: "", Email: "", Type: "", Status: "", PhotoURL: "", Remarks: "", TSM: "",
+    manager: "", company_name: "", contact_person: "", contact_number: "", email_address: "", address: "",
   });
 
 
@@ -2899,7 +2751,6 @@ function ActivityPage() {
         pin: data.pin ?? "",
         TSM: data.TSM ?? "",
         Directories: data.Directories ?? [],
-        permissions: data.permissions ?? { canCreateAttendance: true, canCreateSiteVisit: true },
         faceVerificationEnabled: data.faceVerificationEnabled ?? true,
       });
       setError(null);
@@ -2946,7 +2797,7 @@ function ActivityPage() {
   }, [queryUserId]);
 
   useEffect(() => {
-    if (userDetails) setFormData((prev) => ({ ...prev, ReferenceID: userDetails.ReferenceID, Email: userDetails.Email, TSM: userDetails.TSM }));
+    if (userDetails) setFormData((prev) => ({ ...prev, ReferenceID: userDetails.ReferenceID, Email: userDetails.Email, TSM: userDetails.TSM, manager: userDetails.Manager }));
   }, [userDetails]);
 
 
@@ -3452,7 +3303,7 @@ function ActivityPage() {
         style={{ paddingBottom: "env(safe-area-inset-bottom,0px)" }}
       >
         {/* SVG curve that creates the mountain notch */}
-        {activeTab === "home" && (userDetails?.Role === "SuperAdmin" || userDetails?.permissions?.canCreateAttendance || userDetails?.permissions?.canCreateSiteVisit) ? (
+        {activeTab === "home" ? (
           <svg
             className="absolute -top-[50px] left-0 w-full pointer-events-none"
             height="60"
@@ -3522,26 +3373,19 @@ function ActivityPage() {
         {/* Circular FAB — sits in the notch, above the nav */}
         {activeTab === "home" && (
           <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-10">
-            {(userDetails?.Role === "SuperAdmin" || userDetails?.permissions?.canCreateAttendance || userDetails?.permissions?.canCreateSiteVisit) && (
-              <button
-                onClick={() => {
-                  haptic("medium");
-                  if (
-                    userDetails?.Role === "SuperAdmin" ||
-                    (userDetails?.permissions?.canCreateAttendance && userDetails?.permissions?.canCreateSiteVisit)
-                  ) {
-                    setCreateAttendanceOpen(true);
-                  } else if (userDetails?.permissions?.canCreateAttendance) {
-                    setCreateAttendanceOpen(true);
-                  } else {
-                    setCreateSalesAttendanceOpen(true);
-                  }
-                }}
-                className="w-14 h-14 rounded-full bg-[#CC1318] flex items-center justify-center shadow-xl shadow-red-300 hover:bg-[#A8100F] active:scale-95 transition-all border-4 border-white"
-              >
-                <Plus size={22} className="text-white" />
-              </button>
-            )}
+            <button
+              onClick={() => {
+                haptic("medium");
+                if (userDetails?.Department === "Sales") {
+                  setCreateSalesAttendanceOpen(true);
+                } else {
+                  setCreateAttendanceOpen(true);
+                }
+              }}
+              className="w-14 h-14 rounded-full bg-[#CC1318] flex items-center justify-center shadow-xl shadow-red-300 hover:bg-[#A8100F] active:scale-95 transition-all border-4 border-white"
+            >
+              <Plus size={22} className="text-white" />
+            </button>
           </div>
         )}
       </div>
@@ -3590,53 +3434,6 @@ function ActivityPage() {
                 className="flex-1 py-3.5 rounded-2xl bg-[#CC1318] text-white text-[13px] font-bold hover:bg-[#A8100F] active:scale-95 transition-all"
               >
                 Stay Logged In
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── PWA Update Available Modal ── */}
-      {updateAvailable && (
-        <div className="fixed inset-0 z-[210] flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}>
-          <div className="w-full max-w-sm bg-white rounded-t-[32px] p-6 pb-10 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-5" />
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 rounded-[14px] bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <Download size={20} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-[15px] font-bold text-gray-900">New Version Available</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">Update available at {updateInfo.timestamp}</p>
-              </div>
-            </div>
-            <p className="text-[13px] text-gray-500 mb-5 leading-relaxed">
-              A new version of Acculog has been applied. Update now to get the latest features and improvements on your device.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={dismissUpdate}
-                className="flex-1 py-3.5 rounded-2xl border border-gray-200 text-[13px] font-semibold text-gray-500 hover:bg-gray-50 transition-all"
-                disabled={isUpdating}
-              >
-                Later
-              </button>
-              <button
-                onClick={handlePWAUpdate}
-                disabled={isUpdating}
-                className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white text-[13px] font-bold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isUpdating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Download size={14} />
-                    Update Now
-                  </>
-                )}
               </button>
             </div>
           </div>
@@ -3752,10 +3549,22 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><User size={18} className="text-purple-600" /></div>
               <div>
-                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Organizer</p>
-                <p className="text-[14px] font-semibold text-gray-800">{user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}</p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Organizer / Manager</p>
+                <p className="text-[14px] font-semibold text-gray-800">
+                  {user ? `${user.Firstname} ${user.Lastname}` : meeting.Email}
+                  {meeting.Manager ? ` (Manager: ${meeting.Manager})` : ""}
+                </p>
               </div>
             </div>
+            {meeting.CompanyName && (
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><Building2 size={18} className="text-purple-600" /></div>
+                <div>
+                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Company</p>
+                  <p className="text-[14px] font-semibold text-gray-800">{meeting.CompanyName}</p>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0"><CalendarIcon size={18} className="text-purple-600" /></div>
               <div>
@@ -3826,7 +3635,9 @@ function CreateMeetingDialog({ open, onOpenChange, userDetails, onSuccess }: {
     StartDate: "",
     EndDate: "",
     Location: "",
-    Remarks: ""
+    Remarks: "",
+    Manager: "",
+    CompanyName: ""
   });
 
   const [duration, setDuration] = useState(0);
@@ -3874,7 +3685,7 @@ function CreateMeetingDialog({ open, onOpenChange, userDetails, onSuccess }: {
         toast.success("Meeting created successfully");
         onSuccess();
         onOpenChange(false);
-        setFormData({ Title: "", StartDate: "", EndDate: "", Location: "", Remarks: "" });
+        setFormData({ Title: "", StartDate: "", EndDate: "", Location: "", Remarks: "", Manager: "", CompanyName: "" });
       } else {
         const error = await res.json();
         toast.error(error.error || "Failed to create meeting");
@@ -3939,6 +3750,27 @@ function CreateMeetingDialog({ open, onOpenChange, userDetails, onSuccess }: {
               <span className="text-[13px] font-bold text-purple-700">{duration} minutes</span>
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Manager</label>
+              <input 
+                value={formData.Manager}
+                onChange={e => setFormData(prev => ({ ...prev, Manager: e.target.value }))}
+                placeholder="Manager Name" 
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-[13px] outline-none focus:border-purple-300 transition-all" 
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Company</label>
+              <input 
+                value={formData.CompanyName}
+                onChange={e => setFormData(prev => ({ ...prev, CompanyName: e.target.value }))}
+                placeholder="Company Name" 
+                className="w-full rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-[13px] outline-none focus:border-purple-300 transition-all" 
+              />
+            </div>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Location</label>

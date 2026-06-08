@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 /* ── Simple in-memory cache (per server instance) ── */
 const cache = new Map<string, { data: any; ts: number }>();
@@ -29,18 +29,6 @@ export default async function loginSummary(
       return res.status(200).json(cached.data);
     }
 
-    /* ── DB ── */
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch (dbErr) {
-      return res.status(503).json({
-        error: "Database connection failed. Please try again.",
-      });
-    }
-
-    const collection = db.collection("TaskLog");
-
     /* ── Manila Time (UTC+8) ── */
     const offset = 8 * 60 * 60 * 1000;
     const now = new Date(Date.now() + offset);
@@ -55,21 +43,24 @@ export default async function loginSummary(
     const endUTC = new Date(end.getTime() - offset);
 
     /* ── SINGLE QUERY ONLY ── */
-    const last = await collection.findOne(
-      {
-        ReferenceID: ref,
-        date_created: { $gte: startUTC, $lte: endUTC },
-      },
-      {
-        sort: { date_created: -1 },
-        projection: { Status: 1, date_created: 1 },
-      }
-    );
+    const { data: last, error } = await supabase
+      .from("tasklog")
+      .select("Status, date_created")
+      .eq("ReferenceID", ref)
+      .gte("date_created", startUTC.toISOString())
+      .lte("date_created", endUTC.toISOString())
+      .order("date_created", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Supabase login summary error:", error);
+      return res.status(503).json({ error: "Database error" });
+    }
 
     const response = {
       lastStatus: last?.Status ?? null,
       lastTime: last?.date_created ?? null,
-      // ❌ removed loginCount (heavy)
     };
 
     /* ── SAVE TO CACHE ── */
@@ -78,6 +69,7 @@ export default async function loginSummary(
     return res.status(200).json(response);
 
   } catch (error) {
+    console.error("[LoginSummary] error:", error);
     return res.status(500).json({ error: "Failed to fetch login summary" });
   }
 }

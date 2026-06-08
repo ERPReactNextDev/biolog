@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export default async function handler(
   req: NextApiRequest,
@@ -8,19 +8,21 @@ export default async function handler(
   // Handle GET - List all GPS Reports
   if (req.method === "GET") {
     try {
-      const db = await connectToDatabase();
-      const collection = db.collection("GPSReports");
+      const { data: reports, count, error } = await supabase
+        .from("gps_reports")
+        .select("*", { count: "exact" })
+        .order("date_created", { ascending: false })
+        .limit(10);
       
-      const reports = await collection.find().sort({ date_created: -1 }).limit(10).toArray();
-      const count = await collection.countDocuments();
+      if (error) throw error;
       
       return res.status(200).json({
-        database: db.databaseName,
-        collection: "GPSReports",
+        collection: "gps_reports",
         totalCount: count,
         reports: reports,
       });
     } catch (error) {
+      console.error("fetch gps-report error:", error);
       return res.status(500).json({ error: "Failed to fetch reports" });
     }
   }
@@ -77,23 +79,8 @@ export default async function handler(
       });
     }
 
-    /* ── DB connection ───────────────────── */
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch (dbErr) {
-      return res.status(503).json({
-        error: "Database connection failed. Please try again.",
-      });
-    }
-
-    // List all collections before insert
-    const collectionsBefore = await db.listCollections().toArray();
-
-    const collection = db.collection("GPSReports");
-
     /* ── Build document ─────────────────── */
-    const newReport: Record<string, unknown> = {
+    const newReport: any = {
       ReferenceID: ReferenceID.trim(),
       Email: Email.trim(),
       Type: "GPS Report",
@@ -101,49 +88,35 @@ export default async function handler(
       Remarks: remarks.trim(),
       TSM: typeof TSM === "string" ? TSM.trim() : "",
       PhotoURL: photos,
-      loginDate: new Date(loginDate),
-      logoutDate: new Date(logoutDate),
-      Latitude: gpsLocation.lat,
-      Longitude: gpsLocation.lng,
+      loginDate: new Date(loginDate).toISOString(),
+      logoutDate: new Date(logoutDate).toISOString(),
+      Latitude: gpsLocation.lat.toString(),
+      Longitude: gpsLocation.lng.toString(),
       Location: gpsLocation.address || "",
       reviewStatus: "pending",
-      date_created: new Date(),
+      date_created: new Date().toISOString(),
     };
 
     /* ── Insert ─────────────────────────── */
-    
-    let result;
-    try {
-      result = await collection.insertOne(newReport);
-    } catch (insertErr) {
-      throw insertErr;
-    }
+    const { data, error: insertError } = await supabase
+      .from("gps_reports")
+      .insert(newReport)
+      .select()
+      .single();
 
-    if (!result.acknowledged) {
-      throw new Error("MongoDB insertOne was not acknowledged");
+    if (insertError) {
+      console.error("Supabase insert error:", insertError);
+      throw insertError;
     }
-
-    // Verify the insert by reading it back
-    let verifyDoc;
-    try {
-      verifyDoc = await collection.findOne({ _id: result.insertedId });
-      if (verifyDoc) {
-      }
-    } catch (verifyErr) {
-    }
-    
-    // List collections after insert to confirm GPSReports exists
-    const collectionsAfter = await db.listCollections().toArray();
 
     return res.status(201).json({
       message: "GPS Report submitted successfully",
-      id: result.insertedId.toString(),
-      verified: !!verifyDoc,
-      database: db.databaseName,
-      collection: "GPSReports",
+      id: data.id.toString(),
+      collection: "gps_reports",
     });
 
   } catch (error) {
+    console.error("[gps-report] error:", error);
     return res.status(500).json({
       error: "Failed to submit GPS report. Please try again.",
     });

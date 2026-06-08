@@ -1,5 +1,15 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
+import { sql } from "@/lib/neon";
+
+const generateAccountRef = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 20; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
 export default async function addActivityLog(
   req: NextApiRequest,
@@ -24,6 +34,12 @@ export default async function addActivityLog(
       TSM,
       SiteVisitAccount,
       FaceData,
+      company_name,
+      contact_person,
+      contact_number,
+      email_address,
+      address,
+      manager, // Assuming manager is passed for Neon
       date_created: clientDateCreated, // offline timestamp from client
     } = req.body ?? {};
 
@@ -39,18 +55,13 @@ export default async function addActivityLog(
       });
     }
 
-    const validStatuses = ["Login", "Logout"];
+    const validStatuses = ["Login", "Logout", "For Approval"];
     if (!validStatuses.includes(Status)) {
       return res.status(400).json({
         error: `Invalid Status. Must be one of: ${validStatuses.join(", ")}`,
       });
     }
 
-    /* ── Resolve the actual timestamp ─────────────────────────────────────
-     * For offline submissions the client sends the original timestamp so the
-     * record lands on the correct work-day. Fall back to now() if absent or
-     * invalid (e.g. online submissions that don't send date_created).
-     */
     let resolvedDate: Date;
     if (clientDateCreated) {
       const parsed = new Date(clientDateCreated);
@@ -59,25 +70,16 @@ export default async function addActivityLog(
       resolvedDate = new Date();
     }
 
-    /* ── DB connection ───────────────────── */
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch {
-      return res.status(503).json({
-        error: "Database connection failed. Please try again.",
-      });
-    }
-
-    const collection         = db.collection("TaskLog");
-    const settingsCollection = db.collection("system_settings");
-
     // Fetch dynamic work-day start
-    const settings        = await settingsCollection.findOne({ type: "global" });
+    const { data: settings } = await supabase
+      .from("system_settings")
+      .select("officeStartTime")
+      .eq("type", "global")
+      .single();
+
     const officeStartTime = settings?.officeStartTime || "08:00";
     const [startH, startM] = officeStartTime.split(":").map(Number);
 
-    /* ── Day window based on the RESOLVED date ──────────────────────────── */
     const startOfDay = new Date(resolvedDate);
     startOfDay.setHours(startH, startM, 0, 0);
     if (resolvedDate < startOfDay) {
@@ -89,13 +91,15 @@ export default async function addActivityLog(
     endOfDay.setMilliseconds(-1);
 
     /* ── Duplicate check ────────────────────────────────────────────────── */
-    const lastActivityToday = await collection.findOne(
-      {
-        ReferenceID,
-        date_created: { $gte: startOfDay, $lte: endOfDay },
-      },
-      { sort: { date_created: -1 } }
-    );
+    const { data: lastActivityToday } = await supabase
+      .from("tasklog")
+      .select("Status, Type")
+      .eq("ReferenceID", ReferenceID)
+      .gte("date_created", startOfDay.toISOString())
+      .lte("date_created", endOfDay.toISOString())
+      .order("date_created", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (
       lastActivityToday?.Status === Status &&
@@ -106,52 +110,116 @@ export default async function addActivityLog(
       });
     }
 
-    /* ── Build document ─────────────────── */
-    const newLog: Record<string, unknown> = {
+    /* ── Build document for Supabase ─────────────────── */
+    // If it's a New Client, we map company_name to SiteVisitAccount for the tasklog
+    const effectiveSiteVisitAccount = Status === "For Approval" ? (company_name || SiteVisitAccount) : SiteVisitAccount;
+
+    const newLog: any = {
       ReferenceID:  ReferenceID.trim(),
       Email:        Email.trim(),
       Type:         Type.trim(),
       Status:       Status.trim(),
       Remarks:      typeof Remarks === "string" ? Remarks.trim() : "",
       TSM:          typeof TSM === "string" ? TSM.trim() : "",
-      date_created: resolvedDate,   // use original offline time, not server time
+      date_created: resolvedDate.toISOString(),
+      SiteVisitAccount: typeof effectiveSiteVisitAccount === "string" ? effectiveSiteVisitAccount.trim() : "",
     };
 
     if (typeof Location === "string" && Location.trim())
       newLog.Location = Location.trim();
 
     if (typeof Latitude === "number" && isFinite(Latitude))
-      newLog.Latitude = Latitude;
+      newLog.Latitude = Latitude.toString();
 
     if (typeof Longitude === "number" && isFinite(Longitude))
-      newLog.Longitude = Longitude;
+      newLog.Longitude = Longitude.toString();
 
     if (typeof PhotoURL === "string" && PhotoURL.trim())
       newLog.PhotoURL = PhotoURL.trim();
 
-    if (typeof SiteVisitAccount === "string" && SiteVisitAccount.trim())
-      newLog.SiteVisitAccount = SiteVisitAccount.trim();
+    // Add specific fields if present (for Supabase tasklog too)
+    if (company_name) newLog.company_name = company_name;
+    if (contact_person) newLog.contact_person = contact_person;
+    if (contact_number) newLog.contact_number = contact_number;
+    if (email_address) newLog.email_address = email_address;
+    if (address) newLog.address = address;
 
-    if (FaceData && typeof FaceData === "object")
-      newLog.FaceData = FaceData;
+    /* ── Insert to Supabase ─────────────────────────── */
+    const { data: supabaseData, error: insertError } = await supabase
+      .from("tasklog")
+      .insert(newLog)
+      .select()
+      .maybeSingle();
 
-    /* ── Insert ─────────────────────────── */
-    const result = await collection.insertOne(newLog);
+    if (insertError) {
+      console.error("[AddLog] Supabase insert error:", insertError);
+      return res.status(500).json({
+        error: "Supabase insert failed",
+        details: insertError.message,
+      });
+    }
 
-    if (!result.acknowledged) {
-      throw new Error("MongoDB insertOne was not acknowledged");
+    if (!supabaseData) {
+      console.error("[AddLog] No data returned from Supabase insert");
+      return res.status(500).json({
+        error: "No data returned from Supabase insert",
+      });
+    }
+
+    /* ── Insert to Neon (TASKFLOW_DB) if it's a New Client ── */
+    if (Status === "For Approval" && sql) {
+      try {
+        const accountRef = generateAccountRef();
+        await sql`
+          INSERT INTO accounts (
+            referenceid, 
+            tsm, 
+            manager, 
+            company_name, 
+            contact_person, 
+            contact_number, 
+            email_address, 
+            address, 
+            remarks, 
+            status,
+            type,
+            type_client,
+            account_reference_number,
+            date_created
+          ) VALUES (
+            ${ReferenceID}, 
+            ${TSM || ""}, 
+            ${manager || ""}, 
+            ${company_name || ""}, 
+            ${contact_person || ""}, 
+            ${contact_number || ""}, 
+            ${email_address || ""}, 
+            ${address || ""}, 
+            ${Remarks || ""}, 
+            'For Approval',
+            'Client Visit',
+            'New Client',
+            ${accountRef},
+            ${resolvedDate.toISOString()}
+          )
+        `;
+        console.log("[AddLog] Successfully inserted into Neon accounts table");
+      } catch (neonErr) {
+        console.error("[AddLog] Neon insert error:", neonErr);
+      }
     }
 
     return res.status(201).json({
       message:      `${Status} recorded successfully`,
-      id:           result.insertedId.toString(),
+      id:           supabaseData.id.toString(),
       date_created: resolvedDate.toISOString(),
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("[AddLog] Unhandled error:", error);
     return res.status(500).json({
       error: "Failed to add activity log. Please try again.",
+      message: error?.message || "Unknown error",
     });
   }
 }

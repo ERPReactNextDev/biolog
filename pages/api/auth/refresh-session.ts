@@ -3,7 +3,7 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import { parse, serialize } from "cookie";
-import { connectToDatabase } from "@/lib/MongoDB";
+import { supabase } from "@/lib/supabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,19 +18,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db       = await connectToDatabase();
-    const sessions = db.collection("sessions");
+    const { data: session, error: fetchError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("token", sessionToken)
+      .single();
 
-    const session = await sessions.findOne({ token: sessionToken });
-    if (!session) {
+    if (fetchError || !session) {
       return res.status(401).json({ error: "Invalid session" });
     }
 
     // Update lastActive
-    await sessions.updateOne(
-      { token: sessionToken },
-      { $set: { lastActive: new Date() } }
-    );
+    await supabase
+      .from("sessions")
+      .update({ lastActive: new Date().toISOString() })
+      .eq("token", sessionToken);
 
     // Re-issue cookie with fresh 7-day expiry
     res.setHeader(

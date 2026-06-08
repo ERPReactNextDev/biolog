@@ -1,56 +1,46 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
-
+import { supabase } from "@/lib/supabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const db = await connectToDatabase();
-  const meetingsCollection = db.collection("meetings");
-
   if (req.method === "POST") {
     try {
       const { 
         ReferenceID, 
-        Email, 
         Title, 
         StartDate, 
         EndDate, 
-        Location, 
         Remarks, 
-        TSM 
+        TSM,
+        Manager,
+        CompanyName
       } = req.body;
 
       if (!ReferenceID || !StartDate || !EndDate || !Title) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // FIX: Parse dates without timezone conversion
-      const start = new Date(StartDate);
-      const end = new Date(EndDate);
-      
-      // Store as ISO strings to preserve the local time
-      const startDateISO = new Date(StartDate).toISOString();
-      const endDateISO = new Date(EndDate).toISOString();
-      
-      const durationMs = end.getTime() - start.getTime();
-      const durationMin = Math.round(durationMs / (1000 * 60));
-
       const newMeeting = {
-        ReferenceID,
-        Email,
-        Title,
-        StartDate: startDateISO,  // Store as ISO string
-        EndDate: endDateISO,      // Store as ISO string
-        Duration: durationMin,
-        Location,
-        Remarks,
-        TSM,
-        Status: "Scheduled",
-        CreatedAt: new Date(),
+        referenceid:   ReferenceID,
+        tsm:           TSM || "",
+        manager:       Manager || "",
+        type_activity: Title,
+        remarks:       Remarks || "",
+        start_date:    new Date(StartDate).toISOString(),
+        end_date:      new Date(EndDate).toISOString(),
+        company_name:  CompanyName || "",
+        // date_created has a default value in DB
       };
 
-      const result = await meetingsCollection.insertOne(newMeeting);
-      return res.status(201).json({ message: "Meeting created successfully", id: result.insertedId });
+      const { data, error } = await supabase.from("meetings").insert(newMeeting).select().single();
+      if (error) throw error;
+      
+      return res.status(201).json({ 
+        message: "Meeting created successfully", 
+        id: data.id,
+        _id: data.id // for compatibility
+      });
     } catch (error) {
+      console.error("create meeting error:", error);
       return res.status(500).json({ error: "Internal Server Error" });
     }
   }
@@ -58,22 +48,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "GET") {
     try {
       const { referenceID, startDate, endDate, role } = req.query;
-      const query: any = {};
+      
+      let query = supabase.from("meetings").select("*");
 
       if (role !== "SuperAdmin" && role !== "Human Resources" && referenceID) {
-        query.ReferenceID = referenceID;
+        query = query.eq("referenceid", referenceID);
       }
 
       if (startDate && endDate) {
-        query.StartDate = {
-          $gte: new Date(startDate as string),
-          $lte: new Date(endDate as string),
-        };
+        query = query.gte("start_date", new Date(startDate as string).toISOString())
+                     .lte("start_date", new Date(endDate as string).toISOString());
       }
 
-      const meetings = await meetingsCollection.find(query).sort({ StartDate: 1 }).toArray();
+      const { data: rawMeetings, error } = await query.order("start_date", { ascending: true });
+      if (error) throw error;
+
+      // Map back to expected frontend fields for compatibility
+      const meetings = (rawMeetings || []).map((m: any) => ({
+        ...m,
+        _id:         m.id,
+        ReferenceID: m.referenceid,
+        TSM:         m.tsm,
+        Title:       m.type_activity,
+        StartDate:   m.start_date,
+        EndDate:     m.end_date,
+        Remarks:     m.remarks,
+        CreatedAt:   m.date_created,
+        Manager:     m.manager,
+        CompanyName: m.company_name
+      }));
+
       return res.status(200).json(meetings);
     } catch (error) {
+      console.error("fetch meetings error:", error);
       return res.status(500).json({ error: "Internal Server Error" });
     }
   }

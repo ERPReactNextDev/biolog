@@ -1,57 +1,41 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "@/lib/MongoDB";
-import { ObjectId } from "mongodb";
+import { supabase } from "@/lib/supabase";
 
 export default async function updateActivityLog(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== "PUT") {
-    res.setHeader("Allow", ["PUT"]);
+    res.setHeader("Allow", "PUT");
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
   try {
-    const { _id, Remarks } = req.body ?? {};
+    const { id, Remarks } = req.body ?? {};
 
-    if (!_id || typeof _id !== "string" || !_id.trim()) {
-      return res.status(400).json({ error: "_id is required" });
+    if (!id) {
+      return res.status(400).json({ error: "id is required" });
     }
 
     if (Remarks === undefined || Remarks === null) {
       return res.status(400).json({ error: "Remarks field is required" });
     }
 
-    // Validate ObjectId format before hitting the DB
-    if (!ObjectId.isValid(_id.trim())) {
-      return res.status(400).json({ error: "Invalid _id format" });
-    }
+    const { error } = await supabase
+      .from("tasklog")
+      .update({
+        Remarks:   typeof Remarks === "string" ? Remarks.trim() : String(Remarks),
+      })
+      .eq("id", id);
 
-    let db;
-    try {
-      db = await connectToDatabase();
-    } catch (dbErr) {
-      return res.status(503).json({ error: "Database connection failed. Please try again." });
-    }
-
-    const collection = db.collection("TaskLog");
-
-    const result = await collection.updateOne(
-      { _id: new ObjectId(_id.trim()) },
-      {
-        $set: {
-          Remarks:   typeof Remarks === "string" ? Remarks.trim() : String(Remarks),
-          updatedAt: new Date(),
-        },
-      }
-    );
-
-    if (result.matchedCount === 0) {
+    if (error) {
+      console.error("Supabase update error:", error);
       return res.status(404).json({ error: "Activity log not found" });
     }
 
     return res.status(200).json({ message: "Activity log updated successfully" });
   } catch (error) {
+    console.error("[UpdateLog] error:", error);
     return res.status(500).json({ error: "Failed to update activity log" });
   }
 }

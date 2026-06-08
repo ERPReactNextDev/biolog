@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (error) throw error;
 
         // Remove passwords from response and add _id for compatibility
-        const sanitizedUsers = users.map(({ Password, id, ...u }) => ({ ...u, id, _id: id }));
+        const sanitizedUsers = (users || []).map(({ Password, id, ...u }: any) => ({ ...u, id, _id: id }));
         return res.status(200).json(sanitizedUsers);
       } catch (error) {
         return res.status(500).json({ error: "Failed to fetch users" });

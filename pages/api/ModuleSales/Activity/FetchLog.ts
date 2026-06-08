@@ -77,7 +77,7 @@ export default async function fetchLogs(
       return res.status(503).json({ error: "Failed to fetch logs from database." });
     }
 
-    const logs: ActivityLog[] = (rawLogs || []).map((doc) => ({
+    const logs: ActivityLog[] = (rawLogs || []).map((doc: any) => ({
       id:               doc.id.toString(),
       _id:              doc.id.toString(), // for compatibility
       ReferenceID:      doc.ReferenceID      ?? "",

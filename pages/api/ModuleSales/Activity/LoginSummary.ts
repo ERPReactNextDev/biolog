@@ -15,6 +15,11 @@ export default async function loginSummary(
   }
 
   try {
+    if (!supabase) {
+      console.error("[LoginSummary] Supabase client not initialized.");
+      return res.status(500).json({ error: "Database connection error" });
+    }
+
     const { referenceId } = req.query;
 
     if (!referenceId || typeof referenceId !== "string" || !referenceId.trim()) {

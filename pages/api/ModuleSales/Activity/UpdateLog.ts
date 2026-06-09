@@ -11,6 +11,11 @@ export default async function updateActivityLog(
   }
 
   try {
+    if (!supabase) {
+      console.error("[UpdateLog] Supabase client not initialized.");
+      return res.status(500).json({ error: "Database connection error" });
+    }
+
     const { id, Remarks } = req.body ?? {};
 
     if (!id) {

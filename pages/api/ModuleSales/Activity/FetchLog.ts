@@ -26,6 +26,11 @@ export default async function fetchLogs(
   }
 
   try {
+    if (!supabase) {
+      console.error("[FetchLog] Supabase client not initialized.");
+      return res.status(500).json({ error: "Database connection error" });
+    }
+
     // ── Pagination ────────────────────────────────────────────────────────────
     const page  = Math.max(1, parseInt((req.query.page  as string) || "1",  10));
     const limit = Math.min(500, Math.max(1, parseInt((req.query.limit as string) || "100", 10)));
@@ -78,8 +83,8 @@ export default async function fetchLogs(
     }
 
     const logs: ActivityLog[] = (rawLogs || []).map((doc: any) => ({
-      id:               doc.id.toString(),
-      _id:              doc.id.toString(), // for compatibility
+      id:               doc.id?.toString() || "",
+      _id:              doc.id?.toString() || "", // for compatibility
       ReferenceID:      doc.ReferenceID      ?? "",
       Email:            doc.Email            ?? "",
       Type:             doc.Type             ?? "",

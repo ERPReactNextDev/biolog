@@ -15,12 +15,17 @@ export default async function addActivityLog(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
-  }
-
   try {
+    if (!supabase) {
+      console.error("[AddLog] Supabase client not initialized. Check your environment variables.");
+      return res.status(500).json({ error: "Database connection error" });
+    }
+
+    if (req.method !== "POST") {
+      res.setHeader("Allow", ["POST"]);
+      return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    }
+
     const {
       ReferenceID,
       Email,
@@ -71,11 +76,15 @@ export default async function addActivityLog(
     }
 
     // Fetch dynamic work-day start
-    const { data: settings } = await supabase
+    const { data: settings, error: settingsError } = await supabase
       .from("system_settings")
       .select("officeStartTime")
       .eq("type", "global")
-      .single();
+      .maybeSingle();
+
+    if (settingsError) {
+      console.error("[AddLog] Settings fetch error:", settingsError);
+    }
 
     const officeStartTime = settings?.officeStartTime || "08:00";
     const [startH, startM] = officeStartTime.split(":").map(Number);
@@ -91,7 +100,7 @@ export default async function addActivityLog(
     endOfDay.setMilliseconds(-1);
 
     /* ── Duplicate check ────────────────────────────────────────────────── */
-    const { data: lastActivityToday } = await supabase
+    const { data: lastActivityToday, error: dupError } = await supabase
       .from("tasklog")
       .select("Status, Type")
       .eq("ReferenceID", ReferenceID)
@@ -100,6 +109,10 @@ export default async function addActivityLog(
       .order("date_created", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (dupError) {
+      console.error("[AddLog] Duplicate check error:", dupError);
+    }
 
     if (
       lastActivityToday?.Status === Status &&
@@ -137,13 +150,6 @@ export default async function addActivityLog(
     if (typeof PhotoURL === "string" && PhotoURL.trim())
       newLog.PhotoURL = PhotoURL.trim();
 
-    // Add specific fields if present (for Supabase tasklog too)
-    if (company_name) newLog.company_name = company_name;
-    if (contact_person) newLog.contact_person = contact_person;
-    if (contact_number) newLog.contact_number = contact_number;
-    if (email_address) newLog.email_address = email_address;
-    if (address) newLog.address = address;
-
     /* ── Insert to Supabase ─────────────────────────── */
     const { data: supabaseData, error: insertError } = await supabase
       .from("tasklog")
@@ -156,13 +162,6 @@ export default async function addActivityLog(
       return res.status(500).json({
         error: "Supabase insert failed",
         details: insertError.message,
-      });
-    }
-
-    if (!supabaseData) {
-      console.error("[AddLog] No data returned from Supabase insert");
-      return res.status(500).json({
-        error: "No data returned from Supabase insert",
       });
     }
 
@@ -211,14 +210,14 @@ export default async function addActivityLog(
 
     return res.status(201).json({
       message:      `${Status} recorded successfully`,
-      id:           supabaseData.id.toString(),
+      id:           supabaseData?.id?.toString() || "",
       date_created: resolvedDate.toISOString(),
     });
 
   } catch (error: any) {
-    console.error("[AddLog] Unhandled error:", error);
+    console.error("[AddLog] Fatal Error:", error);
     return res.status(500).json({
-      error: "Failed to add activity log. Please try again.",
+      error: "Internal server error",
       message: error?.message || "Unknown error",
     });
   }

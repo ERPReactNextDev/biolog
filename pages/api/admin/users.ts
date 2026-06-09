@@ -4,6 +4,11 @@ import bcrypt from "bcrypt";
 import { recordAuditLog } from "@/utils/audit-logger";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!supabase) {
+    console.error("[AdminUsers] Supabase client not initialized.");
+    return res.status(500).json({ error: "Database connection error" });
+  }
+
   switch (req.method) {
     case "GET":
       try {
@@ -17,8 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Remove passwords from response and add _id for compatibility
         const sanitizedUsers = (users || []).map(({ Password, id, ...u }: any) => ({ ...u, id, _id: id }));
         return res.status(200).json(sanitizedUsers);
-      } catch (error) {
-        return res.status(500).json({ error: "Failed to fetch users" });
+      } catch (error: any) {
+        console.error("[AdminUsers] GET error:", error);
+        return res.status(500).json({ error: "Failed to fetch users", details: error.message });
       }
 
     case "POST":
@@ -27,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Email, Password, Role, Department, Firstname, Lastname, ReferenceID, Status, 
           Company, Manager, TSM, ContactNumber, Position, Address,
           adminId, adminName 
-        } = req.body;
+        } = req.body ?? {};
 
         if (!Email || !Password || !Role || !Department || !Firstname || !Lastname || !ReferenceID) {
           return res.status(400).json({ error: "Missing required fields" });
@@ -74,14 +80,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         return res.status(201).json({ message: "User created successfully" });
-      } catch (error) {
-        console.error("Create user error:", error);
-        return res.status(500).json({ error: "Failed to create user" });
+      } catch (error: any) {
+        console.error("[AdminUsers] POST error:", error);
+        return res.status(500).json({ error: "Failed to create user", details: error.message });
       }
 
     case "PUT":
       try {
-        const { userId, adminId, adminName, ...updateData } = req.body;
+        const { userId, adminId, adminName, ...updateData } = req.body ?? {};
         if (!userId) return res.status(400).json({ error: "User ID is required" });
 
         const { data: oldUser, error: fetchError } = await supabase
@@ -98,27 +104,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const { error: updateError } = await supabase
           .from("users")
-          .update({ ...updateData })
+          .update({ ...updateData, updatedAt: new Date().toISOString() })
           .eq("id", userId);
 
         if (updateError) throw updateError;
 
         if (adminId && adminName) {
-            let action = "UPDATE_USER";
-            let details = "Updated user profile";
-            
-            if (updateData.Status && updateData.Status !== oldUser.Status) {
-                action = updateData.Status === "Active" ? "GRANT_ACCESS" : "REVOKE_ACCESS";
-                details = `Status changed from ${oldUser.Status} to ${updateData.Status}`;
-            }
-
-            await recordAuditLog(adminId, adminName, action, oldUser.ReferenceID, `${oldUser.Firstname} ${oldUser.Lastname}`, details);
+            await recordAuditLog(adminId, adminName, "UPDATE_USER", oldUser.ReferenceID, `${oldUser.Firstname} ${oldUser.Lastname}`, `Updated user details`);
         }
 
         return res.status(200).json({ message: "User updated successfully" });
-      } catch (error) {
-        console.error("Update user error:", error);
-        return res.status(500).json({ error: "Failed to update user" });
+      } catch (error: any) {
+        console.error("[AdminUsers] PUT error:", error);
+        return res.status(500).json({ error: "Failed to update user", details: error.message });
       }
 
     case "DELETE":
@@ -151,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
     default:
-      res.setHeader("Allow", ["GET", "POST", "PUT", "DELETE"]);
-      return res.status(405).end(`Method ${req.method} Not Allowed`);
+      res.setHeader("Allow", ["GET", "POST", "PUT"]);
+      return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 }

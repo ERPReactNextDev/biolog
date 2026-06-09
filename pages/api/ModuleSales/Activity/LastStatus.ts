@@ -11,6 +11,11 @@ export default async function lastStatus(
   }
 
   try {
+    if (!supabase) {
+      console.error("[LastStatus] Supabase client not initialized.");
+      return res.status(500).json({ error: "Database connection error" });
+    }
+
     const { referenceId, type } = req.query;
 
     if (!referenceId || typeof referenceId !== "string" || !referenceId.trim()) {

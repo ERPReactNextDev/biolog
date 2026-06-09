@@ -2,6 +2,11 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!supabase) {
+    console.error("[Meeting] Supabase client not initialized.");
+    return res.status(500).json({ error: "Database connection error" });
+  }
+
   if (req.method === "POST") {
     try {
       const { 
@@ -19,25 +24,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Missing required fields" });
       }
 
+      const start = new Date(StartDate);
+      const end = new Date(EndDate);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid StartDate or EndDate format" });
+      }
+
       const newMeeting = {
         referenceid:   ReferenceID,
         tsm:           TSM || "",
         manager:       Manager || "",
         type_activity: Title,
         remarks:       Remarks || "",
-        start_date:    new Date(StartDate).toISOString(),
-        end_date:      new Date(EndDate).toISOString(),
+        start_date:    start.toISOString(),
+        end_date:      end.toISOString(),
         company_name:  CompanyName || "",
         // date_created has a default value in DB
       };
 
-      const { data, error } = await supabase.from("meetings").insert(newMeeting).select().single();
+      const { data, error } = await supabase.from("meetings").insert(newMeeting).select().maybeSingle();
       if (error) throw error;
       
       return res.status(201).json({ 
         message: "Meeting created successfully", 
-        id: data.id,
-        _id: data.id // for compatibility
+        id: data?.id,
+        _id: data?.id // for compatibility
       });
     } catch (error) {
       console.error("create meeting error:", error);
@@ -56,8 +68,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (startDate && endDate) {
-        query = query.gte("start_date", new Date(startDate as string).toISOString())
-                     .lte("start_date", new Date(endDate as string).toISOString());
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          query = query.gte("start_date", start.toISOString())
+                       .lte("start_date", end.toISOString());
+        }
       }
 
       const { data: rawMeetings, error } = await query.order("start_date", { ascending: true });

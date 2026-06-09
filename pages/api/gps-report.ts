@@ -80,6 +80,13 @@ export default async function handler(
     }
 
     /* ── Build document ─────────────────── */
+    const loginD = new Date(loginDate);
+    const logoutD = new Date(logoutDate);
+
+    if (isNaN(loginD.getTime()) || isNaN(logoutD.getTime())) {
+      return res.status(400).json({ error: "Invalid loginDate or logoutDate format" });
+    }
+
     const newReport: any = {
       ReferenceID: ReferenceID.trim(),
       Email: Email.trim(),
@@ -88,8 +95,8 @@ export default async function handler(
       Remarks: remarks.trim(),
       TSM: typeof TSM === "string" ? TSM.trim() : "",
       PhotoURL: photos,
-      loginDate: new Date(loginDate).toISOString(),
-      logoutDate: new Date(logoutDate).toISOString(),
+      loginDate: loginD.toISOString(),
+      logoutDate: logoutD.toISOString(),
       Latitude: gpsLocation.lat.toString(),
       Longitude: gpsLocation.lng.toString(),
       Location: gpsLocation.address || "",

@@ -2648,7 +2648,31 @@ function ActivityPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { userId, setUserId } = useUser();
-  const queryUserId = searchParams?.get("id") ?? "";
+  const [resolvedQueryUserId, setResolvedQueryUserId] = useState<string>("");
+  
+  // Resolve queryUserId: first check ?id param, then check offline session, then redirect to login
+  useEffect(() => {
+    const idParam = searchParams?.get("id") ?? "";
+    if (idParam) {
+      setResolvedQueryUserId(idParam);
+      return;
+    }
+    
+    // No id param, check for shortcut and offline session
+    (async () => {
+      const shortcut = searchParams?.get("shortcut");
+      if (shortcut) {
+        const { getOfflineSession } = await import("@/lib/offline-auth");
+        const offlineUserId = await getOfflineSession();
+        if (offlineUserId) {
+          setResolvedQueryUserId(offlineUserId);
+          return;
+        }
+      }
+    })();
+  }, [searchParams]);
+  
+  const queryUserId = resolvedQueryUserId;
 
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [posts, setPosts] = useState<ActivityLog[]>([]);

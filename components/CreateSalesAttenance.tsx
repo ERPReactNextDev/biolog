@@ -98,62 +98,61 @@ export default function CreateSalesAttendance({
   }, [open]);
 
   /* ── Geolocation ── */
-  useEffect(() => {
-    if (!open) return;
+  const getLocation = () => {
+    setLocationAddress("Fetching location...");
 
-    const getLocation = () => {
-      setLocationAddress("Fetching location...");
-
-      const options = {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0
-      };
-
-      const success = (position: GeolocationPosition) => {
-        const { latitude: lat, longitude: lng } = position.coords;
-        setLatitude(lat);
-        setLongitude(lng);
-
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-          .then((r) => r.json())
-          .then((d) => {
-            const addr = d.display_name || "Location detected";
-            setLocationAddress(addr);
-            // Auto-populate address field for New Client
-            if (clientType === "New Client") {
-              onChangeAction("address", addr);
-            }
-          })
-          .catch(() => {
-            const fallback = "Location detected (GPS OK)";
-            setLocationAddress(fallback);
-            if (clientType === "New Client") {
-              onChangeAction("address", fallback);
-            }
-          });
-      };
-
-      const error = (err: GeolocationPositionError) => {
-        // Retry with lower accuracy if high accuracy fails
-        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-          navigator.geolocation.getCurrentPosition(success,
-            () => setLocationAddress("Location unavailable. Please check GPS."),
-            { ...options, enableHighAccuracy: false, timeout: 10000 }
-          );
-        } else {
-          setLocationAddress("Location permission denied or unavailable.");
-        }
-      };
-
-      if (!navigator.geolocation) {
-        setLocationAddress("Geolocation not supported by browser.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(success, error, options);
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
     };
 
+    const success = (position: GeolocationPosition) => {
+      const { latitude: lat, longitude: lng } = position.coords;
+      setLatitude(lat);
+      setLongitude(lng);
+
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const addr = d.display_name || "Location detected";
+          setLocationAddress(addr);
+          // Auto-populate address field for New Client
+          if (clientType === "New Client") {
+            onChangeAction("address", addr);
+          }
+        })
+        .catch(() => {
+          const fallback = "Location detected (GPS OK)";
+          setLocationAddress(fallback);
+          if (clientType === "New Client") {
+            onChangeAction("address", fallback);
+          }
+        });
+    };
+
+    const error = (err: GeolocationPositionError) => {
+      // Retry with lower accuracy if high accuracy fails
+      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+        navigator.geolocation.getCurrentPosition(success,
+          () => setLocationAddress("Location unavailable. Please check GPS."),
+          { ...options, enableHighAccuracy: false, timeout: 10000 }
+        );
+      } else {
+        setLocationAddress("Location permission denied or unavailable.");
+      }
+    };
+
+    if (!navigator.geolocation) {
+      setLocationAddress("Geolocation not supported by browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(success, error, options);
+  };
+
+  useEffect(() => {
+    if (!open) return;
     getLocation();
   }, [open]);
 
@@ -864,6 +863,9 @@ export default function CreateSalesAttendance({
                       <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
                       <button
                         onClick={() => {
+                          // First re-fetch location
+                          getLocation();
+                          
                           if (!navigator.onLine) {
                             toast.error("Manual map is not available offline.");
                             return;

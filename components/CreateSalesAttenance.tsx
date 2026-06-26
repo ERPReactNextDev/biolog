@@ -111,14 +111,11 @@ export default function CreateSalesAttendance({
       const { latitude: lat, longitude: lng } = position.coords;
       setLatitude(lat);
       setLongitude(lng);
-      
-      // Create fallback with lat/lng
-      const latLngFallback = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
-      
+
       fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
         .then((r) => r.json())
         .then((d) => {
-          const addr = d.display_name || latLngFallback;
+          const addr = d.display_name || "Location detected";
           setLocationAddress(addr);
           // Auto-populate address field for New Client
           if (clientType === "New Client") {
@@ -126,10 +123,10 @@ export default function CreateSalesAttendance({
           }
         })
         .catch(() => {
-          // Use lat/lng when offline
-          setLocationAddress(latLngFallback);
+          const fallback = "Location detected (GPS OK)";
+          setLocationAddress(fallback);
           if (clientType === "New Client") {
-            onChangeAction("address", latLngFallback);
+            onChangeAction("address", fallback);
           }
         });
     };

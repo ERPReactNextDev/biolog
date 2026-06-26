@@ -71,32 +71,45 @@ async function reverseGeocode(coords: string): Promise<string | null> {
 }
 
 // Hook for resolving location (works for both logs and meetings)
-function useResolvedLocation(location: string | undefined | null, isOpen: boolean) {
+function useResolvedLocation(location: string | undefined | null, latitude?: number | null, longitude?: number | null) {
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
 
+  // Determine which coordinate string to use
+  const getCoordString = () => {
+    // Convert to numbers if they are strings
+    const latNum = typeof latitude === 'string' ? parseFloat(latitude) : latitude;
+    const lngNum = typeof longitude === 'string' ? parseFloat(longitude) : longitude;
+    
+    if (latNum !== null && latNum !== undefined && !isNaN(latNum) && lngNum !== null && lngNum !== undefined && !isNaN(lngNum)) {
+      return `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`;
+    }
+    return location;
+  };
+  const coordString = getCoordString();
+
   useEffect(() => {
-    if (!isOpen || !location) {
+    if (!coordString) {
       setResolvedAddress(null);
       return;
     }
 
     // If it's already an address (not coordinates), no need to resolve
-    if (!isCoordinateFormat(location)) {
+    if (!isCoordinateFormat(coordString)) {
       setResolvedAddress(null);
       return;
     }
 
     // If we have it cached, use it
-    if (addressCache.has(location)) {
-      setResolvedAddress(addressCache.get(location)!);
+    if (addressCache.has(coordString)) {
+      setResolvedAddress(addressCache.get(coordString)!);
       return;
     }
 
     // Try to reverse geocode if online
     if (navigator.onLine) {
       setIsResolving(true);
-      reverseGeocode(location)
+      reverseGeocode(coordString)
         .then(address => {
           if (address) {
             setResolvedAddress(address);
@@ -104,14 +117,53 @@ function useResolvedLocation(location: string | undefined | null, isOpen: boolea
         })
         .finally(() => setIsResolving(false));
     }
-  }, [isOpen, location]);
+  }, [coordString]);
 
   return { 
     displayLocation: resolvedAddress || location || "Not specified", 
     isResolving, 
-    isCoords: isCoordinateFormat(location || ""),
-    originalCoords: location 
+    isCoords: isCoordinateFormat(coordString || ""),
+    originalCoords: coordString 
   };
+}
+
+// Component to display location, with resolved coordinates
+function LocationDisplay({ 
+  location, 
+  latitude, 
+  longitude,
+  className = "", 
+  isDark = false 
+}: { 
+  location?: string | null; 
+  latitude?: number | null;
+  longitude?: number | null;
+  className?: string; 
+  isDark?: boolean; 
+}) {
+  const { displayLocation, isResolving, isCoords, originalCoords } = useResolvedLocation(location, latitude, longitude);
+  
+  return (
+    <div className={className}>
+      {isResolving ? (
+        <div className="flex items-center gap-1.5 opacity-70">
+          <Clock size={14} className="animate-pulse" />
+          <span>Resolving address...</span>
+        </div>
+      ) : (
+        <>
+          <span className="truncate max-w-[180px]">
+            {displayLocation || "No location"}
+          </span>
+          {isCoords && originalCoords && (
+            <span className={isDark ? "ml-1 text-[9px] bg-amber-500/20 text-amber-200 px-1 rounded" : "ml-1 text-[9px] bg-amber-100 text-amber-700 px-1 rounded"}>
+              offline
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 
@@ -189,6 +241,8 @@ type TimelineItem = {
   location: string;
   status: string;
   date?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 interface ActivityLog {
@@ -203,6 +257,8 @@ interface ActivityLog {
   TSM: string;
   SiteVisitAccount: string;
   _id?: string;
+  Latitude?: number | null;
+  Longitude?: number | null;
 }
 
 interface Meeting {
@@ -220,6 +276,8 @@ interface Meeting {
   CreatedAt: string;
   Manager?: string;
   CompanyName?: string;
+  Latitude?: number | null;
+  Longitude?: number | null;
 }
 
 interface UserInfo {
@@ -361,7 +419,9 @@ function TimelineItemComponent({ item, index }: { item: TimelineItem; index: num
             {item.status === "Login" || item.status === "Logout" ? item.status : `Visited: ${item.title}`}
           </p>
         )}
-        <p className="mt-0.5 text-[11px] text-gray-500 leading-snug">{item.location}</p>
+        <div className="mt-0.5 text-[11px] text-gray-500 leading-snug">
+          <LocationDisplay location={item.location} latitude={item.latitude} longitude={item.longitude} />
+        </div>
         {item.description && item.description !== "No remarks" && (
           <p className="mt-0.5 text-[10px] text-gray-400 italic">"{item.description}"</p>
         )}
@@ -1110,20 +1170,15 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                     </div>
                     
                     <div className="flex items-center gap-4 text-[12px] text-white/80">
-                      <div className="flex items-center gap-1.5">
-                        <Clock size={14} />
-                        <span>{new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={14} />
+                          <span>{new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin size={14} />
+                          <LocationDisplay location={meeting.Location} latitude={meeting.Latitude} longitude={meeting.Longitude} isDark={true} />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin size={14} />
-                        <span className="truncate max-w-[120px]">
-                          {meeting.Location || "No location"}
-                          {meeting.Location && isCoordinateFormat(meeting.Location) && (
-                            <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-200 px-1 rounded">offline</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
                   </motion.button>
                 );
               } else {
@@ -1218,12 +1273,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin size={14} />
-                        <span className="truncate max-w-[120px]">
-                          {log.Location || "No location"}
-                          {log.Location && isCoordinateFormat(log.Location) && (
-                            <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-200 px-1 rounded">offline</span>
-                          )}
-                        </span>
+                        <LocationDisplay location={log.Location} latitude={log.Latitude} longitude={log.Longitude} isDark={isLogin || isClientVisit} />
                       </div>
                     </div>
                     
@@ -3010,6 +3060,8 @@ function ActivityPage() {
         title: p.Title,
         description: p.Remarks || "Meeting scheduled",
         location: p.Location || "",
+        latitude: p.Latitude,
+        longitude: p.Longitude,
         status: "Meeting",
         date: new Date(p.StartDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }),
       };
@@ -3019,6 +3071,8 @@ function ActivityPage() {
         title: p.Type === "Client Visit" ? p.SiteVisitAccount : p.Status,
         description: p.Remarks || "No remarks",
         location: p.Location || "",
+        latitude: p.Latitude,
+        longitude: p.Longitude,
         status: p.Status || "",
         date: new Date(p.date_created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true }),
       };
@@ -3465,7 +3519,7 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
   const user = usersMap[meeting.ReferenceID];
   
   // Use reverse geocoding for coordinate-based locations
-  const { displayLocation, isResolving, isCoords, originalCoords } = useResolvedLocation(meeting.Location, open);
+  const { displayLocation, isResolving, isCoords, originalCoords } = useResolvedLocation(meeting.Location, meeting.Latitude, meeting.Longitude);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

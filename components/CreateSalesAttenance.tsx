@@ -111,11 +111,12 @@ export default function CreateSalesAttendance({
       const { latitude: lat, longitude: lng } = position.coords;
       setLatitude(lat);
       setLongitude(lng);
+      const coordString = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
       fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
         .then((r) => r.json())
         .then((d) => {
-          const addr = d.display_name || "Location detected";
+          const addr = d.display_name || coordString;
           setLocationAddress(addr);
           // Auto-populate address field for New Client
           if (clientType === "New Client") {
@@ -123,10 +124,9 @@ export default function CreateSalesAttendance({
           }
         })
         .catch(() => {
-          const fallback = "Location detected (GPS OK)";
-          setLocationAddress(fallback);
+          setLocationAddress(coordString);
           if (clientType === "New Client") {
-            onChangeAction("address", fallback);
+            onChangeAction("address", coordString);
           }
         });
     };
@@ -855,21 +855,26 @@ export default function CreateSalesAttendance({
                         Detected Location
                       </p>
                       <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
-                      <button
-                        onClick={() => {
-                          // First re-fetch location
-                          getLocation();
-                          
-                          if (!navigator.onLine) {
-                            toast.error("Manual map is not available offline.");
-                            return;
-                          }
-                          setShowMap(!showMap);
-                        }}
-                        className="mt-2 text-[11px] font-semibold text-brand-primary hover:underline"
-                      >
-                        {showMap ? "Hide map" : "⚙ Set manually →"}
-                      </button>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        <button
+                          onClick={getLocation}
+                          className="text-[11px] font-semibold text-brand-primary hover:underline"
+                        >
+                          🔄 Retry Location
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!navigator.onLine) {
+                              toast.error("Manual map is not available offline.");
+                              return;
+                            }
+                            setShowMap(!showMap);
+                          }}
+                          className="text-[11px] font-semibold text-brand-primary hover:underline"
+                        >
+                          {showMap ? "Hide map" : "⚙ Set manually →"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   {showMap && navigator.onLine && (

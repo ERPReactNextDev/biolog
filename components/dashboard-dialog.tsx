@@ -16,6 +16,8 @@ interface ActivityLog {
   Remarks: string;
   SiteVisitAccount: string | null;
   _id?: string;
+  Latitude?: number | null;
+  Longitude?: number | null;
 }
 
 // Cache for reverse geocoding results
@@ -88,29 +90,45 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
   // Reverse geocode coordinates when dialog opens
   useEffect(() => {
-    if (!open || !selectedEvent?.Location) {
+    if (!open || !selectedEvent) {
       setResolvedAddress(null);
       return;
     }
 
-    const location = selectedEvent.Location;
+    // First check if we have Latitude and Longitude to use
+    let coordString: string | null = null;
+    
+    // Convert to numbers if they are strings
+    const latNum = typeof selectedEvent.Latitude === 'string' ? parseFloat(selectedEvent.Latitude) : selectedEvent.Latitude;
+    const lngNum = typeof selectedEvent.Longitude === 'string' ? parseFloat(selectedEvent.Longitude) : selectedEvent.Longitude;
+    
+    if (latNum !== null && latNum !== undefined && !isNaN(latNum) && lngNum !== null && lngNum !== undefined && !isNaN(lngNum)) {
+      coordString = `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`;
+    } else if (selectedEvent.Location) {
+      coordString = selectedEvent.Location;
+    }
+
+    if (!coordString) {
+      setResolvedAddress(null);
+      return;
+    }
     
     // If it's already an address (not coordinates), use it directly
-    if (!isCoordinateFormat(location)) {
+    if (!isCoordinateFormat(coordString)) {
       setResolvedAddress(null);
       return;
     }
 
     // If we have it cached, use it
-    if (addressCache.has(location)) {
-      setResolvedAddress(addressCache.get(location)!);
+    if (addressCache.has(coordString)) {
+      setResolvedAddress(addressCache.get(coordString)!);
       return;
     }
 
     // Try to reverse geocode if online
     if (navigator.onLine) {
       setIsResolving(true);
-      reverseGeocode(location)
+      reverseGeocode(coordString)
         .then(address => {
           if (address) {
             setResolvedAddress(address);
@@ -118,11 +136,24 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
         })
         .finally(() => setIsResolving(false));
     }
-  }, [open, selectedEvent?.Location]);
+  }, [open, selectedEvent?.Location, selectedEvent?.Latitude, selectedEvent?.Longitude]);
 
   // Get display location (resolved address or original)
+  const getCoordString = () => {
+    if (!selectedEvent) return null;
+    
+    // Convert to numbers if they are strings
+    const latNum = typeof selectedEvent.Latitude === 'string' ? parseFloat(selectedEvent.Latitude) : selectedEvent.Latitude;
+    const lngNum = typeof selectedEvent.Longitude === 'string' ? parseFloat(selectedEvent.Longitude) : selectedEvent.Longitude;
+    
+    if (latNum !== null && latNum !== undefined && !isNaN(latNum) && lngNum !== null && lngNum !== undefined && !isNaN(lngNum)) {
+      return `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`;
+    }
+    return selectedEvent.Location;
+  };
+  const coordString = getCoordString();
   const displayLocation = resolvedAddress || selectedEvent?.Location || "No location recorded";
-  const isCoords = isCoordinateFormat(selectedEvent?.Location || "");
+  const isCoords = coordString ? isCoordinateFormat(coordString) : false;
 
   // State for download loading
   const [isDownloading, setIsDownloading] = useState(false);

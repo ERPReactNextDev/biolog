@@ -444,17 +444,28 @@ export default function CreateAttendance({
                         {locationAddress === LOCATION_PENDING ? "Detecting location..." : "Detected Location"}
                       </p>
                       <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
-                      {isLocationReady(locationAddress) && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
                         <button
-                          onClick={() => {
-                            getLocation();
-                            setShowMap(!showMap);
-                          }}
-                          className="mt-2 text-[11px] font-semibold text-brand-primary hover:underline"
+                          onClick={getLocation}
+                          className="text-[11px] font-semibold text-brand-primary hover:underline"
                         >
-                          {showMap ? "Hide map" : "⚙ Set manually →"}
+                          🔄 Retry Location
                         </button>
-                      )}
+                        {isLocationReady(locationAddress) && (
+                          <button
+                            onClick={() => {
+                              if (!navigator.onLine) {
+                                toast.error("Manual map is not available offline.");
+                                return;
+                              }
+                              setShowMap(!showMap);
+                            }}
+                            className="text-[11px] font-semibold text-brand-primary hover:underline"
+                          >
+                            {showMap ? "Hide map" : "⚙ Set manually →"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {showMap && (

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import { UserProvider } from "@/contexts/UserContext";
+import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
 
 const inter = Inter({
   weight: "100",
@@ -53,8 +54,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script type="module" defer src="https://static.rocket.new/rocket-shot.js?v=0.0.2" /></head>
       <body className={`${inter.variable} font-mono antialiased relative`}>
         <UserProvider>
-          {children}
-          <Toaster />
+          <OfflineStatusProvider>
+            {children}
+            <Toaster />
+          </OfflineStatusProvider>
         </UserProvider>
       </body>
     </html>

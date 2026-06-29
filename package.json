@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 5000 -H 0.0.0.0",
     "export": "next export",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch --runInBand"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -120,11 +122,15 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/bcrypt": "^5.0.2",
     "@types/draft-js": "^0.11.18",
     "@types/express": "^5.0.3",
     "@types/file-saver": "^2.0.7",
     "@types/formidable": "^3.4.5",
+    "@types/jest": "^30.0.0",
     "@types/leaflet": "^1.9.16",
     "@types/multer": "^1.4.12",
     "@types/node": "^20.19.11",
@@ -138,8 +144,14 @@
     "@types/react-window": "^1.8.8",
     "@types/socket.io": "^3.0.1",
     "@types/twilio": "^3.19.2",
+    "fake-indexeddb": "^6.2.5",
+    "fast-check": "^4.8.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "workbox-window": "^7.4.0"

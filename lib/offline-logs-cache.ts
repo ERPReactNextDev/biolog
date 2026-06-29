@@ -3,9 +3,10 @@
 // shows data even when the user is offline.
 
 const DB_NAME    = "acculog-logs";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "logs";
 const META_STORE = "meta";
+const ACTION_QUEUE_STORE = "action-queue";
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -23,6 +24,10 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(META_STORE)) {
         db.createObjectStore(META_STORE, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(ACTION_QUEUE_STORE)) {
+        const aqStore = db.createObjectStore(ACTION_QUEUE_STORE, { keyPath: "id" });
+        aqStore.createIndex("syncStatus", "syncStatus", { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -95,5 +100,141 @@ export async function getLastFetchedAge(): Promise<number> {
     return meta ? Date.now() - meta.value : Infinity;
   } catch {
     return Infinity;
+  }
+}
+
+// ─── Action Queue ──────────────────────────────────────────────────────────
+
+export interface ActionQueueEntry {
+  id: string;
+  action: string;
+  payload: Record<string, unknown>;
+  createdAt: number;
+  syncStatus: "pending" | "synced" | "failed" | "dead-letter";
+  lastAttemptAt: number | null;
+  attempts: number;
+  errorMessage: string | null;
+}
+
+/**
+ * Enqueue an action for offline sync.
+ * Works without a network connection — writes directly to IndexedDB.
+ * Returns the generated id within 1 second.
+ */
+export async function enqueueAction(
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const id =
+    "aq_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+
+  const entry: ActionQueueEntry = {
+    id,
+    action,
+    payload,
+    createdAt: Date.now(),
+    syncStatus: "pending",
+    lastAttemptAt: null,
+    attempts: 0,
+    errorMessage: null,
+  };
+
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx    = db.transaction(ACTION_QUEUE_STORE, "readwrite");
+      const store = tx.objectStore(ACTION_QUEUE_STORE);
+      store.put(entry);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror    = () => { db.close(); reject(tx.error); };
+    });
+  } catch (err) {
+    console.warn("[offline-logs] enqueueAction failed:", err);
+  }
+
+  return id;
+}
+
+/**
+ * Returns all action-queue entries with syncStatus "pending" or "failed",
+ * sorted by createdAt ascending. Falls back to [] on any IDB error.
+ */
+export async function getUnsyncedActions(): Promise<ActionQueueEntry[]> {
+  try {
+    const db = await openDB();
+    return await new Promise<ActionQueueEntry[]>((resolve, reject) => {
+      const tx    = db.transaction(ACTION_QUEUE_STORE, "readonly");
+      const store = tx.objectStore(ACTION_QUEUE_STORE);
+      const req   = store.getAll();
+      tx.oncomplete = () => db.close();
+      req.onsuccess = () => {
+        const all = req.result as ActionQueueEntry[];
+        const unsynced = all
+          .filter(e => e.syncStatus === "pending" || e.syncStatus === "failed")
+          .sort((a, b) => a.createdAt - b.createdAt);
+        resolve(unsynced);
+      };
+      req.onerror = () => { db.close(); reject(req.error); };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Marks an action-queue entry as synced.
+ * Sets syncStatus = "synced" and lastAttemptAt = Date.now().
+ */
+export async function markSynced(id: string): Promise<void> {
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx    = db.transaction(ACTION_QUEUE_STORE, "readwrite");
+      const store = tx.objectStore(ACTION_QUEUE_STORE);
+      const req   = store.get(id);
+      req.onsuccess = () => {
+        const entry = req.result as ActionQueueEntry | undefined;
+        if (!entry) { resolve(); return; }
+        entry.syncStatus    = "synced";
+        entry.lastAttemptAt = Date.now();
+        store.put(entry);
+      };
+      req.onerror   = () => { db.close(); reject(req.error); };
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror    = () => { db.close(); reject(tx.error); };
+    });
+  } catch (err) {
+    console.warn("[offline-logs] markSynced failed:", err);
+  }
+}
+
+/**
+ * Marks an action-queue entry as failed (or dead-letter after 5 attempts).
+ * Increments attempts, sets lastAttemptAt, sets errorMessage.
+ * If attempts >= 5 after increment, sets syncStatus = "dead-letter";
+ * otherwise sets syncStatus = "failed".
+ */
+export async function markFailed(id: string, errorMessage: string): Promise<void> {
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx    = db.transaction(ACTION_QUEUE_STORE, "readwrite");
+      const store = tx.objectStore(ACTION_QUEUE_STORE);
+      const req   = store.get(id);
+      req.onsuccess = () => {
+        const entry = req.result as ActionQueueEntry | undefined;
+        if (!entry) { resolve(); return; }
+        entry.attempts     += 1;
+        entry.lastAttemptAt = Date.now();
+        entry.errorMessage  = errorMessage;
+        entry.syncStatus    = entry.attempts >= 5 ? "dead-letter" : "failed";
+        store.put(entry);
+      };
+      req.onerror   = () => { db.close(); reject(req.error); };
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror    = () => { db.close(); reject(tx.error); };
+    });
+  } catch (err) {
+    console.warn("[offline-logs] markFailed failed:", err);
   }
 }

@@ -375,14 +375,34 @@ export function LoginForm({
   const router = useRouter();
 
   React.useEffect(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      // Offline branch: load branding from localStorage cache
+      const raw = localStorage.getItem("acculog_settings_cache");
+      if (raw) {
+        try {
+          const cached = JSON.parse(raw);
+          setSettings(cached);
+          if (cached.themeColor) {
+            document.documentElement.setAttribute("data-theme", cached.themeColor);
+          }
+        } catch {
+          // Corrupted cache — silently ignore; default logo/styles apply via built-in fallbacks
+        }
+      }
+      // If no cache found, return without error — built-in fallbacks handle rendering
+      return;
+    }
+
     fetch("/api/admin/settings")
       .then(r => r.json())
       .then(data => {
         setSettings(data);
+        localStorage.setItem("acculog_settings_cache", JSON.stringify(data));
         if (data.themeColor) {
           document.documentElement.setAttribute("data-theme", data.themeColor);
         }
-      });
+      })
+      .catch(() => {});
   }, []);
 
   function getDeviceId() {

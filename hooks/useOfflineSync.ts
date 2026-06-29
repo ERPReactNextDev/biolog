@@ -9,6 +9,9 @@ import {
   incrementRetry,
   getPendingCount,
   clearAllPendingLogs,
+  acquireSyncLock,
+  releaseSyncLock,
+  isSyncLocked,
 } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
@@ -41,6 +44,20 @@ export function useOfflineSync(onSyncComplete?: () => void) {
       return;
     }
 
+    // Acquire the global lock shared with OfflineStatusProvider to prevent
+    // both sync loops from processing the same pending-logs simultaneously.
+    if (!acquireSyncLock()) {
+      console.log("[sync] Skipped - global sync lock held by another sync loop");
+      // Schedule a deferred refresh so our pendingCount reflects whatever the
+      // other sync loop processed, once it releases the lock.
+      // Use a microtask-safe approach: wait for the current tick to pass, then
+      // refresh. Production: 500 ms is imperceptible. Tests: advanceTimersByTime handles it.
+      setTimeout(async () => {
+        await refreshCount();
+      }, 500);
+      return;
+    }
+
     syncingRef.current = true;
     setIsSyncing(true);
     console.log("[sync] Starting sync...");
@@ -53,6 +70,7 @@ export function useOfflineSync(onSyncComplete?: () => void) {
       console.error("[sync] Failed to read pending logs:", err);
       syncingRef.current = false;
       setIsSyncing(false);
+      releaseSyncLock();
       return;
     }
 
@@ -60,6 +78,7 @@ export function useOfflineSync(onSyncComplete?: () => void) {
       console.log("[sync] No pending logs to sync");
       syncingRef.current = false;
       setIsSyncing(false);
+      releaseSyncLock();
       return;
     }
 
@@ -157,6 +176,7 @@ export function useOfflineSync(onSyncComplete?: () => void) {
 
     syncingRef.current = false;
     setIsSyncing(false);
+    releaseSyncLock();
     await refreshCount();
 
     if (successCount > 0) {

@@ -9,7 +9,6 @@ import {
   UserPlus, X, ChevronRight, CheckCircle2, Clock,
   User, Mail, Lock, Building2, Briefcase, Hash,
 } from "lucide-react";
-import PWADiagnosticsPanel from "@/components/pwa-diagnostics-panel";
 
 /* ─────────────────────────────────────────────
    GOOGLE ICON (inline SVG — no extra dep)
@@ -373,9 +372,7 @@ export function LoginForm({
   const [settings, setSettings] = useState<any>(null);
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [googleLoginLoading, setGoogleLoginLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  const [isOnline, setIsOnline] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -383,6 +380,7 @@ export function LoginForm({
       setIsOnline(navigator.onLine);
     };
 
+    syncOnlineState();
     window.addEventListener("online", syncOnlineState);
     window.addEventListener("offline", syncOnlineState);
 
@@ -904,7 +902,6 @@ export function LoginForm({
                 Your session is secured with device authentication
               </p>
             </div>
-            <PWADiagnosticsPanel />
           </div>
 
           {/* Mobile footer */}

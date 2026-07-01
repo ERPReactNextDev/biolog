@@ -1,11 +1,17 @@
 // public/service-worker.js
-// Acculog PWA — Service Worker v13
+// Acculog PWA — Service Worker v14
+// Fixes: resilient install, correct offline navigation fallback,
+//        RSC request caching, improved _next/static caching.
 
-const CACHE_NAME     = "acculog-cache-v13";
-const OSM_CACHE_NAME = "acculog-osm-tiles-v1";
-const SYNC_TAG       = "sync-activity-logs";
-const OSM_MAX_ENTRIES = 200;
+const CACHE_NAME            = "acculog-cache-v14";
+const OSM_CACHE_NAME        = "acculog-osm-tiles-v1";
+const STATIC_RUNTIME_CACHE  = "acculog-runtime-static-v2";
+const RSC_CACHE_NAME        = "acculog-rsc-v1";
+const SYNC_TAG              = "sync-activity-logs";
+const OSM_MAX_ENTRIES       = 200;
 
+// ─── Assets to pre-cache on install ───────────────────────────────────────────
+// These are cached individually so a single 404 does NOT abort the whole install.
 const STATIC_ASSETS = [
   "/",
   "/Login",
@@ -17,27 +23,48 @@ const STATIC_ASSETS = [
   "/models/face_landmark68/face_landmark_68_model.json",
 ];
 
-const STATIC_RUNTIME_CACHE = "acculog-runtime-static-v1";
-
+// ─── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await cache.addAll(
-        STATIC_ASSETS.map((url) => new Request(url, { cache: "reload" }))
+
+      // Cache each asset individually — a 404 on one asset will NOT fail the
+      // entire install.  This is the critical fix for the iOS offline-launch bug.
+      await Promise.allSettled(
+        STATIC_ASSETS.map(async (url) => {
+          try {
+            await cache.add(new Request(url, { cache: "reload" }));
+          } catch (err) {
+            console.warn(`[SW] Failed to pre-cache ${url}:`, err);
+          }
+        })
       );
+
+      // Register background sync (best-effort)
       if ("sync" in self.registration) {
-        await self.registration.sync.register(SYNC_TAG);
+        try {
+          await self.registration.sync.register(SYNC_TAG);
+        } catch (err) {
+          console.warn("[SW] Background sync registration failed:", err);
+        }
       }
+
       await self.skipWaiting();
     })()
   );
 });
 
+// ─── Activate ─────────────────────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const validCaches = new Set([CACHE_NAME, OSM_CACHE_NAME, STATIC_RUNTIME_CACHE]);
+      const validCaches = new Set([
+        CACHE_NAME,
+        OSM_CACHE_NAME,
+        STATIC_RUNTIME_CACHE,
+        RSC_CACHE_NAME,
+      ]);
       const keys = await caches.keys();
       await Promise.all(
         keys.filter((k) => !validCaches.has(k)).map((k) => caches.delete(k))
@@ -47,6 +74,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function isDevOnlyRequest(url) {
   return (
     url.pathname.startsWith("/_next/webpack-hmr") ||
@@ -57,33 +85,78 @@ function isDevOnlyRequest(url) {
   );
 }
 
+// ─── Navigation handler ───────────────────────────────────────────────────────
+// Priority when offline:
+//   1. Exact URL match in cache
+//   2. /activity-planner  (the PWA start_url / shell)
+//   3. /                  (root fallback)
 async function handleNavigationRequest(request) {
+  // Always try the network first.
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) return networkResponse;
+    if (networkResponse.ok) {
+      // Opportunistically cache the navigation response so it's available offline.
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, networkResponse.clone());
+      return networkResponse;
+    }
     throw new Error(`Non-OK: ${networkResponse.status}`);
   } catch {
+    // Network unavailable — serve from cache in priority order.
     const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match("/");
-    if (cached) return cached;
+
+    const exactMatch = await cache.match(request);
+    if (exactMatch) return exactMatch;
+
+    const shellMatch = await cache.match("/activity-planner");
+    if (shellMatch) return shellMatch;
+
+    const rootMatch = await cache.match("/");
+    if (rootMatch) return rootMatch;
+
+    // Absolute last resort: let the browser handle it (will show native error).
     return fetch(request);
   }
 }
 
-async function handleStaleWhileRevalidate(request) {
+// ─── Stale-while-revalidate ───────────────────────────────────────────────────
+async function handleStaleWhileRevalidate(request, cacheName = STATIC_RUNTIME_CACHE) {
   const cached = await caches.match(request);
 
-  const networkUpdate = fetch(request).then(async (response) => {
-    if (response.ok) {
-      const cache = await caches.open(STATIC_RUNTIME_CACHE);
-      await cache.put(request, response.clone());
-    }
-    return response;
-  }).catch(() => cached);
+  const networkUpdate = fetch(request)
+    .then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(cacheName);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => cached);
 
-  return cached ?? await networkUpdate;
+  // Return cached immediately if available; otherwise wait for network.
+  return cached ?? (await networkUpdate);
 }
 
+// ─── RSC (React Server Component) handler ─────────────────────────────────────
+// Next.js App Router appends ?_rsc=<id> to in-flight server component requests.
+// Without caching these, navigating while offline shows a blank page / error.
+async function handleRSCRequest(request) {
+  const cached = await caches.match(request);
+
+  const networkUpdate = fetch(request)
+    .then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(RSC_CACHE_NAME);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => cached);
+
+  return cached ?? (await networkUpdate);
+}
+
+// ─── OpenStreetMap tile handler ───────────────────────────────────────────────
 async function handleOSMTile(request) {
   const cache = await caches.open(OSM_CACHE_NAME);
   const cached = await cache.match(request);
@@ -100,28 +173,56 @@ async function handleOSMTile(request) {
   return response;
 }
 
+// ─── Fetch handler ────────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip dev-only noise
   if (isDevOnlyRequest(url)) return;
 
+  // ── Navigation requests (HTML page loads) ──
   if (request.mode === "navigate") {
     event.respondWith(handleNavigationRequest(request));
     return;
   }
 
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(handleStaleWhileRevalidate(request));
+  // ── Next.js RSC requests (?_rsc=…) ──
+  // Must be checked before the _next/static rule.
+  if (url.search.includes("_rsc=")) {
+    event.respondWith(handleRSCRequest(request));
     return;
   }
 
+  // ── Next.js static assets (JS, CSS, fonts, images) ──
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(handleStaleWhileRevalidate(request, STATIC_RUNTIME_CACHE));
+    return;
+  }
+
+  // ── OpenStreetMap tiles ──
   if (url.hostname === "tile.openstreetmap.org") {
     event.respondWith(handleOSMTile(request));
     return;
   }
 
+  // ── Everything else: cache-first, then network ──
   event.respondWith(
     caches.match(request).then((cached) => cached ?? fetch(request))
   );
+});
+
+// ─── Background Sync ──────────────────────────────────────────────────────────
+self.addEventListener("sync", (event) => {
+  if (event.tag === SYNC_TAG) {
+    event.waitUntil(
+      self.clients
+        .matchAll({ includeUncontrolled: true, type: "window" })
+        .then((clients) => {
+          clients.forEach((client) =>
+            client.postMessage({ type: "SW_SYNC_TRIGGER" })
+          );
+        })
+    );
+  }
 });

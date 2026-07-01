@@ -9,13 +9,24 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
-      // Service worker must never be cached by the browser itself
+      // Main PWA service worker — must never be cached by the browser itself
       {
         source: "/service-worker.js",
         headers: [
-          { key: "Cache-Control",        value: "no-cache, no-store, must-revalidate" },
-          { key: "Content-Type",         value: "application/javascript" },
-          { key: "Service-Worker-Allowed", value: "/" }]},
+          { key: "Cache-Control",          value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type",           value: "application/javascript" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      // Firebase messaging SW — scoped narrowly to avoid hijacking navigation
+      {
+        source: "/firebase-messaging-sw.js",
+        headers: [
+          { key: "Cache-Control",          value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type",           value: "application/javascript" },
+          { key: "Service-Worker-Allowed", value: "/firebase-cloud-messaging-push-scope" },
+        ],
+      },
       // Manifest
       {
         source: "/manifest.json",

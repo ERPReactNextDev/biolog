@@ -9,6 +9,7 @@ import {
   UserPlus, X, ChevronRight, CheckCircle2, Clock,
   User, Mail, Lock, Building2, Briefcase, Hash,
 } from "lucide-react";
+import PWADiagnosticsPanel from "@/components/pwa-diagnostics-panel";
 
 /* ─────────────────────────────────────────────
    GOOGLE ICON (inline SVG — no extra dep)
@@ -372,7 +373,24 @@ export function LoginForm({
   const [settings, setSettings] = useState<any>(null);
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [googleLoginLoading, setGoogleLoginLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
   const router = useRouter();
+
+  useEffect(() => {
+    const syncOnlineState = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    window.addEventListener("online", syncOnlineState);
+    window.addEventListener("offline", syncOnlineState);
+
+    return () => {
+      window.removeEventListener("online", syncOnlineState);
+      window.removeEventListener("offline", syncOnlineState);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -721,7 +739,7 @@ export function LoginForm({
                   id="email" type="email" value={Email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@acculog.com"
-                  required autoComplete="email"
+                  required autoComplete="email" disabled={loading}
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-300 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
                 />
               </div>
@@ -735,7 +753,7 @@ export function LoginForm({
                   <input
                     id="otp" type="text" maxLength={6}
                     value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Enter 6-digit code" required
+                    placeholder="Enter 6-digit code" required disabled={loading}
                     className="w-full rounded-2xl border-2 border-brand-primary/20 bg-white px-4 py-3.5 text-center text-[20px] font-bold tracking-[8px] text-gray-900 placeholder:text-gray-300 placeholder:tracking-normal outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 transition-all"
                   />
                   <p className="text-[11px] text-gray-400 text-center">Enter 6-digit code from authenticator app</p>
@@ -752,7 +770,7 @@ export function LoginForm({
                     <input
                       id="password" type={showPassword ? "text" : "password"}
                       value={Password} onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password" required autoComplete="current-password"
+                      placeholder="Enter your password" required autoComplete="current-password" disabled={loading}
                       className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 pr-12 text-[14px] text-gray-900 placeholder:text-gray-300 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
                     />
                     <button
@@ -799,6 +817,14 @@ export function LoginForm({
               {/* Biometric + Sign Up */}
               {!twoFactorRequired && (
                 <>
+                  {!isOnline ? (
+                    <div
+                      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800"
+                      data-testid="offline-login-note"
+                    >
+                      Offline mode: Email and password login stays available when this device has cached credentials. Network-only sign-in options are disabled.
+                    </div>
+                  ) : null}
                   <div className="relative my-2">
                     <div className="absolute inset-0 flex items-center">
                       <span className="w-full border-t border-gray-100" />
@@ -815,10 +841,10 @@ export function LoginForm({
                       setGoogleLoginLoading(true);
                       window.location.href = "/api/auth/google";
                     }}
-                    disabled={loading || biometricLoading || googleLoginLoading}
+                    disabled={loading || biometricLoading || googleLoginLoading || !isOnline}
                     className={[
                       "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
-                      loading || biometricLoading || googleLoginLoading
+                      loading || biometricLoading || googleLoginLoading || !isOnline
                         ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
                     ].join(" ")}
                   >
@@ -835,10 +861,10 @@ export function LoginForm({
                   {/* ── Biometric ── */}
                   <button
                     type="button" onClick={handleBiometricLogin}
-                    disabled={loading || biometricLoading || googleLoginLoading}
+                    disabled={loading || biometricLoading || googleLoginLoading || !isOnline}
                     className={[
                       "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
-                      loading || biometricLoading || googleLoginLoading
+                      loading || biometricLoading || googleLoginLoading || !isOnline
                         ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
                     ].join(" ")}
                   >
@@ -861,7 +887,8 @@ export function LoginForm({
                     <button
                       type="button"
                       onClick={() => setSignUpOpen(true)}
-                      className="text-[13px] font-bold text-brand-primary hover:underline flex items-center gap-1 transition-all"
+                      disabled={!isOnline}
+                      className="text-[13px] font-bold text-brand-primary hover:underline flex items-center gap-1 transition-all disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
                     >
                       <UserPlus size={13} /> Sign Up
                     </button>
@@ -877,6 +904,7 @@ export function LoginForm({
                 Your session is secured with device authentication
               </p>
             </div>
+            <PWADiagnosticsPanel />
           </div>
 
           {/* Mobile footer */}

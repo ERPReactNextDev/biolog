@@ -15,7 +15,7 @@
  */
 
 import React from "react";
-import { render, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
+import { render, fireEvent, waitFor, act, cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 // Static imports — shared React instance with @testing-library/react
@@ -200,6 +200,13 @@ describe("Integration — Full Offline Login Flow", () => {
       document.querySelector("form") ||
       document.querySelector('[class*="min-h-screen"]');
     expect(formOrContainer).not.toBeNull();
+
+    const { emailInput, passwordInput } = getFormElements();
+    expect(emailInput).toBeEnabled();
+    expect(passwordInput).toBeEnabled();
+    expect(screen.getByTestId("offline-login-note")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /login with fingerprint/i })).toBeDisabled();
 
     // No unhandled rejection — D1 guard prevented the fetch
     expect(unhandledRejections).toHaveLength(0);

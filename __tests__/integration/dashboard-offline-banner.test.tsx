@@ -51,11 +51,16 @@ jest.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }));
 
+// Mock sonner — the provider now uses toast() for connectivity notifications
+// instead of rendering OfflineBanner in the DOM.
+jest.mock("sonner", () => ({ toast: jest.fn() }));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
 
 import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,6 +94,9 @@ beforeEach(() => {
   if (typeof window !== "undefined") {
     delete (window as Record<string, unknown>).__prevSyncing;
   }
+
+  // Clear toast mock between tests
+  (toast as unknown as jest.Mock).mockClear();
 
   // Start online
   setOnlineStatus(true);
@@ -150,10 +158,23 @@ describe("Integration — Banner Visible on /dashboard While Offline", () => {
       await Promise.resolve();
     });
 
-    // 3. Assert the "You are offline" banner is now visible
-    await waitFor(() => {
-      expect(screen.getByText(/you are offline/i)).toBeInTheDocument();
+    // 3. OfflineBanner is no longer rendered inside the provider.
+    //    Connectivity notifications now use sonner toast (Req 8.1 / pwa-offline-launch-fix spec).
+    //    Advance past the 500 ms stability delay so the toast fires.
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
     });
+
+    // No "You are offline" banner text should be in the DOM
+    expect(screen.queryByText(/you are offline/i)).not.toBeInTheDocument();
+
+    // The offline toast should have been called with the correct message
+    const toastMock = toast as unknown as jest.Mock;
+    expect(toastMock).toHaveBeenCalledWith(
+      "You're offline. Changes will be saved locally and synced automatically.",
+      { duration: 4000 }
+    );
   });
 
   /**
@@ -179,11 +200,26 @@ describe("Integration — Banner Visible on /dashboard While Offline", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/you are offline/i)).toBeInTheDocument();
+    // Advance past the 500 ms stability delay so the offline state commits
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
     });
 
-    // Come back online (no pending records → banner should disappear)
+    // No banner text in DOM (notifications moved to toast)
+    expect(screen.queryByText(/you are offline/i)).not.toBeInTheDocument();
+
+    // Offline toast should have fired
+    const toastMock = toast as unknown as jest.Mock;
+    expect(toastMock).toHaveBeenCalledWith(
+      "You're offline. Changes will be saved locally and synced automatically.",
+      { duration: 4000 }
+    );
+
+    // Clear toast history before testing reconnect
+    toastMock.mockClear();
+
+    // Come back online (no pending records → reconnect toast fires)
     setOnlineStatus(true);
     await act(async () => {
       window.dispatchEvent(new Event("online"));
@@ -193,6 +229,13 @@ describe("Integration — Banner Visible on /dashboard While Offline", () => {
       }
     });
 
+    // Advance past the stability delay for online event
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    // No "You are offline" banner text — still no DOM banner
     await waitFor(() => {
       expect(screen.queryByText(/you are offline/i)).not.toBeInTheDocument();
     });

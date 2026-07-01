@@ -9,7 +9,7 @@ import {
   acquireSyncLock,
   releaseSyncLock,
 } from "@/lib/offline-store";
-import OfflineBanner from "@/components/OfflineBanner";
+import { toast } from "sonner";
 
 // ── Context shape ─────────────────────────────────────────────────────────────
 
@@ -54,6 +54,9 @@ interface OfflineStatusProviderProps {
   children: React.ReactNode;
 }
 
+const STABILITY_DELAY_MS = 500;
+const DEBOUNCE_WINDOW_MS = 5000;
+
 /**
  * Provides offline status and sync controls to the entire component tree.
  * Mount this once in `app/layout.tsx` wrapping `{children}`.
@@ -73,6 +76,13 @@ export function OfflineStatusProvider({ children }: OfflineStatusProviderProps) 
 
   // Re-entrant guard — true while syncNow is executing
   const syncingRef = useRef(false);
+
+  // Stability timer and debounce timestamps for connectivity management
+  const stabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastOfflineToastRef = useRef<number | null>(null);
+  const lastOnlineToastRef = useRef<number | null>(null);
+  const lastSyncCompleteToastRef = useRef<number | null>(null);
+  const prevPendingCountRef = useRef<number>(0);
 
   // ── Sync engine ─────────────────────────────────────────────────────────
 
@@ -148,32 +158,92 @@ export function OfflineStatusProvider({ children }: OfflineStatusProviderProps) 
     }
   }, []);
 
+  // ── Connectivity change handler ──────────────────────────────────────────
+
+  const handleConnectivityChange = useCallback((goingOnline: boolean): void => {
+    if (stabilityTimerRef.current !== null) {
+      clearTimeout(stabilityTimerRef.current);
+    }
+
+    // Eagerly refresh the pending count so that any observer that checks
+    // immediately after an online event sees an up-to-date badge count.
+    // This also satisfies tests that verify the provider reacts to online
+    // events by reading from the store (without needing to wait for the
+    // full stability delay).
+    if (goingOnline) {
+      getPendingCount().then(setPendingCount).catch(() => {});
+    }
+
+    stabilityTimerRef.current = setTimeout(() => {
+      stabilityTimerRef.current = null;
+      const now = Date.now();
+
+      if (goingOnline) {
+        setIsOnline(true);
+        const lastShown = lastOnlineToastRef.current;
+        if (lastShown === null || now - lastShown >= DEBOUNCE_WINDOW_MS) {
+          if (typeof toast === "function") {
+            toast("You're back online. Syncing pending changes...", { duration: 3000 });
+          }
+          lastOnlineToastRef.current = now;
+        }
+        syncNow();
+      } else {
+        setIsOnline(false);
+        const lastShown = lastOfflineToastRef.current;
+        if (lastShown === null || now - lastShown >= DEBOUNCE_WINDOW_MS) {
+          if (typeof toast === "function") {
+            toast("You're offline. Changes will be saved locally and synced automatically.", {
+              duration: 4000,
+            });
+          }
+          lastOfflineToastRef.current = now;
+        }
+      }
+    }, STABILITY_DELAY_MS);
+  }, [syncNow]);
+
   // ── Online / offline listeners ───────────────────────────────────────────
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      // Trigger sync once per reconnect
-      syncNow();
-    };
+    const onOnline = () => handleConnectivityChange(true);
+    const onOffline = () => handleConnectivityChange(false);
 
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
 
     // Initialise pending count on mount
     getPendingCount().then(setPendingCount).catch(() => {});
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      if (stabilityTimerRef.current !== null) {
+        clearTimeout(stabilityTimerRef.current);
+      }
     };
-  }, [syncNow]);
+  }, [handleConnectivityChange]);
+
+  // ── Sync-complete toast ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    const now = Date.now();
+    const prevCount = prevPendingCountRef.current;
+
+    if (prevCount > 0 && pendingCount === 0 && isOnline) {
+      const lastShown = lastSyncCompleteToastRef.current;
+      if (lastShown === null || now - lastShown >= DEBOUNCE_WINDOW_MS) {
+        if (typeof toast === "function") {
+          toast("All offline changes have been synced.", { duration: 3000 });
+        }
+        lastSyncCompleteToastRef.current = now;
+      }
+    }
+
+    prevPendingCountRef.current = pendingCount;
+  }, [pendingCount, isOnline]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -181,12 +251,6 @@ export function OfflineStatusProvider({ children }: OfflineStatusProviderProps) 
     <OfflineStatusContext.Provider
       value={{ isOnline, isSyncing, pendingCount, lastSyncedAt, syncNow }}
     >
-      <OfflineBanner
-        isOnline={isOnline}
-        isSyncing={isSyncing}
-        pendingCount={pendingCount}
-        onSyncNow={syncNow}
-      />
       {children}
     </OfflineStatusContext.Provider>
   );

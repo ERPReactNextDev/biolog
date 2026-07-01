@@ -63,12 +63,18 @@ jest.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
+// Mock sonner so we can assert toast calls without a real DOM toast layer.
+// The provider calls toast() as a plain function (not toast.success/error),
+// so we expose it as a callable jest.fn().
+jest.mock("sonner", () => ({ toast: jest.fn() }));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
 
 import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
 import { enqueuePendingLog } from "@/lib/offline-store";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Setup / Teardown
@@ -86,6 +92,9 @@ beforeEach(() => {
   if (typeof window !== "undefined") {
     delete (window as Record<string, unknown>).__prevSyncing;
   }
+
+  // Clear toast mock call history between tests
+  (toast as unknown as jest.Mock).mockClear();
 
   // Start offline so we can enqueue logs without triggering premature sync
   setOnlineStatus(false);
@@ -240,17 +249,16 @@ describe("Integration — Full Reconnect Sync Flow", () => {
       { timeout: 3000 }
     );
 
-    // The "All records synced successfully" flash banner should now be visible.
-    // OfflineBanner detects the isSyncing true→false transition with pendingCount===0
-    // and renders this message.
-    await waitFor(
-      () => {
-        expect(
-          screen.getByText(/all records synced successfully/i)
-        ).toBeInTheDocument();
-      },
-      { timeout: 3000 }
+    // OfflineBanner is no longer rendered inside the provider. The sync-complete
+    // notification is now a sonner toast. Assert the toast was called with the
+    // correct message (Req 7.3 / pwa-offline-launch-fix spec).
+    const toastMock = toast as unknown as jest.Mock;
+    expect(toastMock).toHaveBeenCalledWith(
+      "All offline changes have been synced.",
+      { duration: 3000 }
     );
+    // No banner text should be present in the DOM
+    expect(screen.queryByText(/all records synced successfully/i)).not.toBeInTheDocument();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -286,24 +294,32 @@ describe("Integration — Full Reconnect Sync Flow", () => {
       }
     });
 
-    // Wait for the success banner to appear
+    // Wait for the sync-complete toast to be triggered (pendingCount → 0 while online).
+    // OfflineBanner is no longer rendered in the provider; the notification now
+    // comes from the sonner toast system (Req 7.3 / pwa-offline-launch-fix spec).
     await waitFor(
       () => {
-        expect(
-          screen.getByText(/all records synced successfully/i)
-        ).toBeInTheDocument();
+        const toastMock = toast as unknown as jest.Mock;
+        const syncCompleteCall = toastMock.mock.calls.find(
+          ([msg]) => /all offline changes have been synced/i.test(msg)
+        );
+        expect(syncCompleteCall).toBeDefined();
       },
       { timeout: 3000 }
     );
 
-    // Advance fake timers past the 2500 ms auto-hide timeout
+    // No banner DOM text should be present — notifications moved to toast
+    expect(
+      screen.queryByText(/all records synced successfully/i)
+    ).not.toBeInTheDocument();
+
+    // Advance fake timers past sonner's auto-dismiss (3 s)
     await act(async () => {
-      jest.advanceTimersByTime(2600);
-      // Flush any React state updates triggered by the timer
+      jest.advanceTimersByTime(3100);
       await Promise.resolve();
     });
 
-    // Banner should no longer be in the DOM
+    // Toast would have auto-dismissed; still no banner DOM text
     expect(
       screen.queryByText(/all records synced successfully/i)
     ).not.toBeInTheDocument();

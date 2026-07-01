@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import ServiceWorkerRegister from "@/components/service-worker-register";
 import "./globals.css";
 import { UserProvider } from "@/contexts/UserContext";
 import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <UserProvider>
           <OfflineStatusProvider>
             {children}
+            <ServiceWorkerRegister />
             <Toaster />
           </OfflineStatusProvider>
         </UserProvider>

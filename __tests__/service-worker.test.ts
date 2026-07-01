@@ -47,6 +47,7 @@ function makeCacheMock(opts: {
   return {
     match: jest.fn().mockResolvedValue(opts.matchResult ?? undefined),
     put: jest.fn().mockResolvedValue(undefined),
+    add: jest.fn().mockResolvedValue(undefined),
     addAll: jest.fn().mockResolvedValue(undefined),
     delete: jest.fn().mockResolvedValue(true),
     keys: jest.fn().mockResolvedValue(opts.keysResult ?? []),
@@ -193,7 +194,13 @@ describe("Service Worker", () => {
   describe("4.1 navigation request offline returns cached app shell (status 200)", () => {
     it("returns status 200 from cache when fetch rejects with TypeError", async () => {
       const cachedAppShell = new SWResponse("<html>app shell</html>", { status: 200 });
-      const appShellCacheMock = makeCacheMock({ matchResult: cachedAppShell });
+      const appShellCacheMock = makeCacheMock();
+      appShellCacheMock.match.mockImplementation(async (input: Request | string) => {
+        if (typeof input === "string") {
+          return input === "/activity-planner" ? cachedAppShell : undefined;
+        }
+        return new URL(input.url).pathname === "/activity-planner" ? cachedAppShell : undefined;
+      });
       const cachesMock = makeCachesMock({ openImpl: () => appShellCacheMock });
       const fetchMock = jest.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 
@@ -208,8 +215,7 @@ describe("Service Worker", () => {
 
       expect(response).toBeInstanceOf(SWResponse);
       expect(response.status).toBe(200);
-      // cache.match("/") must have been called to retrieve the app shell
-      expect(appShellCacheMock.match).toHaveBeenCalledWith("/");
+      expect(appShellCacheMock.match).toHaveBeenCalledWith(request);
     });
   });
 
@@ -279,7 +285,7 @@ describe("Service Worker", () => {
   // 4.3  Install event precaches all STATIC_ASSETS
   // -------------------------------------------------------------------------
   describe("4.3 install event precaches all STATIC_ASSETS", () => {
-    it("calls cache.addAll with requests matching all 8 STATIC_ASSETS entries", async () => {
+    it("calls cache.add once per static asset without aborting the full install", async () => {
       const cacheMock = makeCacheMock();
       const cachesMock = makeCachesMock({ openImpl: () => cacheMock });
       const fetchMock = jest.fn();
@@ -292,13 +298,10 @@ describe("Service Worker", () => {
 
       await fireExtendableEvent("install");
 
-      expect(cacheMock.addAll).toHaveBeenCalledTimes(1);
+      expect(cacheMock.add).toHaveBeenCalledTimes(8);
 
-      const [addAllArg] = cacheMock.addAll.mock.calls[0];
-      expect(Array.isArray(addAllArg)).toBe(true);
-
-      // Extract pathnames from Request objects passed to addAll
-      const urls: string[] = addAllArg.map((r: Request) => {
+      // Extract pathnames from Request objects passed to add()
+      const urls: string[] = cacheMock.add.mock.calls.map(([r]: [Request]) => {
         try {
           return new URL(r.url).pathname;
         } catch {
@@ -328,12 +331,13 @@ describe("Service Worker", () => {
   // 4.4  Activate event deletes stale caches
   // -------------------------------------------------------------------------
   describe("4.4 activate event deletes stale caches", () => {
-    it("deletes only acculog-cache-v12 and keeps the three valid caches", async () => {
+    it("deletes only stale caches and keeps the current offline caches", async () => {
       const allKeys = [
-        "acculog-cache-v12",          // stale — must be deleted
-        "acculog-cache-v13",          // valid CACHE_NAME
+        "acculog-cache-v14",          // stale — must be deleted
+        "acculog-cache-v15",          // valid CACHE_NAME
         "acculog-osm-tiles-v1",       // valid OSM_CACHE_NAME
-        "acculog-runtime-static-v1",  // valid STATIC_RUNTIME_CACHE
+        "acculog-runtime-static-v3",  // valid STATIC_RUNTIME_CACHE
+        "acculog-rsc-v1",             // valid RSC cache
       ];
       const cachesMock = makeCachesMock({ keysResult: allKeys });
       const fetchMock = jest.fn();
@@ -348,12 +352,13 @@ describe("Service Worker", () => {
 
       // Exactly one deletion — the stale cache
       expect(cachesMock.delete).toHaveBeenCalledTimes(1);
-      expect(cachesMock.delete).toHaveBeenCalledWith("acculog-cache-v12");
+      expect(cachesMock.delete).toHaveBeenCalledWith("acculog-cache-v14");
 
-      // The three valid caches must NOT be deleted
-      expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-cache-v13");
+      // The current caches must NOT be deleted
+      expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-cache-v15");
       expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-osm-tiles-v1");
-      expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-runtime-static-v1");
+      expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-runtime-static-v3");
+      expect(cachesMock.delete).not.toHaveBeenCalledWith("acculog-rsc-v1");
     });
   });
 
@@ -373,7 +378,8 @@ describe("Service Worker", () => {
             .map((s) => "/" + s.replace(/[^a-zA-Z0-9/_-]/g, "x")),
           async (pathname) => {
             const cachedAppShell = new SWResponse("<html>app</html>", { status: 200 });
-            const appShellCacheMock = makeCacheMock({ matchResult: cachedAppShell });
+            const appShellCacheMock = makeCacheMock();
+            appShellCacheMock.match.mockImplementation(async () => cachedAppShell);
             const cachesMock = makeCachesMock({ openImpl: () => appShellCacheMock });
             const fetchMock = jest
               .fn()

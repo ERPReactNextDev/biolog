@@ -1,14 +1,22 @@
 // public/service-worker.js
-// Acculog PWA — Service Worker v14
+// Acculog PWA — Service Worker v15
 // Fixes: resilient install, correct offline navigation fallback,
 //        RSC request caching, improved _next/static caching.
 
-const CACHE_NAME            = "acculog-cache-v14";
+const CACHE_NAME            = "acculog-cache-v15";
 const OSM_CACHE_NAME        = "acculog-osm-tiles-v1";
-const STATIC_RUNTIME_CACHE  = "acculog-runtime-static-v2";
+const STATIC_RUNTIME_CACHE  = "acculog-runtime-static-v3";
 const RSC_CACHE_NAME        = "acculog-rsc-v1";
 const SYNC_TAG              = "sync-activity-logs";
 const OSM_MAX_ENTRIES       = 200;
+const SAME_ORIGIN_RUNTIME_DESTINATIONS = new Set([
+  "script",
+  "style",
+  "font",
+  "image",
+  "manifest",
+  "worker",
+]);
 
 // ─── Assets to pre-cache on install ───────────────────────────────────────────
 // These are cached individually so a single 404 does NOT abort the whole install.
@@ -83,6 +91,20 @@ function isDevOnlyRequest(url) {
     url.pathname.startsWith("/_next/data") ||
     url.search.includes("hot-update")
   );
+}
+
+function isAppShellAssetRequest(request, url) {
+  if (request.method !== "GET") return false;
+  if (url.origin !== self.location.origin) return false;
+  if (request.mode === "navigate") return false;
+  if (url.pathname.startsWith("/api/")) return false;
+  if (url.search.includes("_rsc=")) return false;
+
+  if (url.pathname.startsWith("/_next/")) return true;
+  if (url.pathname === "/manifest.json") return true;
+  if (url.pathname.startsWith("/models/")) return true;
+
+  return SAME_ORIGIN_RUNTIME_DESTINATIONS.has(request.destination);
 }
 
 // ─── Navigation handler ───────────────────────────────────────────────────────
@@ -178,6 +200,9 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Never intercept mutations or other non-GET requests.
+  if (request.method !== "GET") return;
+
   // Skip dev-only noise
   if (isDevOnlyRequest(url)) return;
 
@@ -196,6 +221,14 @@ self.addEventListener("fetch", (event) => {
 
   // ── Next.js static assets (JS, CSS, fonts, images) ──
   if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(handleStaleWhileRevalidate(request, STATIC_RUNTIME_CACHE));
+    return;
+  }
+
+  // ── Same-origin app-shell assets (Next manifests, icons, models, media) ──
+  // These requests are required to boot the cached shell offline even when
+  // App Router pulls them after the initial navigation response is served.
+  if (isAppShellAssetRequest(request, url)) {
     event.respondWith(handleStaleWhileRevalidate(request, STATIC_RUNTIME_CACHE));
     return;
   }

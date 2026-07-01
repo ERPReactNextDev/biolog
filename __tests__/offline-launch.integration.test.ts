@@ -105,6 +105,7 @@ function makeCacheMock(opts: {
   return {
     match: jest.fn().mockResolvedValue(opts.matchResult ?? undefined),
     put: jest.fn().mockResolvedValue(undefined),
+    add: jest.fn().mockResolvedValue(undefined),
     addAll: jest.fn().mockResolvedValue(undefined),
     delete: jest.fn().mockResolvedValue(true),
     keys: jest.fn().mockResolvedValue(opts.keysResult ?? []),
@@ -262,16 +263,23 @@ describe("6.1 — SW install precaches STATIC_ASSETS; navigation request offline
     "/models/face_landmark68/face_landmark_68_model.json",
   ];
 
-  it("install event calls cache.addAll with all 8 STATIC_ASSETS, then navigation fetch returns status 200 from cache while offline", async () => {
+  it("install event caches each static asset individually, then navigation fetch returns status 200 from cache while offline", async () => {
     // ── Build the app-shell cache mock ──────────────────────────────────
-    // The navigation handler opens CACHE_NAME and calls cache.match("/").
+    // The navigation handler opens CACHE_NAME and checks the exact request
+    // before falling back to /activity-planner.
     // We pre-load this mock with the cached app shell.
     const appShellResponse = new NodeFetchResponse("<html>app shell</html>", {
       status: 200,
       headers: { "Content-Type": "text/html" },
     }) as unknown as Response;
 
-    const cacheMock = makeCacheMock({ matchResult: appShellResponse });
+    const cacheMock = makeCacheMock();
+    cacheMock.match.mockImplementation(async (input: Request | string) => {
+      if (typeof input === "string") {
+        return input === "/activity-planner" ? appShellResponse : undefined;
+      }
+      return new URL(input.url).pathname === "/activity-planner" ? appShellResponse : undefined;
+    });
 
     // All caches.open() calls return the same mock (CACHE_NAME is used by
     // both the install handler and the navigation fallback).
@@ -292,14 +300,10 @@ describe("6.1 — SW install precaches STATIC_ASSETS; navigation request offline
     // ── Step 1: fire the install event and await its waitUntil ──────────
     await fireExtendableEvent("install");
 
-    // Assert cache.addAll was called exactly once
-    expect(cacheMock.addAll).toHaveBeenCalledTimes(1);
+    expect(cacheMock.add).toHaveBeenCalledTimes(8);
 
-    const [addAllArg] = cacheMock.addAll.mock.calls[0];
-    expect(Array.isArray(addAllArg)).toBe(true);
-
-    // Extract URL pathnames from the Request objects passed to addAll
-    const pathnames: string[] = addAllArg.map((r: any) => {
+    // Extract URL pathnames from the Request objects passed to add()
+    const pathnames: string[] = cacheMock.add.mock.calls.map(([r]: [Request]) => {
       try {
         return new URL(r.url).pathname;
       } catch {
@@ -319,6 +323,7 @@ describe("6.1 — SW install precaches STATIC_ASSETS; navigation request offline
     // and returns cache.match("/").
     const navigateRequest = {
       url: "https://example.com/activity-planner",
+      method: "GET",
       mode: "navigate" as const,
     };
 
@@ -329,8 +334,7 @@ describe("6.1 — SW install precaches STATIC_ASSETS; navigation request offline
     expect(response).toBeDefined();
     expect(response.status).toBe(200);
 
-    // cache.match("/") was called to retrieve the app shell
-    expect(cacheMock.match).toHaveBeenCalledWith("/");
+    expect(cacheMock.match).toHaveBeenCalledWith(navigateRequest);
   });
 });
 

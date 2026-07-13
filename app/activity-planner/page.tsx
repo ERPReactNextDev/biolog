@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { type DateRange } from "react-day-picker";
 import { MapPin, X, CalendarCheck, ChevronLeft, ChevronRight, ArrowLeft, Building2, Home, BarChart3, User, LogIn, LogOut, TrendingUp, Plus, FileSpreadsheet, CalendarIcon, Clock, Megaphone, ChevronRight as ArrowRight, Power, Cloud, CloudUpload, WifiOff, Sun, CloudRain, CloudLightning, Fingerprint, Smartphone, Laptop, Globe, ShieldCheck, Trash2, Settings, Users, ShieldAlert, Download, Loader2, FileDown } from "lucide-react";
 
+import { toDateKeyPH, getPHHour, formatPHDate, formatPHTimeStr, formatPHDateTime, setPHTime, phTodayAsLocalDate } from "@/lib/ph-time";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { getAllPendingLogs, removePendingLog, type PendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
@@ -333,8 +334,7 @@ interface FormData {
 
 // Format date to YYYY-MM-DD key - uses actual calendar date (date-to-date)
 function toDateKey(date: Date | string) {
-  const d = typeof date === "string" ? new Date(date) : new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return toDateKeyPH(date);
 }
 
 // Alias for calendar-specific usage (same behavior now)
@@ -366,7 +366,7 @@ function isSameDay(d1: Date, d2: Date) {
 function LiveClock() {
   const [time, setTime] = useState("");
   useEffect(() => {
-    const tick = () => setTime(new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true }));
+    const tick = () => setTime(formatPHTimeStr(new Date()));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -470,7 +470,8 @@ function HomeTab({
 }) {
   const router = useRouter();
   const today = new Date();
-  const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
+  const phHour = getPHHour(today);
+  const greeting = phHour < 12 ? "Good morning" : phHour < 17 ? "Good afternoon" : "Good evening";
   const presentRate = monthlyStats.total > 0 ? Math.round((monthlyStats.present / monthlyStats.total) * 100) : 0;
   const initials = userDetails ? `${userDetails.Firstname[0] ?? ""}${userDetails.Lastname[0] ?? ""}`.toUpperCase() : "?";
 
@@ -510,10 +511,8 @@ function HomeTab({
   if (firstLogin) {
     const loginTime = new Date(firstLogin.date_created);
     const [sH, sM] = systemSettings.officeStartTime.split(":").map(Number);
-    const shiftStart = new Date(loginTime);
-    shiftStart.setHours(sH, sM, 0, 0);
-    const graceThreshold = new Date(shiftStart);
-    graceThreshold.setMinutes(shiftStart.getMinutes() + systemSettings.gracePeriod);
+    const shiftStart = setPHTime(loginTime, sH, sM);
+    const graceThreshold = new Date(shiftStart.getTime() + systemSettings.gracePeriod * 60000);
     isLate = loginTime > graceThreshold;
   }
 
@@ -569,7 +568,7 @@ function HomeTab({
               </div>
               <p className="text-[11px] font-medium text-gray-400 mt-1 flex items-center gap-1.5">
                 <CalendarIcon size={12} />
-                {today.toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                {formatPHDate(today, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
               </p>
             </div>
             <div className="h-12 w-px bg-gray-100" />
@@ -719,7 +718,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
   goToPrevMonth: () => void; goToNextMonth: () => void;
   userDetails: UserDetails | null;
 }) {
-  const today = new Date();
+    const today = phTodayAsLocalDate();
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const [activeFilter, setActiveFilter] = useState<"All" | "Login" | "Logout" | "Site Visit" | "Meeting">("All");
   const [selectedDate, setSelectedDate] = useState<string>(toCalendarDateKey(today));
@@ -970,7 +969,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
           
           <div className="text-center">
             <h2 className="text-[22px] font-bold text-gray-900">
-              {currentMonth.toLocaleDateString("en-PH", { month: "long" })}
+              {formatPHDate(currentMonth, { month: "long" })}
             </h2>
           </div>
           
@@ -1072,7 +1071,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
               {isSameDay(new Date(selectedDate), today) ? "Today" : "Activities"}
             </p>
             <h3 className="text-[18px] font-bold text-gray-900">
-              {new Date(selectedDate).toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })}
+              {formatPHDate(selectedDate, { weekday: "long", month: "long", day: "numeric" })}
             </h3>
           </div>
           
@@ -1172,7 +1171,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                     <div className="flex items-center gap-4 text-[12px] text-white/80">
                         <div className="flex items-center gap-1.5">
                           <Clock size={14} />
-                          <span>{new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                          <span>{formatPHTimeStr(meeting.StartDate)}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <MapPin size={14} />
@@ -1269,7 +1268,7 @@ function CalendarTab({ currentMonth, calendarDays, usersMap, onEventClick, onMee
                     ].join(" ")}>
                       <div className="flex items-center gap-1.5">
                         <Clock size={14} />
-                        <span>{new Date(log.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+date_created: new Date(log.date_created).toLocaleString("en-PH"),
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin size={14} />
@@ -1466,7 +1465,7 @@ function ReportsTab({ monthlyStats, allLogs, userId, userDetails }: {
           Type: log.Type,
           Status: log.Status,
           Location: log.Location,
-          date_created: new Date(log.date_created).toLocaleString("en-PH"),
+          date_created: formatPHDateTime(log.date_created),
           Remarks: log.Remarks,
           TSM: log.TSM,
           SiteVisitAccount: log.SiteVisitAccount,
@@ -1848,7 +1847,7 @@ function OfflineActivitiesCard() {
                             {payload.Status} – {payload.Type}
                           </p>
                           <p className="text-[11px] text-gray-400 mt-0.5">
-                            {new Date(log.createdAt).toLocaleString("en-PH")}
+                            {formatPHDateTime(log.createdAt)}
                           </p>
                           <p className="text-[11px] text-gray-500 mt-1 truncate">
                             {payload.Location || "No location"}
@@ -2892,7 +2891,7 @@ function ActivityPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dateCreatedFilterRange] = useState<DateRange | undefined>(undefined);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useState(phTodayAsLocalDate());
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [selectedEvent, setSelectedEvent] = useState<ActivityLog | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
@@ -2944,7 +2943,7 @@ function ActivityPage() {
 
 
 
-  const today = new Date();
+const today = phTodayAsLocalDate();
 
   // ── Logout ── matches nav-user.tsx logic exactly
   const handleLogout = async () => {
@@ -3774,10 +3773,10 @@ function MeetingDetailsDialog({ open, onOpenChange, meeting, usersMap }: {
               <div>
                 <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Schedule</p>
                 <p className="text-[14px] font-semibold text-gray-800">
-                  {new Date(meeting.StartDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
+                  {formatPHDate(meeting.StartDate, { month: "long", day: "numeric", year: "numeric" })}
                 </p>
                 <p className="text-[12px] text-gray-500">
-                  {new Date(meeting.StartDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })} – {new Date(meeting.EndDate).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                  {formatPHTimeStr(meeting.StartDate)} – {formatPHTimeStr(meeting.EndDate)}
                 </p>
               </div>
             </div>

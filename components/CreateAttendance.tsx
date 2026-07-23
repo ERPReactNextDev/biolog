@@ -22,6 +22,7 @@ interface FormData {
   PhotoURL: string;
   Remarks: string;
   TSM: string;
+  manager?: string;
   _id?: string;
 }
 
@@ -29,10 +30,10 @@ interface UserDetails {
   ReferenceID: string;
   Email: string;
   TSM: string;
+  Manager?: string;
   faceDescriptors?: number[][];
   faceVerificationEnabled?: boolean;
 }
-
 interface CreateAttendanceProps {
   open: boolean;
   onOpenChangeAction: (open: boolean) => void;
@@ -253,13 +254,14 @@ export default function CreateAttendance({
       photo = await compressImage(capturedImage);
     } catch { /* use original if compression fails */ }
 
-    const basePayload = {
-      ...formData,
-      Location:  locationAddress,
-      Latitude:  manualLat ?? latitude,
-      Longitude: manualLng ?? longitude,
-      FaceData:  faceData,
-    };
+const basePayload = {
+  ...formData,
+  Location:  locationAddress,
+  Latitude:  manualLat ?? latitude,
+  Longitude: manualLng ?? longitude,
+  FaceData:  faceData,
+  manager:   userDetails.Manager,
+};
 
     try {
       if (!navigator.onLine) {

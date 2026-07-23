@@ -2989,6 +2989,7 @@ const today = phTodayAsLocalDate();
         SecondaryEmail: data.SecondaryEmail ?? "",
         pin: data.pin ?? "",
         TSM: data.TSM ?? "",
+        Manager: data.Manager ?? "",
         Directories: data.Directories ?? [],
         faceVerificationEnabled: data.faceVerificationEnabled ?? true,
       });
@@ -3646,6 +3647,7 @@ const today = phTodayAsLocalDate();
           ReferenceID: userDetails?.ReferenceID ?? "",
           Email: userDetails?.Email ?? "",
           TSM: userDetails?.TSM ?? "",
+          Manager: userDetails?.Manager ?? "",
           faceDescriptors: userDetails?.faceDescriptors,
           faceVerificationEnabled: userDetails?.faceVerificationEnabled
         } as any}
@@ -3662,6 +3664,7 @@ const today = phTodayAsLocalDate();
           Email: userDetails?.Email ?? "",
           TSM: userDetails?.TSM ?? "",
           Role: userDetails?.Role ?? "",
+          Manager: userDetails?.Manager ?? "",
           faceDescriptors: userDetails?.faceDescriptors,
           faceVerificationEnabled: userDetails?.faceVerificationEnabled
         } as any}

@@ -159,6 +159,9 @@ export default async function addActivityLog(
     if (typeof PhotoURL === "string" && PhotoURL.trim())
       newLog.PhotoURL = PhotoURL.trim();
 
+    if (typeof manager === "string" && manager.trim())
+      newLog.Manager = manager.trim();
+
     /* ── Insert to Supabase ─────────────────────────── */
     const { data: supabaseData, error: insertError } = await supabase
       .from("tasklog")

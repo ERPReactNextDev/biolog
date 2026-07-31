@@ -178,7 +178,7 @@ export default async function addActivityLog(
     }
 
     /* ── Insert to Neon (TASKFLOW_DB) if it's a New Client ── */
-    if (Status === "For Approval" && sql) {
+    if (type_client === "New Client" && sql) {
       try {
         const accountRef = generateAccountRef();
         await sql`
@@ -207,7 +207,7 @@ export default async function addActivityLog(
             ${email_address || ""}, 
             ${address || ""}, 
             ${Remarks || ""}, 
-            'For Approval',
+            'For Approval of TSM',
             'Client Visit',
             ${type_client || 'New Client'},
             ${accountRef},

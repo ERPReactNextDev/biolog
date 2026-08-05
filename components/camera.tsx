@@ -13,7 +13,7 @@ interface CameraProps {
   skipFaceVerification?: boolean;
 }
 
-const COUNTDOWN_SECONDS = 3;
+const COUNTDOWN_SECONDS = 10;
 
 type FaceStatus = "idle" | "no-face" | "multiple" | "detected" | "unsupported";
 

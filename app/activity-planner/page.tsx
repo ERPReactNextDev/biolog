@@ -2598,6 +2598,10 @@ function ProfileTab({
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Customize</p>
         <CustomizePanel />
 
+        {/* ── Camera Timer Settings ── */}
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Camera Timer</p>
+        <CameraTimerPanel />
+
         {/* ── Permanent Install App Section ── */}
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Install App on Phone</p>
         <InstallAppSection
@@ -2715,13 +2719,72 @@ function CustomizePanel() {
               }
               haptic("light");
             }}
-            aria-pressed={prefs[it.key]}
+            aria-pressed={!!prefs[it.key]}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ${prefs[it.key] ? "bg-[var(--brand-primary)]" : "bg-gray-200"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${prefs[it.key] ? "translate-x-6" : "translate-x-1"}`} />
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Camera Timer Panel ────────────────────────────────────────────────────────
+
+function CameraTimerPanel() {
+  const { prefs, setPref } = usePreferences();
+  const PRESETS = [3, 5, 10, 15, 30];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm mb-5">
+      {/* Enable / disable toggle */}
+      <div className="flex items-center gap-4 px-4 py-3.5 border-b border-gray-50">
+        <div className="w-10 h-10 rounded-[12px] bg-gray-50 flex items-center justify-center flex-shrink-0 text-[18px]">
+          ⏱️
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-gray-800">Countdown Timer</p>
+          <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+            {prefs.cameraTimerEnabled ? `${prefs.cameraTimerSeconds}s countdown before capture` : "Capture instantly on tap"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPref("cameraTimerEnabled", !prefs.cameraTimerEnabled)}
+          aria-pressed={prefs.cameraTimerEnabled}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ${prefs.cameraTimerEnabled ? "bg-[var(--brand-primary)]" : "bg-gray-200"}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${prefs.cameraTimerEnabled ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+      </div>
+
+      {/* Seconds presets — only shown when timer is enabled */}
+      {prefs.cameraTimerEnabled && (
+        <div className="px-4 py-3.5">
+          <p className="text-[11px] font-semibold text-gray-400 mb-3">Duration</p>
+          <div className="flex gap-2 flex-wrap">
+            {PRESETS.map((s) => {
+              const isSelected = prefs.cameraTimerSeconds === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setPref("cameraTimerSeconds", s)}
+                  className={[
+                    "flex-1 min-w-[48px] rounded-xl py-2.5 text-[13px] font-bold transition-all border",
+                    isSelected
+                      ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-sm"
+                      : "bg-gray-50 text-gray-600 border-gray-100 hover:border-gray-200",
+                  ].join(" ")}
+                >
+                  {s}s
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

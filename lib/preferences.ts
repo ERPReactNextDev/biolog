@@ -12,6 +12,8 @@ export interface UserPreferences {
   showWeather: boolean;
   showOfflineBanner: boolean;
   swipeToRefresh: boolean;
+  cameraTimerEnabled: boolean;
+  cameraTimerSeconds: number;
 }
 
 const DEFAULTS: UserPreferences = {
@@ -22,6 +24,8 @@ const DEFAULTS: UserPreferences = {
   showWeather:         true,
   showOfflineBanner:   true,
   swipeToRefresh:      true,
+  cameraTimerEnabled:  true,
+  cameraTimerSeconds:  10,
 };
 
 const STORAGE_KEY = "biolog_prefs_v1";
@@ -71,7 +75,7 @@ export function usePreferences() {
     return undefined;
   }, []);
 
-  function setPref(key: keyof UserPreferences, value: boolean) {
+  function setPref(key: keyof UserPreferences, value: boolean | number) {
     const next = { ...readPrefs(), [key]: value };
     writePrefs(next);
     setPrefs(next);

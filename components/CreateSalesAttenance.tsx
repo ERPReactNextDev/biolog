@@ -364,8 +364,8 @@ export default function CreateSalesAttendance({
   /* ── Submit ── */
   const handleCreate = async () => {
     if (!capturedImage) return toast.error("Please capture a photo first.");
-    if (!clientType) return toast.error("Please select client type.");
-    if (clientType === "Existing Client" && !formData.SiteVisitAccount) {
+    if (formData.Status === "Logout" && !clientType) return toast.error("Please select client type.");
+    if (formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) {
       return toast.error("Please select a company.");
     }
     if (locationAddress === "Fetching location...") return toast.error("Location not ready yet.");
@@ -493,12 +493,12 @@ export default function CreateSalesAttendance({
   const isSubmitDisabled =
     loading ||
     !capturedImage ||
-    !clientType ||
     loadingStatus ||
     locationAddress === "Fetching location..." ||
     locationAddress.includes("unavailable") ||
-    (clientType === "Existing Client" && !formData.SiteVisitAccount) ||
-    (clientType === "New Client" && (!formData.company_name || !formData.address));
+    (formData.Status === "Logout" && !clientType) ||
+    (formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) ||
+    (formData.Status === "Logout" && clientType === "New Client" && (!formData.company_name || !formData.address));
 
   /* ── Render ── */
   return (
@@ -594,8 +594,8 @@ export default function CreateSalesAttendance({
             {/* Post-capture form */}
             {capturedImage && !loadingStatus && (
               <>
-                {/* Client Type toggle */}
-                <div>
+                {/* Client Type toggle — only shown on Logout */}
+                {formData.Status === "Logout" && <div>
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
                     Client Type
                   </p>
@@ -653,10 +653,10 @@ export default function CreateSalesAttendance({
                       );
                     })}
                   </div>
-                </div>
+                </div>}
 
                 {/* New Client Fields */}
-                {clientType === "New Client" && (
+                {formData.Status === "Logout" && clientType === "New Client" && (
                   <div className="flex flex-col gap-3">
                     <div>
                       <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
@@ -724,7 +724,7 @@ export default function CreateSalesAttendance({
                 )}
 
                 {/* Existing Client — account selector */}
-                {clientType === "Existing Client" && (
+                {formData.Status === "Logout" && clientType === "Existing Client" && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">

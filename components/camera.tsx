@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as faceapi from "face-api.js";
 import { toast } from "sonner";
 import { RefreshCcw, SwitchCamera, Camera as CameraIcon, CheckCircle2, AlertCircle, Maximize2, Minimize2 } from "lucide-react";
+import { getPreferences } from "@/lib/preferences";
 
 interface CameraProps {
   onCaptureAction: (dataUrl: string, faceData?: any) => void;
@@ -13,7 +14,8 @@ interface CameraProps {
   skipFaceVerification?: boolean;
 }
 
-const COUNTDOWN_SECONDS = 10;
+// Fallback default — overridden at runtime by user preferences
+const DEFAULT_COUNTDOWN_SECONDS = 10;
 
 type FaceStatus = "idle" | "no-face" | "multiple" | "detected" | "unsupported";
 
@@ -433,7 +435,12 @@ export default function Camera({
       }
     }
 
-    setCountdown(COUNTDOWN_SECONDS);
+    // Read timer prefs at tap-time so it always reflects the latest setting
+    const timerPrefs = getPreferences();
+    const seconds = timerPrefs.cameraTimerEnabled
+      ? (timerPrefs.cameraTimerSeconds ?? DEFAULT_COUNTDOWN_SECONDS)
+      : 0;
+    setCountdown(seconds);
   }, [capturedImage, countdown, registerTake, skipFaceVerification]);
 
   useEffect(() => {

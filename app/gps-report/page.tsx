@@ -16,7 +16,8 @@ import {
   Upload,
   Clock,
 } from "lucide-react";
-import { format } from "date-fns";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import { compressImage } from "@/lib/image-compress";
 
 interface UserDetails {
   UserId: string;
@@ -181,46 +182,60 @@ function GPSReportPage() {
 
     setSubmitting(true);
     
-    // Prepare payload
-    const payload = {
-      ReferenceID: userDetails.ReferenceID,
-      Email: userDetails.Email,
-      TSM: userDetails.TSM,
-      photos,
-      loginDate,
-      logoutDate,
-      remarks,
-      gpsLocation,
-    };
-    
-    
     try {
+      // ── Upload photos to Cloudinary first (avoids 1MB body limit) ──────
+      toast.info("Uploading photos...", { id: "gps-upload" });
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        try {
+          let photo = photos[i];
+          try { photo = await compressImage(photo); } catch { /* use original */ }
+          const url = await uploadToCloudinary(photo);
+          uploadedUrls.push(url);
+        } catch {
+          toast.dismiss("gps-upload");
+          toast.error(`Failed to upload photo ${i + 1}. Please try again.`);
+          setSubmitting(false);
+          return;
+        }
+      }
+      toast.dismiss("gps-upload");
+
+      // Prepare payload with Cloudinary URLs instead of base64
+      const payload = {
+        ReferenceID: userDetails.ReferenceID,
+        Email: userDetails.Email,
+        TSM: userDetails.TSM,
+        photos: uploadedUrls,
+        loginDate,
+        logoutDate,
+        remarks,
+        gpsLocation,
+      };
+
       const res = await fetch("/api/gps-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      
       if (res.ok) {
-        const data = await res.json();
         toast.success("GPS Report submitted successfully!");
-        // Reset form
         setPhotos([]);
         setLoginDate("");
         setLogoutDate("");
         setRemarks("");
         setGpsLocation(null);
-        // Navigate back to activity planner
         setTimeout(() => {
           router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
         }, 1500);
       } else {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
         toast.error(errorData.error || `Failed to submit report (${res.status}).`);
       }
     } catch (err) {
-      toast.error("Network error. Please check your connection and try again.");
+      console.error("[GPS Report] submit error:", err);
+      toast.error("Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }

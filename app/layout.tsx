@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Nunito } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/components/service-worker-register";
 import "./globals.css";
+import "./activity-planner/mint/mint.css";
 import { UserProvider } from "@/contexts/UserContext";
 import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
 
@@ -10,6 +11,15 @@ const inter = Inter({
   weight: "100",
   subsets: ["latin"],
   variable: "--font-inter",
+});
+
+// Nunito — rounded, friendly, high-legibility. Drives the "Calm Mint"
+// design system on app/activity-planner via the `.mint-root` class.
+const nunito = Nunito({
+  weight: ["400", "600", "700", "800", "900"],
+  subsets: ["latin"],
+  variable: "--font-nunito",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#CC1318",
+  themeColor: "#0D9669",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -53,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <script type="module" async src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fbiolog7091back.builtwithrocket.new&_be=https%3A%2F%2Fappanalytics.rocket.new&_v=0.1.18" />
         <script type="module" defer src="https://static.rocket.new/rocket-shot.js?v=0.0.2" /></head>
-      <body className={`${inter.variable} font-mono antialiased relative`}>
+      <body className={`${inter.variable} ${nunito.variable} font-mono antialiased relative`}>
         <UserProvider>
           <OfflineStatusProvider>
             {children}

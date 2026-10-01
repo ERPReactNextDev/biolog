@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -65,31 +65,31 @@ const commonIssues = [
     text: "Computer won't turn on or is running slow",
   },
   {
-    icon: <Wifi className="w-5 h-5 text-green-600" />,
+    icon: <Wifi className="w-5 h-5 text-[var(--mint)]" />,
     text: "Network connectivity problems or slow internet",
   },
   {
-    icon: <Mail className="w-5 h-5 text-purple-600" />,
+    icon: <Mail className="w-5 h-5 text-[var(--info)]" />,
     text: "Email issues: can't send or receive emails",
   },
   {
-    icon: <AlertCircle className="w-5 h-5 text-red-600" />,
+    icon: <AlertCircle className="w-5 h-5 text-[var(--alert)]" />,
     text: "Software errors or unexpected crashes",
   },
   {
-    icon: <Laptop className="w-5 h-5 text-indigo-600" />,
+    icon: <Laptop className="w-5 h-5 text-[var(--info)]" />,
     text: "Laptop battery drains quickly or not charging",
   },
   {
-    icon: <Wifi className="w-5 h-5 text-teal-600" />,
+    icon: <Wifi className="w-5 h-5 text-[var(--mint)]" />,
     text: "WiFi disconnects frequently",
   },
   {
-    icon: <Mail className="w-5 h-5 text-pink-600" />,
+    icon: <Mail className="w-5 h-5 text-[var(--clay)]" />,
     text: "Email password reset or account locked",
   },
   {
-    icon: <AlertCircle className="w-5 h-5 text-orange-600" />,
+    icon: <AlertCircle className="w-5 h-5 text-[var(--clay)]" />,
     text: "Application installation or update failures",
   },
   {
@@ -137,7 +137,7 @@ const commonIssues = [
     text: "Email not syncing on mobile devices",
   },
   {
-    icon: <AlertCircle className="w-5 h-5 text-red-700" />,
+    icon: <AlertCircle className="w-5 h-5 text-[var(--alert-ink)]" />,
     text: "Forgotten login credentials for applications",
   },
 ];
@@ -273,7 +273,7 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
                 <span
                   key={idx}
                   onClick={() => setCurrentSlide(idx)}
-                  className={`h-2 w-2 rounded-full cursor-pointer ${idx === currentSlide ? "bg-blue-600" : "bg-gray-300"
+                  className={`h-2 w-2 rounded-full cursor-pointer ${idx === currentSlide ? "bg-[var(--mint-btn)]" : "bg-[var(--border-strong)]"
                     }`}
                   aria-label={`Slide ${idx + 1}`}
                 />
@@ -309,7 +309,7 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
             <AlertTitle className="mb-2">Ticket Information</AlertTitle>
             <AlertDescription className="space-y-2">
               <div>
-                <div className="font-semibold text-indigo-900">
+                <div className="font-semibold text-[var(--text)]">
                   Ticket Number: {form.ticket_id || "-"}
                 </div>
                 <Input
@@ -319,7 +319,7 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
                 />
               </div>
               <div>
-                <div className="font-semibold text-indigo-900">
+                <div className="font-semibold text-[var(--text)]">
                   Full Name: {form.requestor_name || "-"}
                 </div>
                 <Input
@@ -329,7 +329,7 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
                 />
               </div>
               <div>
-                <div className="font-semibold text-indigo-900">
+                <div className="font-semibold text-[var(--text)]">
                   Department: {form.department || "-"}
                 </div>
                 <Input
@@ -341,7 +341,7 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
               <Input type="hidden" name="mode" value="Acculog" />
               <Input type="hidden" name="status" value="Pending" />
 
-              <div className="font-semibold text-indigo-900 mt-4">Status: Pending</div>
+              <div className="font-semibold text-[var(--text)] mt-4">Status: Pending</div>
             </AlertDescription>
           </Alert>
         </div>

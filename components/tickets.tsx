@@ -358,7 +358,7 @@ export const Received: React.FC<RequestProps> = ({
         return (
             <Alert variant="destructive" className="flex flex-col space-y-4 p-4 text-xs">
                 <div className="flex items-center space-x-3">
-                    <AlertCircleIcon className="h-6 w-6 text-red-600" />
+                    <AlertCircleIcon className="h-6 w-6 text-[var(--alert)]" />
                     <div>
                         <AlertTitle>No Data Found or No Network Connection</AlertTitle>
                         <AlertDescription className="text-xs">

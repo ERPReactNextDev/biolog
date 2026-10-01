@@ -500,7 +500,7 @@ export default function Page() {
         <ProtectedPageWrapper>
             <UserProvider>
                 <FormatProvider>
-                    <SidebarProvider>
+                    <div className="mint-ui mint-scope"><SidebarProvider>
                         <AppSidebar
                             userId={userId ?? undefined}
                             dateCreatedFilterRange={dateCreatedFilterRange}
@@ -558,7 +558,7 @@ export default function Page() {
                                             "Human Resources") && (
                                         <Button
                                             onClick={handleExport}
-                                            className="bg-black text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#d11a2a] transition-all shadow-lg shadow-gray-200"
+                                            className="text-white px-6 py-4 rounded-[var(--r-btn)] font-extrabold text-[12px] flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
                                         >
                                             <DownloadCloud size={18} /> Export
                                             Data
@@ -955,7 +955,7 @@ export default function Page() {
                                 </Dialog>
                             </div>
                         </SidebarInset>
-                    </SidebarProvider>
+                    </SidebarProvider></div>
                 </FormatProvider>
             </UserProvider>
         </ProtectedPageWrapper>

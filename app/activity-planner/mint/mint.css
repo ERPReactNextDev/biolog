@@ -1,0 +1,365 @@
+/* ============================================================================
+   BIOLOG · "Calm Mint" design tokens
+   ----------------------------------------------------------------------------
+   Scoped to `.mint-root` so the rest of the app (which still uses the legacy
+   red/blue brand) is untouched.
+
+   ACCESSIBILITY NOTE
+   The brief specifies #0D9669 as the primary accent. Measured against white it
+   only reaches 3.76:1, which is fine for large text / UI shapes but fails the
+   4.5:1 body-text requirement. So the token set is split in two:
+
+     --mint          #0D9669  accents, borders, indicators, large numerals
+     --mint-btn      #0B7F5A  button fills + white label text  (5.00:1)
+     --mint-strong   #096B4C  pressed states, small text on mint tint
+
+   Same pattern for clay (#D4724A -> #B45C38 = 4.64:1) and alert
+   (#DC2626 -> #B91C1C = 5.51:1 on the soft tint).
+   ========================================================================== */
+
+.mint-root {
+  /* ── Primary ─────────────────────────────────────────────────────────── */
+  --mint: #0d9669;
+  --mint-btn: #0b7f5a;
+  --mint-strong: #096b4c;
+  --mint-soft: #e6f4ee;
+  --mint-gradient: #e8f6ef;
+  --mint-rgb: 13, 150, 105;
+
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+  --bg: #f7fcf9;
+  --card: #ffffff;
+  --card-alt: #fbfefc;
+  --border: #e2ece8;
+  --border-strong: #cfe3da;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+
+  /* ── Status: orange = GPS / site visit ───────────────────────────────── */
+  --clay: #d4724a;
+  --clay-ink: #b45c38; /* small text on --clay-soft -> 4.64:1 on white */
+  --clay-soft: #fff1e6;
+
+  /* ── Status: red = absent / error ─────────────────────────────────────── */
+  --alert: #dc2626;
+  --alert-ink: #b91c1c;
+  --alert-soft: #fde8e8;
+
+  /* ── Status: blue = informational ─────────────────────────────────────── */
+  --info: #2563eb;
+  --info-soft: #e8f0fd;
+
+  /* ── Helpful hint ─────────────────────────────────────────────────────── */
+  --hint-bg: #fef3c7;
+  --hint-text: #92400e;
+
+  /* ── Shape ────────────────────────────────────────────────────────────── */
+  --r-card: 16px;
+  --r-card-lg: 18px;
+  --r-btn: 18px;
+  --r-pill: 14px;
+  --r-sheet: 26px;
+
+  /* ── Elevation (green-tinted, low opacity) ────────────────────────────── */
+  --sh-card: 0 2px 10px rgba(13, 150, 105, 0.06);
+  --sh-card-lg: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --sh-btn: 0 6px 16px rgba(13, 150, 105, 0.3);
+  --sh-sheet: 0 -12px 40px rgba(15, 23, 42, 0.16);
+
+  color: var(--text);
+  font-family: var(--font-nunito), Nunito, ui-rounded, system-ui, sans-serif;
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Soft dark navy + gold accent ─────────────────────────────────────────── */
+.mint-root.mint-dark,
+.dark .mint-root {
+  --mint: #4ade9e;
+  --mint-btn: #34c98a;
+  --mint-strong: #86efac;
+  --mint-soft: rgba(74, 222, 158, 0.13);
+  --mint-gradient: #1f2b2a;
+  --mint-rgb: 74, 222, 158;
+
+  --gold: #e8b44a;
+  --gold-soft: rgba(232, 180, 74, 0.14);
+
+  --bg: #1c1f2e;
+  --card: #232739;
+  --card-alt: #1f2333;
+  --border: #2f3450;
+  --border-strong: #3d4363;
+
+  --text: #f1f3f9;
+  --text-muted: #a8b0c8;
+  --text-faint: #7d859e;
+
+  --clay: #e08a5f;
+  --clay-ink: #f0a87f;
+  --clay-soft: rgba(224, 138, 95, 0.15);
+
+  --alert: #f87171;
+  --alert-ink: #fca5a5;
+  --alert-soft: rgba(248, 113, 113, 0.15);
+
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.15);
+
+  --hint-bg: rgba(232, 180, 74, 0.14);
+  --hint-text: #f0c674;
+
+  --sh-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --sh-card-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --sh-btn: 0 6px 16px rgba(52, 201, 138, 0.3);
+  --sh-sheet: 0 -12px 40px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   Token fallback
+   ----------------------------------------------------------------------------
+   Portaled dialogs and shared components (CreateAttendance, camera,
+   login-form, …) render outside .mint-root, so they can't see the vars above.
+   These :root defaults give them the same light palette. They are additive —
+   nothing outside the Mint system reads these names yet, and the legacy
+   --brand-* variables are left untouched for the rest of the app.
+   ========================================================================== */
+
+:root {
+  --mint: #0d9669;
+  --mint-btn: #0b7f5a;
+  --mint-strong: #096b4c;
+  --mint-soft: #e6f4ee;
+  --mint-gradient: #e8f6ef;
+  --mint-rgb: 13, 150, 105;
+
+  --bg: #f7fcf9;
+  --card: #ffffff;
+  --card-alt: #fbfefc;
+  --border: #e2ece8;
+  --border-strong: #cfe3da;
+
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+
+  --clay: #d4724a;
+  --clay-ink: #b45c38;
+  --clay-soft: #fff1e6;
+
+  --alert: #dc2626;
+  --alert-ink: #b91c1c;
+  --alert-soft: #fde8e8;
+
+  --info: #2563eb;
+  --info-soft: #e8f0fd;
+
+  --hint-bg: #fef3c7;
+  --hint-text: #92400e;
+
+  --r-card: 16px;
+  --r-card-lg: 18px;
+  --r-btn: 18px;
+  --r-pill: 14px;
+  --r-sheet: 26px;
+
+  --sh-card: 0 2px 10px rgba(13, 150, 105, 0.06);
+  --sh-card-lg: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --sh-btn: 0 6px 16px rgba(13, 150, 105, 0.3);
+  --sh-sheet: 0 -12px 40px rgba(15, 23, 42, 0.16);
+}
+
+.dark {
+  --mint: #4ade9e;
+  --mint-btn: #34c98a;
+  --mint-strong: #86efac;
+  --mint-soft: rgba(74, 222, 158, 0.13);
+  --mint-gradient: #1f2b2a;
+
+  --gold: #e8b44a;
+  --gold-soft: rgba(232, 180, 74, 0.14);
+
+  --bg: #1c1f2e;
+  --card: #232739;
+  --card-alt: #1f2333;
+  --border: #2f3450;
+  --border-strong: #3d4363;
+
+  --text: #f1f3f9;
+  --text-muted: #a8b0c8;
+  --text-faint: #7d859e;
+
+  --clay: #e08a5f;
+  --clay-ink: #f0a87f;
+  --clay-soft: rgba(224, 138, 95, 0.15);
+
+  --alert: #f87171;
+  --alert-ink: #fca5a5;
+  --alert-soft: rgba(248, 113, 113, 0.15);
+
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.15);
+
+  --hint-bg: rgba(232, 180, 74, 0.14);
+  --hint-text: #f0c674;
+
+  --sh-card: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --sh-card-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --sh-btn: 0 6px 16px rgba(52, 201, 138, 0.3);
+  --sh-sheet: 0 -12px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Shared font + tap behaviour for Mint-styled components outside .mint-root */
+.mint-ui {
+  font-family: var(--font-nunito), Nunito, ui-rounded, system-ui, sans-serif;
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ----------------------------------------------------------------------------
+   .mint-scope — re-theme legacy `brand-*` utilities to Calm Mint.
+
+   Tailwind compiles `bg-brand-primary` to `background-color: var(--brand-primary)`.
+   Redefining that variable on a wrapper re-themes every such class in one place,
+   with no JSX churn and no risk to the rest of the app (which keeps its red
+   brand outside this scope).
+   -------------------------------------------------------------------------- */
+.mint-scope {
+  --brand-primary: var(--mint-btn);
+  --brand-primary-hover: var(--mint-strong);
+  --brand-light: var(--mint-soft);
+  --brand-bg: var(--bg);
+  --brand-primary-rgb: var(--mint-rgb);
+
+  font-family: var(--font-nunito), Nunito, ui-rounded, system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Surfaces that were hard-coded to pure white now carry the mint tint */
+.mint-scope .bg-white {
+  background-color: var(--card);
+}
+.mint-scope .border-gray-100,
+.mint-scope .border-gray-200,
+.mint-scope .border-gray-300 {
+  border-color: var(--border);
+}
+.mint-scope .bg-gray-50,
+.mint-scope .bg-gray-100 {
+  background-color: var(--card-alt);
+}
+.mint-scope .text-gray-900,
+.mint-scope .text-gray-800 {
+  color: var(--text);
+}
+.mint-scope .text-gray-500,
+.mint-scope .text-gray-400 {
+  color: var(--text-muted);
+}
+.mint-scope .text-gray-300 {
+  color: var(--text-faint);
+}
+.mint-scope .bg-\[\#d11a2a\],
+.mint-scope .text-\[\#d11a2a\] {
+  background-color: var(--alert-soft);
+  color: var(--alert-ink);
+}
+
+.mint-ui .mint-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.mint-ui .mint-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.mint-ui .mint-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.mint-ui .mint-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+.mint-ui .mint-tap {
+  transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.mint-ui .mint-tap:active {
+  transform: scale(0.985);
+}
+.mint-ui .mint-drag-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+/* ============================================================================
+   Base surface + scrollbars
+   ========================================================================== */
+
+.mint-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.mint-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.mint-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+.mint-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Soft gradient header — replaces the old solid red banner */
+.mint-header {
+  background: linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 100%);
+}
+
+/* Drag handle for bottom sheets */
+.mint-drag-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+/* Tappable rows always meet the 44x44 minimum */
+.mint-tap {
+  min-height: 44px;
+  transition: transform 0.12s ease, background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.mint-tap:active {
+  transform: scale(0.985);
+}
+
+/* Consistent numeric alignment for stats and clocks */
+.mint-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mint-root *,
+  .mint-root *::before,
+  .mint-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

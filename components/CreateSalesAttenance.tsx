@@ -4,16 +4,15 @@ import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Camera from "./camera";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { MapPin, ArrowLeft, CheckCircle2, LogIn, LogOut, FileText, UserPlus, Users, AlertCircle, FileText as FileTextIcon } from "lucide-react";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Select from "react-select";
-
-const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
+import { MapPin, ArrowLeft, LogIn, LogOut, FileText, UserPlus, Users, AlertCircle, FileText as FileTextIcon, Loader2 } from "lucide-react";
+import { MintButton, MintDrawer, MintInput, MintLabel, MintPill } from "@/components/mint";
 import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
+
+const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
 interface FormData {
@@ -496,452 +495,531 @@ export default function CreateSalesAttendance({
     (formData.Status === "Logout" && !clientType) ||
     (formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) ||
     (formData.Status === "Logout" && clientType === "New Client" && !formData.company_name);
-
-  /* ── Render ── */
+  /* ── Render: bottom drawer (not a centred dialog) ── */
+  // The brief calls for a slide-up bottom sheet with a drag handle. All the
+  // attributes must precede the `>` that opens the children — JSX does not
+  // allow attributes after children start.
   return (
-    <Dialog open={open} onOpenChange={onOpenChangeAction}>
-      <DialogContent
-        className="p-0 rounded-[28px] max-w-sm w-full mx-auto border-0 shadow-2xl max-h-[92vh] flex flex-col"
-      >
-        <VisuallyHidden>
-          <DialogTitle>Site Visit Log</DialogTitle>
-        </VisuallyHidden>
-        {/* ── Header ── */}
-        <div className="bg-brand-primary px-6 pt-5 pb-5 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-5">
-            <button
-              onClick={() => onOpenChangeAction(false)}
-              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-            >
-              <ArrowLeft size={15} />
-            </button>
-            <div className="flex-1">
-              <h2 className="text-white font-semibold text-base leading-tight">Site Visit Log</h2>
-              <p className="text-white/65 text-[11px] mt-0.5">Client attendance entry</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white/65 text-[11px]">
-                {new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric" })}
-              </p>
-              <p className="text-white font-semibold text-[13px]">
-                {new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-            </div>
-          </div>
-
-          {/* Status summary pill */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-white/15 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {loadingStatus ? (
-                  <div className="w-2 h-2 rounded-full bg-yellow-300 animate-pulse" />
-                ) : (
-                  <div
-                    className={`w-2 h-2 rounded-full ${isLogout ? "bg-red-300" : "bg-green-300"
-                      } animate-pulse`}
-                  />
-                )}
-                <span className="text-white/75 text-[11px] font-medium">Next action</span>
-              </div>
-              <span
-                className={`text-[12px] font-bold ${loadingStatus
-                  ? "text-yellow-200"
-                  : isLogout
-                    ? "text-red-200"
-                    : "text-green-200"
-                  }`}
+    <MintDrawer
+      open={open}
+      onOpenChange={onOpenChangeAction}
+      onClose={() => onOpenChangeAction(false)}
+      title="Site Visit Log"
+      description="Client attendance entry"
+      tone="clay"
+      header={
+        <>
+          {/* Orange accent: this is the GPS / site-visit flow */}
+          <div
+            className="px-5 pt-2 pb-5 flex-shrink-0"
+            style={{
+              background:
+                "linear-gradient(180deg, var(--clay-soft) 0%, var(--card) 100%)",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenChangeAction(false)}
+                aria-label="Close"
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--card)", color: "var(--clay-ink)" }}
               >
-                {loadingStatus ? "Loading..." : nextAction || "—"}
-              </span>
+                <ArrowLeft size={17} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-[17px] font-black text-[var(--text)] leading-tight">
+                  Site Visit Log
+                </h2>
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5">
+                  Client attendance entry
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[11px] font-bold text-[var(--text-muted)]">
+                  {new Date().toLocaleDateString("en-PH", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+                <p className="mint-num text-[13px] font-black text-[var(--text)]">
+                  {new Date().toLocaleTimeString("en-PH", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
             </div>
-            <div className="bg-white/15 rounded-2xl px-4 py-2.5 text-center">
-              <p className="text-white/65 text-[10px]">Today</p>
-              <p className="text-white font-bold text-[15px]">{loginCountToday}</p>
+
+            {/* Status summary — says what this submission will actually do */}
+            <div className="flex items-center gap-2.5 mt-4">
+              <div
+                className="flex-1 rounded-[var(--r-card)] px-3.5 py-2.5 flex items-center justify-between"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <span className="flex items-center gap-2">
+                  {loadingStatus ? (
+                    <Loader2
+                      size={13}
+                      className="animate-spin"
+                      style={{ color: "var(--clay)" }}
+                    />
+                  ) : (
+                    <span
+                      className="w-2 h-2 rounded-full animate-pulse-soft"
+                      style={{ background: isLogout ? "var(--clay)" : "var(--mint)" }}
+                    />
+                  )}
+                  <span className="text-[11px] font-extrabold text-[var(--text-muted)]">
+                    Next action
+                  </span>
+                </span>
+                <span
+                  className="text-[12.5px] font-black"
+                  style={{
+                    color: isLogout ? "var(--clay-ink)" : "var(--mint-strong)",
+                  }}
+                >
+                  {loadingStatus
+                    ? "Loading…"
+                    : nextAction === "Logout"
+                      ? "Time Out"
+                      : "Time In"}
+                </span>
+              </div>
+              <div
+                className="rounded-[var(--r-card)] px-3.5 py-2.5 text-center"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <p className="text-[10px] font-extrabold text-[var(--text-muted)]">
+                  Today
+                </p>
+                <p className="mint-num text-[15px] font-black text-[var(--text)]">
+                  {loginCountToday}
+                </p>
+              </div>
             </div>
           </div>
+        </>
+      }
+      // The account <Select> renders a floating menu, so let it escape the
+      // scroll container while it's open.
+      bodyClassName={selectMenuOpen ? "overflow-visible" : undefined}
+      // Sticky, so Submit is always one thumb-tap away even mid-form.
+      footer={
+        capturedImage && !loadingStatus ? (
+          <div
+            className="px-5 pt-3.5 pb-4 shrink-0"
+            style={{
+              background: "var(--card)",
+              borderTop: "1px solid var(--border)",
+              paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            <MintButton
+              full
+              size="lg"
+              variant={isLogout ? "clockout" : "primary"}
+              icon={isLogout ? <LogOut size={19} /> : <LogIn size={19} />}
+              loading={loading}
+              disabled={isSubmitDisabled}
+              onClick={handleCreate}
+            >
+              {navigator.onLine
+                ? isLogout
+                  ? "Submit Time Out"
+                  : "Submit Time In"
+                : isLogout
+                  ? "Save Offline (Time Out)"
+                  : "Save Offline (Time In)"}
+            </MintButton>
+            <p className="text-center text-[11px] font-semibold text-[var(--text-muted)] mt-2.5 leading-relaxed">
+              {navigator.onLine
+                ? isLogout
+                  ? "This closes your visit at this client. Your supervisor sees the GPS pin, timestamp and photo."
+                  : "This logs your arrival at the client. Log the Time Out when you leave."
+                : "Saved to this phone — it uploads automatically once you have signal."}
+            </p>
+          </div>
+        ) : undefined
+      }
+    >
+      <div
+        className="flex flex-col gap-4 p-5"
+        style={{ background: "var(--bg)" }}
+      >
+        {/* Camera */}
+        <div>
+          <MintLabel>Photo Verification</MintLabel>
+          <Camera
+            registeredDescriptors={userDetails.faceDescriptors}
+            skipFaceVerification={userDetails.faceVerificationEnabled === false}
+            onCaptureAction={(img, face) => {
+              setCapturedImage(img);
+              setFaceData(face);
+            }}
+          />
         </div>
 
-        {/* ── Body ── */}
-        <div className={`flex-1 bg-brand-bg overflow-y-auto ${selectMenuOpen ? 'overflow-visible' : ''}`}>
-          <div className="flex flex-col gap-4 p-5">
+        {/* Everything below needs a photo first */}
+        {capturedImage && !loadingStatus && (
+          <>
+            {/* Client type — only meaningful on Logout */}
+            {formData.Status === "Logout" && (
+              <div>
+                <MintLabel>Client Type</MintLabel>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {(["New Client", "Existing Client"] as const).map((t) => {
+                    const isSelected = clientType === t;
+                    const isNew = t === "New Client";
+                    // New client = info blue, existing = mint. Both stay legible.
+                    const accent = isNew ? "var(--info)" : "var(--mint-strong)";
+                    const accentBg = isNew ? "var(--info-soft)" : "var(--mint-soft)";
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => {
+                          setClientType(t);
+                          if (t === "New Client") {
+                            onChangeAction("SiteVisitAccount", "");
+                            onChangeAction("address", locationAddress);
+                          } else {
+                            const next = lastStatus === "Login" ? "Logout" : "Login";
+                            onChangeAction("Status", next);
+                          }
+                        }}
+                        className="mint-tap rounded-[var(--r-card)] border-2 p-3.5 flex flex-col items-center gap-2"
+                        style={{
+                          background: isSelected ? accentBg : "var(--card)",
+                          borderColor: isSelected ? accent : "var(--border)",
+                        }}
+                      >
+                        {isNew ? (
+                          <UserPlus
+                            size={20}
+                            style={{
+                              color: isSelected ? accent : "var(--text-faint)",
+                            }}
+                          />
+                        ) : (
+                          <Users
+                            size={20}
+                            style={{
+                              color: isSelected ? accent : "var(--text-faint)",
+                            }}
+                          />
+                        )}
+                        <span
+                          className="text-[12.5px] font-extrabold"
+                          style={{
+                            color: isSelected ? accent : "var(--text-muted)",
+                          }}
+                        >
+                          {t}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-2 leading-relaxed">
+                  {clientType === "New Client"
+                    ? "Add the company's details so your territory records stay complete."
+                    : "Pick the account you're visiting so it links to your existing client."}
+                </p>
+              </div>
+            )}
 
-            {/* Camera */}
+            {/* New client details */}
+            {formData.Status === "Logout" && clientType === "New Client" && (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <MintLabel>Company Name</MintLabel>
+                  <MintInput
+                    type="text"
+                    value={formData.company_name || ""}
+                    onChange={(e) => onChangeAction("company_name", e.target.value)}
+                    placeholder="Enter company name…"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <MintLabel>Contact Person</MintLabel>
+                    <MintInput
+                      type="text"
+                      value={formData.contact_person || ""}
+                      onChange={(e) => onChangeAction("contact_person", e.target.value)}
+                      placeholder="Name…"
+                      className="px-3 text-[12.5px]"
+                    />
+                  </div>
+                  <div>
+                    <MintLabel>Contact Number</MintLabel>
+                    <MintInput
+                      type="text"
+                      value={formData.contact_number || ""}
+                      onChange={(e) => onChangeAction("contact_number", e.target.value)}
+                      placeholder="Phone…"
+                      className="px-3 text-[12.5px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <MintLabel>Email Address</MintLabel>
+                  <MintInput
+                    type="email"
+                    value={formData.email_address || ""}
+                    onChange={(e) => onChangeAction("email_address", e.target.value)}
+                    placeholder="client@email.com…"
+                  />
+                </div>
+                <div>
+                  <MintLabel>Address</MintLabel>
+                  <MintInput
+                    textarea
+                    rows={2}
+                    value={formData.address || ""}
+                    onChange={(e) => onChangeAction("address", e.target.value)}
+                    placeholder="Company address…"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Existing client — account picker */}
+            {formData.Status === "Logout" && clientType === "Existing Client" && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Site Visit Account
+                    </span>
+                    {!navigator.onLine && siteVisitAccounts.length > 0 && (
+                      <MintPill tone="clay">Offline</MintPill>
+                    )}
+                  </div>
+                  {siteVisitAccountsCount > 0 && (
+                    <MintPill tone="mint">
+                      {siteVisitAccountsCount} accounts
+                    </MintPill>
+                  )}
+                </div>
+
+                {loadingAccounts ? (
+                  <div
+                    className="rounded-[var(--r-card)] px-4 py-4 flex items-center gap-3"
+                    style={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                      style={{ color: "var(--mint)" }}
+                    />
+                    <span className="text-[13px] font-semibold text-[var(--text-muted)]">
+                      Loading accounts…
+                    </span>
+                  </div>
+                ) : accountsError ? (
+                  <div
+                    className="rounded-[var(--r-card)] px-4 py-3 flex items-start gap-2"
+                    style={{ background: "var(--alert-soft)" }}
+                  >
+                    <AlertCircle
+                      size={15}
+                      style={{ color: "var(--alert-ink)" }}
+                      className="shrink-0 mt-px"
+                    />
+                    <span className="text-[12px] font-bold text-[var(--alert-ink)]">
+                      {accountsError}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-[var(--r-card)] relative"
+                    style={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <Select
+                      options={siteVisitAccounts.map((a) => ({
+                        value: a.company_name,
+                        label: a.company_name,
+                      }))}
+                      value={
+                        formData.SiteVisitAccount
+                          ? {
+                              value: formData.SiteVisitAccount,
+                              label: formData.SiteVisitAccount,
+                            }
+                          : null
+                      }
+                      onChange={(s) => onChangeAction("SiteVisitAccount", s?.value || "")}
+                      placeholder="Search company…"
+                      classNamePrefix="mb-select"
+                      onMenuOpen={() => setSelectMenuOpen(true)}
+                      onMenuClose={() => setSelectMenuOpen(false)}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          border: "none",
+                          boxShadow: "none",
+                          borderRadius: "16px",
+                          padding: "4px 6px",
+                          fontSize: "13px",
+                          backgroundColor: "transparent",
+                          cursor: "pointer",
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: "16px",
+                          overflow: "hidden",
+                          boxShadow: "0 8px 32px rgba(15,23,42,.12)",
+                          border: "1px solid var(--border)",
+                          fontSize: "13px",
+                          zIndex: 100,
+                        }),
+                        menuList: (base) => ({
+                          ...base,
+                          maxHeight: "200px",
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isSelected
+                            ? "var(--mint-btn)"
+                            : state.isFocused
+                              ? "var(--mint-soft)"
+                              : "var(--card)",
+                          color: state.isSelected ? "white" : "var(--text)",
+                          fontWeight: state.isSelected ? 700 : 600,
+                          padding: "12px 16px",
+                          cursor: "pointer",
+                        }),
+                        placeholder: (base) => ({
+                          ...base,
+                          color: "var(--text-faint)",
+                          fontSize: "13px",
+                        }),
+                        singleValue: (base) => ({
+                          ...base,
+                          color: "var(--text)",
+                          fontWeight: 700,
+                        }),
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Remarks */}
             <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                📷 Photo Verification
-              </p>
-              <Camera
-                registeredDescriptors={userDetails.faceDescriptors}
-                skipFaceVerification={userDetails.faceVerificationEnabled === false}
-                onCaptureAction={(img, face) => {
-                  setCapturedImage(img);
-                  setFaceData(face);
-                }}
+              <MintLabel>
+                <span className="inline-flex items-center gap-1.5">
+                  <FileText size={12} /> Remarks
+                </span>
+              </MintLabel>
+              <MintInput
+                textarea
+                value={formData.Remarks}
+                onChange={(e) => onChangeAction("Remarks", e.target.value)}
+                placeholder="Add notes or feedback (optional)"
               />
-              {capturedImage && (
-                <div className="mt-2 flex items-center gap-2 bg-[#EEF7F2] rounded-xl px-3 py-2">
-                  <CheckCircle2 size={14} className="text-[#1A7A4A]" />
-                  <span className="text-[12px] font-semibold text-[#1A7A4A]">
-                    Photo captured successfully
-                  </span>
+            </div>
+
+            {/* Location */}
+            <div>
+              <MintLabel>Location</MintLabel>
+              <div
+                className="rounded-[var(--r-card)] p-3.5 flex gap-3 items-start"
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div
+                  className="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0"
+                  style={{ background: "var(--clay-soft)" }}
+                >
+                  <MapPin size={16} style={{ color: "var(--clay-ink)" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-[10.5px] font-black uppercase tracking-wider"
+                    style={{ color: "var(--clay-ink)" }}
+                  >
+                    Detected Location
+                  </p>
+                  <p className="text-[12.5px] font-semibold text-[var(--text)] mt-1 leading-relaxed">
+                    {locationAddress}
+                  </p>
+                  <div className="flex gap-2 mt-2.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={getLocation}
+                      className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
+                      style={{
+                        background: "var(--clay-soft)",
+                        color: "var(--clay-ink)",
+                      }}
+                    >
+                      Retry location
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!navigator.onLine) {
+                          toast.error("Manual map is not available offline.");
+                          return;
+                        }
+                        setShowMap(!showMap);
+                      }}
+                      className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
+                      style={{ background: "var(--bg)", color: "var(--text-muted)" }}
+                    >
+                      {showMap ? "Hide map" : "Set manually"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {showMap && navigator.onLine && (
+                <div
+                  className="mt-2.5 rounded-[var(--r-card)] overflow-hidden"
+                  style={{ border: "1px solid var(--border)" }}
+                >
+                  <ManualLocationPicker
+                    latitude={manualLat ?? latitude}
+                    longitude={manualLng ?? longitude}
+                    onChange={(lat, lng, addr) => {
+                      setManualLat(lat);
+                      setManualLng(lng);
+                      if (addr) {
+                        setLocationAddress(addr);
+                        if (clientType === "New Client") {
+                          onChangeAction("address", addr);
+                        }
+                      }
+                    }}
+                  />
                 </div>
               )}
             </div>
+          </>
+        )}
 
-            {/* Post-capture form */}
-            {capturedImage && !loadingStatus && (
-              <>
-                {/* Client Type toggle — only shown on Logout */}
-                {formData.Status === "Logout" && <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                    Client Type
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["New Client", "Existing Client"] as const).map((t) => {
-                      const isSelected = clientType === t;
-                      const isNew = t === "New Client";
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => {
-                            setClientType(t);
-                            if (t === "New Client") {
-                              onChangeAction("SiteVisitAccount", "");
-                              onChangeAction("address", locationAddress);
-                            } else {
-                              // Reset status to the one calculated for Login/Logout
-                              const next = lastStatus === "Login" ? "Logout" : "Login";
-                              onChangeAction("Status", next);
-                            }
-                          }}
-                          className={[
-                            "rounded-2xl border-[1.5px] p-4 flex flex-col items-center gap-2 transition-all",
-                            isSelected
-                              ? isNew
-                                ? "bg-[#E6F1FB] border-[#185FA5]"
-                                : "bg-[#EEF7F2] border-[#1A7A4A]"
-                              : "bg-white border-gray-200 hover:border-gray-300",
-                          ].join(" ")}
-                        >
-                          {isNew ? (
-                            <UserPlus
-                              size={20}
-                              className={isSelected ? "text-[#185FA5]" : "text-gray-400"}
-                            />
-                          ) : (
-                            <Users
-                              size={20}
-                              className={isSelected ? "text-[#1A7A4A]" : "text-gray-400"}
-                            />
-                          )}
-                          <span
-                            className={[
-                              "text-[13px] font-semibold",
-                              isSelected
-                                ? isNew
-                                  ? "text-[#185FA5]"
-                                  : "text-[#1A7A4A]"
-                                : "text-gray-700",
-                            ].join(" ")}
-                          >
-                            {t}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>}
-
-                {/* New Client Fields */}
-                {formData.Status === "Logout" && clientType === "New Client" && (
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                        Company Name
-                      </p>
-                      <input
-                        type="text"
-                        value={formData.company_name || ""}
-                        onChange={(e) => onChangeAction("company_name", e.target.value)}
-                        placeholder="Enter company name..."
-                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                          Contact Person
-                        </p>
-                        <input
-                          type="text"
-                          value={formData.contact_person || ""}
-                          onChange={(e) => onChangeAction("contact_person", e.target.value)}
-                          placeholder="Name..."
-                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                          Contact Number
-                        </p>
-                        <input
-                          type="text"
-                          value={formData.contact_number || ""}
-                          onChange={(e) => onChangeAction("contact_number", e.target.value)}
-                          placeholder="Phone..."
-                          className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                        Email Address
-                      </p>
-                      <input
-                        type="email"
-                        value={formData.email_address || ""}
-                        onChange={(e) => onChangeAction("email_address", e.target.value)}
-                        placeholder="client@email.com..."
-                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all"
-                      />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                        Address
-                      </p>
-                      <textarea
-                        value={formData.address || ""}
-                        onChange={(e) => onChangeAction("address", e.target.value)}
-                        placeholder="Company address..."
-                        rows={2}
-                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 outline-none focus:border-brand-primary transition-all resize-none"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Existing Client — account selector */}
-                {formData.Status === "Logout" && clientType === "Existing Client" && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
-                          Site Visit Account
-                        </p>
-                        {!navigator.onLine && siteVisitAccounts.length > 0 && (
-                          <span className="text-[10px] font-medium text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            Offline
-                          </span>
-                        )}
-                      </div>
-                      {siteVisitAccountsCount > 0 && (
-                        <span className="text-[11px] font-semibold text-[#1A7A4A] bg-[#EEF7F2] rounded-xl px-2.5 py-0.5">
-                          {siteVisitAccountsCount} accounts
-                        </span>
-                      )}
-                    </div>
-
-                    {loadingAccounts ? (
-                      <div className="bg-white rounded-2xl border border-gray-200 px-4 py-4 flex items-center gap-3">
-                        <div className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
-                        <span className="text-[13px] text-gray-400">Loading accounts...</span>
-                      </div>
-                    ) : accountsError ? (
-                      <div className="bg-brand-light border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-2">
-                        <AlertCircle size={14} className="text-brand-primary flex-shrink-0" />
-                        <span className="text-[12px] text-brand-primary">{accountsError}</span>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-gray-200 bg-white relative">
-                        <Select
-                          options={siteVisitAccounts.map((a) => ({
-                            value: a.company_name,
-                            label: a.company_name,
-                          }))}
-                          value={
-                            formData.SiteVisitAccount
-                              ? {
-                                value: formData.SiteVisitAccount,
-                                label: formData.SiteVisitAccount,
-                              }
-                              : null
-                          }
-                          onChange={(s) => onChangeAction("SiteVisitAccount", s?.value || "")}
-                          placeholder="Search company..."
-                          classNamePrefix="mb-select"
-                          onMenuOpen={() => setSelectMenuOpen(true)}
-                          onMenuClose={() => setSelectMenuOpen(false)}
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              border: "none",
-                              boxShadow: "none",
-                              borderRadius: "16px",
-                              padding: "4px 6px",
-                              fontSize: "13px",
-                              backgroundColor: "transparent",
-                              cursor: "pointer",
-                            }),
-                            menu: (base) => ({
-                              ...base,
-                              borderRadius: "16px",
-                              overflow: "hidden",
-                              boxShadow: "0 8px 32px rgba(26,10,11,0.12)",
-                              border: "1px solid #EDE5E1",
-                              fontSize: "13px",
-                              zIndex: 100,
-                            }),
-                            menuList: (base) => ({
-                              ...base,
-                              maxHeight: "200px",
-                            }),
-                            option: (base, state) => ({
-                              ...base,
-                              backgroundColor: state.isSelected
-                                ? "var(--brand-primary)"
-                                : state.isFocused
-                                  ? "var(--brand-light)"
-                                  : "white",
-                              color: state.isSelected ? "white" : "#1A0A0B",
-                              padding: "10px 16px",
-                              cursor: "pointer",
-                            }),
-                            placeholder: (base) => ({
-                              ...base,
-                              color: "#A89898",
-                              fontSize: "13px",
-                            }),
-                            singleValue: (base) => ({
-                              ...base,
-                              color: "#1A0A0B",
-                              fontWeight: 600,
-                            }),
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Remarks */}
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <FileText size={11} /> Remarks
-                  </p>
-                  <textarea
-                    value={formData.Remarks}
-                    onChange={(e) => onChangeAction("Remarks", e.target.value)}
-                    placeholder="Add notes or feedback (optional)..."
-                    rows={3}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
-                  />
-                </div>
-
-                {/* Location */}
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                    📍 Location
-                  </p>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 flex gap-3 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-                      <MapPin size={16} className="text-brand-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-brand-primary uppercase tracking-wider mb-1">
-                        Detected Location
-                      </p>
-                      <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        <button
-                          onClick={getLocation}
-                          className="text-[11px] font-semibold text-brand-primary hover:underline"
-                        >
-                          🔄 Retry Location
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (!navigator.onLine) {
-                              toast.error("Manual map is not available offline.");
-                              return;
-                            }
-                            setShowMap(!showMap);
-                          }}
-                          className="text-[11px] font-semibold text-brand-primary hover:underline"
-                        >
-                          {showMap ? "Hide map" : "⚙ Set manually →"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  {showMap && navigator.onLine && (
-                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-200">
-                      <ManualLocationPicker
-                        latitude={manualLat ?? latitude}
-                        longitude={manualLng ?? longitude}
-                        onChange={(lat, lng, addr) => {
-                          setManualLat(lat);
-                          setManualLng(lng);
-                          if (addr) {
-                            setLocationAddress(addr);
-                            if (clientType === "New Client") {
-                              onChangeAction("address", addr);
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit */}
-                <button
-                  onClick={handleCreate}
-                  disabled={isSubmitDisabled}
-                  className={[
-                    "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all",
-                    isSubmitDisabled
-                      ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                      : isLogout
-                        ? "bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
-                        : "bg-[#1A7A4A] text-white hover:bg-[#155f38] active:scale-[0.98] shadow-lg shadow-green-200",
-                  ].join(" ")}
-                >
-                  {loading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : isLogout ? (
-                    <>
-                      <LogOut size={16} />
-                      {navigator.onLine ? "Logout" : "Save Offline (Logout)"}
-                    </>
-                  ) : (
-                    <>
-                      <LogIn size={16} />
-                      {navigator.onLine ? "Login" : "Save Offline (Login)"}
-                    </>
-                  )}
-                </button>
-
-                <p className="text-center text-[11px] text-gray-300 pb-2">
-                  {navigator.onLine
-                    ? "Submission will be recorded with timestamp & GPS location"
-                    : "Will sync automatically when you're back online"}
-                </p>
-              </>
-            )}
-
-            {loadingStatus && capturedImage && (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <div className="w-8 h-8 border-3 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin" />
-                <p className="text-[13px] text-gray-500">Determining login status...</p>
-              </div>
-            )}
+        {loadingStatus && capturedImage && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 size={30} className="animate-spin" style={{ color: "var(--mint)" }} />
+            <p className="text-[13px] font-bold text-[var(--text-muted)]">
+              Checking your current status…
+            </p>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        )}
+      </div>
+    </MintDrawer>
   );
 }

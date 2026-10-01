@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Calendar, Clock, User, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2, Download } from "lucide-react";
+import { Calendar, Clock, FileText, Building2, ArrowLeft, LogIn, LogOut, Navigation, Camera, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { MintButton, MintDrawer, MintPill } from "@/components/mint";
 
 interface ActivityLog {
   ReferenceID: string;
@@ -81,8 +80,9 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
   const isLogin = selectedEvent?.Status === "Login";
   const isLogout = selectedEvent?.Status === "Logout";
 
-  const statusColor = isLogin ? "#1A7A4A" : isLogout ? "var(--brand-primary)" : "#888";
-  const statusBg = isLogin ? "#EEF7F2" : isLogout ? "var(--brand-light)" : "#F5F5F5";
+  // Watermarked-download badge colours — Login mint, Logout clay (GPS/site visit)
+  const statusColor = isLogin ? "#0B7F5A" : isLogout ? "#B45C38" : "#64748B";
+  const statusBg = isLogin ? "#E6F4EE" : isLogout ? "#FFF1E6" : "#F7FCF9";
 
   // State for resolved address (reverse geocoding)
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
@@ -198,7 +198,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
         minute: "2-digit", 
         hour12: true 
       });
-      const statusTimeText = `${selectedEvent.Status} · ${timeText}`;
+      const statusTimeText = `${selectedEvent.Status} Â· ${timeText}`;
       
       // Truncate location if too long (max 2 lines worth)
       let locationText = displayLocation;
@@ -291,7 +291,7 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
 
       // Draw Biolog footer watermark at bottom right (very small)
       const footerFontSize = Math.max(8, Math.min(canvas.width / 45, 10));
-      const footerText = `Biolog · ${new Date().getFullYear()}`;
+      const footerText = `Biolog Â· ${new Date().getFullYear()}`;
       ctx.font = `600 ${footerFontSize}px system-ui, -apple-system, sans-serif`;
       const footerMetrics = ctx.measureText(footerText);
       const footerX = canvas.width - padding - footerMetrics.width;
@@ -330,184 +330,320 @@ export default function ActivityDialog({ open, onOpenChange, selectedEvent, user
       setIsDownloading(false);
     }
   }, [selectedEvent, displayLocation]);
+  /* ── Render: bottom drawer (not a centred dialog) ── */
+  // All attributes must precede the `>` that opens the children — JSX does not
+  // allow attributes once children start.
+  return (
+    <MintDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      onClose={() => onOpenChange(false)}
+      title="Event Details"
+      description="Activity log entry"
+      maxHeight="88vh"
+      header={
+        <>
+          <div
+            className="px-5 pt-2 pb-6 flex-shrink-0"
+            style={{
+              background:
+                "linear-gradient(180deg, var(--mint-gradient) 0%, var(--card) 100%)",
+            }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                aria-label="Close"
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+              >
+                <ArrowLeft size={17} />
+              </button>
+              <div className="min-w-0">
+                <h2 className="text-[17px] font-black text-[var(--text)] leading-tight">
+                  Event Details
+                </h2>
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
+                  Activity log entry
+                </p>
+              </div>
+            </div>
+
+            {/* Who + what */}
+            <div
+              className="rounded-[var(--r-card)] px-4 py-3 flex items-center gap-3"
+              style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+            >
+              {user?.profilePicture ? (
+                <img
+                  src={user.profilePicture}
+                  alt={fullName}
+                  className="w-11 h-11 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-sm"
+                  style={{ background: "var(--mint-btn)" }}
+                >
+                  {initials}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-extrabold text-[var(--text)] truncate">
+                  {fullName}
+                </p>
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
+                  {selectedEvent?.Type || "Unknown type"}
+                </p>
+              </div>
+              {selectedEvent && (
+                <MintPill tone={isLogin ? "mint" : "clay"}>
+                  {isLogin ? <LogIn size={11} /> : <LogOut size={11} />}
+                  {selectedEvent.Status}
+                </MintPill>
+              )}
+            </div>
+          </div>
+        </>
+      }
+      footer={
+        selectedEvent ? (
+          <div
+            className="px-5 pt-3.5 pb-4 shrink-0"
+            style={{
+              background: "var(--card)",
+              borderTop: "1px solid var(--border)",
+              paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            <MintButton full size="lg" onClick={() => onOpenChange(false)}>
+              Close
+            </MintButton>
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="flex flex-col gap-3 p-5" style={{ background: "var(--bg)" }}>
+        {selectedEvent ? (
+          <>
+            {selectedEvent.SiteVisitAccount && (
+              <DetailRow
+                icon={<Building2 size={15} />}
+                tone="clay"
+                label="Site Visit"
+              >
+                {selectedEvent.SiteVisitAccount}
+              </DetailRow>
+            )}
+
+            {/* Date + time */}
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                className="rounded-[var(--r-card)] px-3.5 py-3 flex items-start gap-2.5"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <div
+                  className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                  style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+                >
+                  <Calendar size={14} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)]">
+                    Date
+                  </p>
+                  <p className="mint-num text-[12.5px] font-extrabold text-[var(--text)] mt-0.5">
+                    {new Date(selectedEvent.date_created).toLocaleDateString("en-PH", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div
+                className="rounded-[var(--r-card)] px-3.5 py-3 flex items-start gap-2.5"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <div
+                  className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                  style={{ background: "var(--info-soft)", color: "var(--info)" }}
+                >
+                  <Clock size={14} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)]">
+                    Time
+                  </p>
+                  <p className="mint-num text-[12.5px] font-extrabold text-[var(--text)] mt-0.5">
+                    {new Date(selectedEvent.date_created).toLocaleTimeString("en-PH", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Location */}
+            <div
+              className="rounded-[var(--r-card)] px-4 py-3 flex items-start gap-3"
+              style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+            >
+              <div
+                className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+              >
+                <Navigation size={14} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)] flex items-center gap-1.5">
+                  Location
+                  {isCoords && !resolvedAddress && !isResolving && (
+                    <MintPill tone="clay" className="!text-[9px] !py-0.5 !px-1.5">
+                      Offline
+                    </MintPill>
+                  )}
+                </p>
+                {isResolving ? (
+                  <div className="flex items-center gap-2 text-[var(--text-muted)] mt-1">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[12px] font-semibold">Resolving address…</span>
+                  </div>
+                ) : (
+                  <p className="text-[12.5px] font-bold text-[var(--text)] mt-1 leading-relaxed">
+                    {displayLocation}
+                  </p>
+                )}
+                {isCoords && resolvedAddress && (
+                  <p className="mint-num text-[10.5px] font-semibold text-[var(--text-faint)] mt-1">
+                    Coordinates: {selectedEvent.Location}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Photo */}
+            {selectedEvent.PhotoURL && (
+              <div
+                className="rounded-[var(--r-card)] p-1 flex flex-col"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <div
+                  className="flex items-center justify-between px-3 py-2.5"
+                  style={{ borderBottom: "1px solid var(--border)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Camera size={13} style={{ color: "var(--mint)" }} />
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)]">
+                      Photo Verification
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadPhoto}
+                    disabled={isDownloading}
+                    className="mint-tap inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-[11px] font-extrabold text-white disabled:opacity-50"
+                    style={{ background: "var(--mint-btn)" }}
+                  >
+                    {isDownloading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Download size={12} />
+                    )}
+                    {isDownloading ? "Saving…" : "Download"}
+                  </button>
+                </div>
+                <div className="relative aspect-[4/3] rounded-[14px] overflow-hidden mt-1.5">
+                  <img
+                    src={selectedEvent.PhotoURL}
+                    alt="Attendance verification"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Remarks */}
+            {selectedEvent.Remarks && (
+              <div
+                className="rounded-[var(--r-card)] px-4 py-3 flex items-start gap-3"
+                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+              >
+                <div
+                  className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                  style={{ background: "var(--bg)", color: "var(--text-faint)" }}
+                >
+                  <FileText size={14} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)]">
+                    Remarks
+                  </p>
+                  <p className="text-[12.5px] font-semibold text-[var(--text)] mt-0.5 leading-relaxed">
+                    {selectedEvent.Remarks}
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-center text-center py-10">
+            <div
+              className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-3"
+              style={{ background: "var(--mint-soft)", color: "var(--mint)" }}
+            >
+              <FileText size={24} />
+            </div>
+            <p className="text-[14px] font-extrabold text-[var(--text)]">
+              No event selected
+            </p>
+            <p className="text-[12px] font-semibold text-[var(--text-muted)] mt-1">
+              Pick an entry from the calendar to see its full details.
+            </p>
+          </div>
+        )}
+      </div>
+    </MintDrawer>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  tone,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  tone: "clay" | "mint" | "info";
+  children: React.ReactNode;
+}) {
+  const map = {
+    clay: { bg: "var(--clay-soft)", fg: "var(--clay-ink)" },
+    mint: { bg: "var(--mint-soft)", fg: "var(--mint-strong)" },
+    info: { bg: "var(--info-soft)", fg: "var(--info)" },
+  }[tone];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col">
-        <VisuallyHidden>
-          <DialogTitle>Activity Details</DialogTitle>
-        </VisuallyHidden>
-
-        {/* Header */}
-        <div className="bg-brand-primary px-6 pt-5 pb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              onClick={() => onOpenChange(false)}
-              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-            >
-              <ArrowLeft size={15} />
-            </button>
-            <div>
-              <h2 className="text-white font-semibold text-base">Event Details</h2>
-              <p className="text-white/65 text-[11px]">Activity log entry</p>
-            </div>
-          </div>
-
-          {/* User card floating */}
-          <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-3 flex items-center gap-3">
-            {user?.profilePicture ? (
-              <img src={user.profilePicture} alt={fullName} className="w-10 h-10 rounded-full object-cover border-2 border-white/40" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold text-sm border-2 border-white/40">
-                {initials}
-              </div>
-            )}
-            <div>
-              <p className="text-white font-semibold text-sm">{fullName}</p>
-              <p className="text-white/65 text-[11px]">
-                {selectedEvent?.Type || "Unknown type"}
-              </p>
-            </div>
-            {selectedEvent && (
-              <div
-                className="ml-auto rounded-xl px-3 py-1.5 text-[11px] font-semibold"
-                style={{ background: statusBg, color: statusColor }}
-              >
-                {isLogin ? <LogIn size={10} className="inline mr-1" /> : <LogOut size={10} className="inline mr-1" />}
-                {selectedEvent.Status}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="bg-brand-bg px-5 py-5 flex flex-col gap-3 -mt-4 rounded-t-[24px] relative z-10">
-
-          {selectedEvent ? (
-            <>
-              {/* Site Visit Account */}
-              {selectedEvent.SiteVisitAccount && (
-                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-[#FDF4E7] flex items-center justify-center flex-shrink-0">
-                    <Building2 size={14} className="text-[#A0611A]" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Site Visit</p>
-                    <p className="text-[13px] font-semibold text-gray-800">{selectedEvent.SiteVisitAccount}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Date & Time */}
-              <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-                    <Calendar size={14} className="text-brand-primary" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Date</p>
-                    <p className="text-[13px] font-semibold text-gray-800">
-                      {new Date(selectedEvent.date_created).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-[#E6F1FB] flex items-center justify-center flex-shrink-0">
-                    <Clock size={14} className="text-[#185FA5]" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Time</p>
-                    <p className="text-[13px] font-semibold text-gray-800">
-                      {new Date(selectedEvent.date_created).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-                  <Navigation size={14} className="text-brand-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">
-                    Location
-                    {isCoords && !resolvedAddress && !isResolving && (
-                      <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Offline</span>
-                    )}
-                  </p>
-                  {isResolving ? (
-                    <div className="flex items-center gap-2 text-gray-500">
-                      <Loader2 size={12} className="animate-spin" />
-                      <span className="text-[12px]">Resolving address...</span>
-                    </div>
-                  ) : (
-                    <p className="text-[12px] text-gray-700 leading-snug">{displayLocation}</p>
-                  )}
-                  {isCoords && resolvedAddress && (
-                    <p className="text-[10px] text-gray-400 mt-1 italic">
-                      Coordinates: {selectedEvent.Location}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Photo Verification */}
-              {selectedEvent.PhotoURL && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-1 flex flex-col">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50">
-                    <div className="flex items-center gap-2">
-                      <Camera size={13} className="text-brand-primary" />
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Photo Verification</p>
-                    </div>
-                    <button
-                      onClick={downloadPhoto}
-                      disabled={isDownloading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white rounded-lg text-[11px] font-semibold hover:bg-brand-primary-hover transition-colors active:scale-95 disabled:opacity-50"
-                    >
-                      {isDownloading ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <Download size={12} />
-                      )}
-                      {isDownloading ? "Downloading..." : "Download"}
-                    </button>
-                  </div>
-                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden mt-1">
-                    <img 
-                      src={selectedEvent.PhotoURL} 
-                      alt="Attendance verification" 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Remarks */}
-              {selectedEvent.Remarks && (
-                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
-                    <FileText size={14} className="text-gray-400" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Remarks</p>
-                    <p className="text-[13px] text-gray-700">{selectedEvent.Remarks}</p>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={() => onOpenChange(false)}
-                className="w-full mt-1 rounded-2xl py-3.5 bg-brand-primary text-white font-semibold text-[14px] hover:bg-brand-primary-hover transition-colors active:scale-[0.98]"
-              >
-                Close
-              </button>
-            </>
-          ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">No event selected.</div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div
+      className="rounded-[var(--r-card)] px-4 py-3 flex items-start gap-3"
+      style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+    >
+      <div
+        className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+        style={{ background: map.bg, color: map.fg }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-faint)]">
+          {label}
+        </p>
+        <p className="text-[13px] font-extrabold text-[var(--text)] mt-0.5">{children}</p>
+      </div>
+    </div>
   );
 }

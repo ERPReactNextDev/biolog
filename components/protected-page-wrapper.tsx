@@ -77,11 +77,30 @@ export default function ProtectedPageWrapper({ children }: { children: React.Rea
   }, []);
 
   if (loading) {
+    // Matches the in-app SplashScreen so the handoff from gate -> app is seamless
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-gray-200 border-t-[#CC1318] rounded-full animate-spin" />
-          <p className="text-[12px] text-gray-400">Loading...</p>
+      <div
+        className="mint-ui fixed inset-0 flex flex-col items-center justify-center gap-5"
+        style={{ background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 100%)" }}
+        role="status"
+        aria-label="Loading Biolog"
+      >
+        <div
+          className="w-[72px] h-[72px] rounded-[22px] flex items-center justify-center"
+          style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
+        >
+          <svg width="34" height="34" viewBox="0 0 18 18" fill="none" aria-hidden>
+            <rect x="2" y="8" width="14" height="2" rx="1" fill="white" />
+            <rect x="2" y="4" width="9" height="2" rx="1" fill="white" />
+            <rect x="2" y="12" width="11" height="2" rx="1" fill="white" />
+          </svg>
+        </div>
+        <p className="text-[20px] font-black tracking-[0.16em] text-[var(--mint-strong)]">BIOLOG</p>
+        <div className="w-32 h-1 rounded-full bg-[var(--mint-soft)] overflow-hidden">
+          <div
+            className="h-full rounded-full animate-pulse-soft"
+            style={{ background: "var(--mint)", width: "70%" }}
+          />
         </div>
       </div>
     );

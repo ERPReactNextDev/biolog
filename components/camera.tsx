@@ -170,7 +170,8 @@ export default function Camera({
           const { x, y, width, height } = det.detection.box;
           const scaleX = overlay.width / video.videoWidth;
           const scaleY = overlay.height / video.videoHeight;
-          ctx.strokeStyle = "#CC1318";
+          // Mint-rust accent for the "multiple faces" warning box
+          ctx.strokeStyle = "#D4724A";
           ctx.lineWidth = 2;
           ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
         });
@@ -205,8 +206,9 @@ export default function Camera({
         const corner = 18;
 
         const isGreen = currentMode === "register" || currentIsMatch === true || currentIsMatch === null;
-        const statusColor = isGreen ? "#1A7A4A" : "#CC1318";
-        const statusBg = isGreen ? "rgba(26,122,74,0.06)" : "rgba(204,19,24,0.06)";
+        // Face box: mint when verified, red only on a genuine mismatch
+        const statusColor = isGreen ? "#0D9669" : "#DC2626";
+        const statusBg = isGreen ? "rgba(13,150,105,0.08)" : "rgba(220,38,38,0.08)";
 
         ctx.fillStyle = statusBg;
         ctx.beginPath();
@@ -523,26 +525,57 @@ export default function Camera({
     return "";
   };
 
-  const isGreenStatus = faceStatus === "detected" && (mode === "register" || isMatch === true || isMatch === null);
-  const statusColor = isGreenStatus ? "#1A7A4A" : faceStatus === "detected" ? "#CC1318" : faceStatus === "multiple" ? "#A0611A" : faceStatus === "no-face" ? "#CC1318" : "#6B7280";
-  const statusBg = isGreenStatus ? "bg-[#EEF7F2]" : faceStatus === "detected" ? "bg-[#FEF0F0]" : faceStatus === "multiple" ? "bg-[#FDF4E7]" : faceStatus === "no-face" ? "bg-[#FEF0F0]" : "bg-gray-100";
+  const isGreenStatus =
+    faceStatus === "detected" &&
+    (mode === "register" || isMatch === true || isMatch === null);
+
+  // Mint status tokens — same palette as the rest of the Calm Mint system
+  const statusColor = isGreenStatus
+    ? "var(--mint-strong)"
+    : faceStatus === "multiple"
+      ? "var(--clay-ink)"
+      : faceStatus === "no-face"
+        ? "var(--alert-ink)"
+        : faceStatus === "detected"
+          ? "var(--alert-ink)"
+          : "var(--text-muted)";
+
+  const statusBg = isGreenStatus
+    ? "var(--mint-soft)"
+    : faceStatus === "multiple"
+      ? "var(--clay-soft)"
+      : faceStatus === "no-face"
+        ? "var(--alert-soft)"
+        : faceStatus === "detected"
+          ? "var(--alert-soft)"
+          : "var(--bg)";
 
   const canTap = skipFaceVerification || faceStatus === "detected" || faceStatus === "unsupported";
 
   return (
-    <div className="w-full flex flex-col gap-3">
+    <div className="mint-ui w-full flex flex-col gap-3">
       {/* Permission prompt */}
       {!permissionGiven && (
         <button
           onClick={requestPermission}
-          className="w-full rounded-2xl border-2 border-dashed border-gray-200 bg-[#F9F6F4] py-8 flex flex-col items-center gap-3 hover:border-[#CC1318]/40 hover:bg-[#FEF0F0] transition-all group"
+          className="mint-tap w-full rounded-[var(--r-card-lg)] border-2 border-dashed py-8 flex flex-col items-center gap-3 transition-colors group"
+          style={{ borderColor: "var(--border-strong)", background: "var(--card-alt)" }}
         >
-          <div className="w-14 h-14 rounded-2xl bg-[#FEF0F0] flex items-center justify-center group-hover:bg-[#CC1318] transition-colors">
-            <CameraIcon size={24} className="text-[#CC1318] group-hover:text-white transition-colors" />
+          <div
+            className="w-14 h-14 rounded-[18px] flex items-center justify-center transition-colors group-hover:bg-[var(--mint-btn)]"
+            style={{ background: "var(--mint-soft)" }}
+          >
+            <CameraIcon
+              size={24}
+              className="transition-colors group-hover:text-white"
+              style={{ color: "var(--mint)" }}
+            />
           </div>
           <div className="text-center">
-            <p className="text-[13px] font-semibold text-gray-700">Start Camera</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">Tap to allow camera access</p>
+            <p className="text-[13.5px] font-extrabold text-[var(--text)]">Start Camera</p>
+            <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5">
+              Tap to allow camera access — your face is verified, never stored as a photo
+            </p>
           </div>
         </button>
       )}
@@ -551,25 +584,41 @@ export default function Camera({
       {permissionGiven && !capturedImage && (
         <>
           {!skipFaceVerification && faceStatus !== "idle" && (
-            <div className={`flex items-center gap-2 rounded-2xl px-3 py-2 ${statusBg}`}>
-              {(faceStatus === "no-face" || faceStatus === "multiple" || (faceStatus === "detected" && !isGreenStatus)) && (
-                <AlertCircle size={13} style={{ color: statusColor }} />
+            <div
+              className="flex items-center gap-2 rounded-[var(--r-card)] px-3.5 py-2.5"
+              style={{ background: statusBg }}
+            >
+              {(faceStatus === "no-face" ||
+                faceStatus === "multiple" ||
+                (faceStatus === "detected" && !isGreenStatus)) && (
+                <AlertCircle size={14} style={{ color: statusColor }} className="shrink-0" />
               )}
               {faceStatus === "detected" && isGreenStatus && (
-                <CheckCircle2 size={13} style={{ color: statusColor }} />
+                <CheckCircle2 size={14} style={{ color: statusColor }} className="shrink-0" />
               )}
-              <span className="text-[12px] font-semibold flex-1" style={{ color: statusColor }}>{getStatusLabel()}</span>
+              <span
+                className="text-[12px] font-extrabold flex-1"
+                style={{ color: statusColor }}
+              >
+                {getStatusLabel()}
+              </span>
               {faceStatus === "detected" && (
-                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: statusColor }} />
+                <span
+                  className="w-2 h-2 rounded-full animate-pulse-soft shrink-0"
+                  style={{ background: statusColor }}
+                />
               )}
             </div>
           )}
 
           <div
-            className={`relative w-full select-none overflow-hidden rounded-2xl border border-gray-200 bg-black transition-all ${canTap ? "cursor-pointer active:scale-[0.995]" : "cursor-not-allowed"} ${isFullscreen ? "fixed inset-0 z-50 rounded-none aspect-video" : ""}`}
+            className={`relative w-full select-none overflow-hidden rounded-[var(--r-card-lg)] bg-black transition-all ${canTap ? "cursor-pointer active:scale-[0.995]" : "cursor-not-allowed"} ${isFullscreen ? "fixed inset-0 z-50 rounded-none aspect-video" : ""}`}
             onClick={handleTap}
             onTouchStart={(e) => { e.preventDefault(); handleTap(); }}
-            style={{ aspectRatio: isFullscreen ? undefined : "4/3" }}
+            style={{
+              aspectRatio: isFullscreen ? undefined : "4/3",
+              border: isFullscreen ? undefined : "1px solid var(--border)",
+            }}
           >
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!skipFaceVerification && <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" />}
@@ -588,8 +637,15 @@ export default function Camera({
             {countdown !== null && countdown > 0 && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                 <div className="flex flex-col items-center gap-2">
-                  <span className="text-white font-bold leading-none" style={{ fontSize: 72, textShadow: "0 0 32px #CC1318" }}>{countdown}</span>
-                  <span className="text-white/70 text-[13px] font-medium tracking-wide">Capturing…</span>
+                  <span
+                    className="font-black leading-none"
+                    style={{ fontSize: 72, color: "var(--mint)", textShadow: "0 0 32px rgba(13,150,105,.6)" }}
+                  >
+                    {countdown}
+                  </span>
+                  <span className="text-white/80 text-[13px] font-bold tracking-wide">
+                    Capturing…
+                  </span>
                 </div>
               </div>
             )}
@@ -606,15 +662,17 @@ export default function Camera({
               <div className="absolute inset-0 flex items-end justify-center pb-4 pointer-events-none">
                 <div
                   className="rounded-full px-4 py-2 flex items-center gap-2 shadow-lg"
-                  style={{ background: isGreenStatus ? "rgba(26,122,74,0.85)" : "rgba(204,19,24,0.85)" }}
+                  style={{ background: isGreenStatus ? "rgba(11,127,90,.9)" : "rgba(185,28,28,.9)" }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  <span className="text-white text-[12px] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse-soft" />
+                  <span className="text-white text-[12px] font-bold">
                     {mode === "register"
                       ? `Tap to take photo ${registrationTakesCount + 1}/3`
-                      : (!(registeredDescriptors && registeredDescriptors.length > 0)
-                            ? "User not registered"
-                            : (isMatch === false ? "Identity mismatch!" : "Tap to capture"))}
+                      : !(registeredDescriptors && registeredDescriptors.length > 0)
+                        ? "User not registered"
+                        : isMatch === false
+                          ? "Identity mismatch!"
+                          : "Tap to capture"}
                   </span>
                 </div>
               </div>
@@ -622,10 +680,15 @@ export default function Camera({
 
             {!skipFaceVerification && countdown === null && (faceStatus === "no-face" || faceStatus === "multiple") && (
               <div className="absolute inset-0 flex items-end justify-center pb-6 pointer-events-none">
-                <div className="bg-[#CC1318]/90 backdrop-blur-sm rounded-full px-5 py-2.5 flex items-center gap-2 shadow-lg">
+                <div
+                  className="backdrop-blur-sm rounded-full px-5 py-2.5 flex items-center gap-2 shadow-lg"
+                  style={{ background: "var(--alert-ink)" }}
+                >
                   <AlertCircle size={14} className="text-white" />
-                  <span className="text-white text-[12px] font-semibold">
-                    {faceStatus === "no-face" ? "Position your face in frame" : "Multiple faces detected"}
+                  <span className="text-white text-[12px] font-extrabold">
+                    {faceStatus === "no-face"
+                      ? "Position your face in frame"
+                      : "Multiple faces detected"}
                   </span>
                 </div>
               </div>
@@ -636,9 +699,14 @@ export default function Camera({
             {devices.length > 1 && (
               <button
                 onClick={flipCamera}
-                className="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-[12px] font-semibold text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-all active:scale-95 flex-shrink-0"
+                className="mint-tap flex items-center gap-2 rounded-[var(--r-btn)] border px-4 min-h-[48px] text-[12.5px] font-extrabold flex-shrink-0"
+                style={{
+                  background: "var(--card)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
               >
-                <SwitchCamera size={15} />
+                <SwitchCamera size={16} style={{ color: "var(--mint)" }} />
                 Flip
               </button>
             )}
@@ -646,10 +714,18 @@ export default function Camera({
               <select
                 value={selectedDevice}
                 onChange={(e) => setSelectedDevice(e.target.value)}
-                className="flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-[12px] text-gray-700 outline-none focus:border-[#CC1318] transition-all"
+                aria-label="Select camera"
+                className="flex-1 rounded-[var(--r-btn)] border px-3 min-h-[48px] text-[12.5px] font-bold outline-none transition-colors"
+                style={{
+                  background: "var(--card)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
               >
                 {devices.map((d, i) => (
-                  <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Camera ${i + 1}`}
+                  </option>
                 ))}
               </select>
             )}
@@ -660,21 +736,42 @@ export default function Camera({
       {/* Captured photo preview */}
       {capturedImage && (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 bg-[#EEF7F2] rounded-2xl px-3 py-2.5">
-            <CheckCircle2 size={15} className="text-[#1A7A4A] flex-shrink-0" />
-            <span className="text-[12px] font-semibold text-[#1A7A4A]">Photo captured successfully</span>
+          <div
+            className="flex items-center gap-2 rounded-[var(--r-card)] px-3.5 py-2.5"
+            style={{ background: "var(--mint-soft)" }}
+          >
+            <CheckCircle2 size={15} style={{ color: "var(--mint-strong)" }} className="shrink-0" />
+            <span className="text-[12.5px] font-extrabold text-[var(--mint-strong)]">
+              Photo captured successfully
+            </span>
           </div>
-          <div className="relative overflow-hidden rounded-2xl border border-gray-200">
-            <img src={capturedImage} alt="Captured" className="w-full object-cover" style={{ aspectRatio: "4/3" }} />
-            <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-[#1A7A4A] flex items-center justify-center shadow-lg">
-              <CheckCircle2 size={16} className="text-white" />
+          <div
+            className="relative overflow-hidden rounded-[var(--r-card-lg)]"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            <img
+              src={capturedImage}
+              alt="Captured"
+              className="w-full object-cover"
+              style={{ aspectRatio: "4/3" }}
+            />
+            <div
+              className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
+              style={{ background: "var(--mint-btn)" }}
+            >
+              <CheckCircle2 size={17} className="text-white" />
             </div>
           </div>
           <button
             onClick={retake}
-            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-2xl py-3 text-[13px] font-semibold text-gray-600 hover:border-[#CC1318]/40 hover:bg-[#FEF0F0] hover:text-[#CC1318] transition-all active:scale-[0.98]"
+            className="mint-tap w-full flex items-center justify-center gap-2 rounded-[var(--r-btn)] border min-h-[48px] text-[13.5px] font-extrabold"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              color: "var(--text)",
+            }}
           >
-            <RefreshCcw size={14} />
+            <RefreshCcw size={15} style={{ color: "var(--mint)" }} />
             Retake Photo
           </button>
         </div>

@@ -17,6 +17,8 @@
 import { useEffect, useState } from "react";
 import { WifiOff, RefreshCw, CheckCircle2 } from "lucide-react";
 
+/* Mint tones: green = synced, blue = syncing, orange = queued, clay = offline */
+
 interface Props {
   isOnline:     boolean;
   isSyncing:    boolean;
@@ -46,11 +48,14 @@ export default function OfflineBanner({ isOnline, isSyncing, pendingCount, onSyn
   // Nothing to show — all good and online
   if (isOnline && !isSyncing && !showSyncDone && pendingCount === 0) return null;
 
+  const bar =
+    "fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 py-2.5 px-4 text-[12px] font-extrabold";
+
   // ── Sync done flash ──────────────────────────────────────────────────────
   if (showSyncDone) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-[#1A7A4A] text-white py-2 px-4 text-[12px] font-semibold animate-pulse">
-        <CheckCircle2 size={13} />
+      <div className={bar} style={{ background: "var(--mint-btn)", color: "white" }} role="status">
+        <CheckCircle2 size={14} />
         All records synced successfully
       </div>
     );
@@ -59,8 +64,13 @@ export default function OfflineBanner({ isOnline, isSyncing, pendingCount, onSyn
   // ── Syncing ──────────────────────────────────────────────────────────────
   if (isSyncing) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-[#185FA5] text-white py-2 px-4 text-[12px] font-semibold">
-        <RefreshCw size={13} className="animate-spin" />
+      <div
+        className={bar}
+        style={{ background: "var(--info)", color: "white" }}
+        role="status"
+        aria-live="polite"
+      >
+        <RefreshCw size={14} className="animate-spin" />
         Syncing {pendingCount} record{pendingCount !== 1 ? "s" : ""}…
       </div>
     );
@@ -69,15 +79,23 @@ export default function OfflineBanner({ isOnline, isSyncing, pendingCount, onSyn
   // ── Online + pending logs (queued but not yet syncing) ───────────────────
   if (isOnline && pendingCount > 0) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-[#A0611A] text-white py-2 px-4 text-[12px] font-semibold">
-        <RefreshCw size={13} />
-        <span>Uploading {pendingCount} queued record{pendingCount !== 1 ? "s" : ""}…</span>
+      <div
+        className={bar}
+        style={{ background: "var(--clay-ink)", color: "white" }}
+        role="status"
+        aria-live="polite"
+      >
+        <RefreshCw size={14} />
+        <span>
+          {pendingCount} record{pendingCount !== 1 ? "s" : ""} ready to upload
+        </span>
         {onSyncNow && (
-          <button 
+          <button
             onClick={onSyncNow}
-            className="ml-2 bg-white/20 hover:bg-white/30 rounded-full px-2 py-0.5 text-[11px] transition-colors"
+            className="ml-1 min-h-[32px] px-3 rounded-full text-[11px] font-extrabold transition-opacity hover:opacity-90"
+            style={{ background: "rgba(255,255,255,.22)" }}
           >
-            Sync Now
+            Sync now
           </button>
         )}
       </div>
@@ -86,11 +104,19 @@ export default function OfflineBanner({ isOnline, isSyncing, pendingCount, onSyn
 
   // ── Offline ──────────────────────────────────────────────────────────────
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-brand-primary text-white py-2 px-4 text-[12px] font-semibold">
-      <WifiOff size={13} />
-      You are offline
+    <div
+      className={bar}
+      style={{ background: "var(--clay-soft)", color: "var(--clay-ink)" }}
+      role="status"
+      aria-live="polite"
+    >
+      <WifiOff size={14} />
+      You&apos;re offline — entries save to this phone
       {pendingCount > 0 && (
-        <span className="ml-1 bg-white/20 rounded-full px-2 py-0.5 text-[11px]">
+        <span
+          className="ml-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
+          style={{ background: "var(--card)" }}
+        >
           {pendingCount} pending
         </span>
       )}

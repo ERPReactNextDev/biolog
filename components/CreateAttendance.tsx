@@ -8,9 +8,16 @@ import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { MapPin, ArrowLeft, CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
+import { MapPin, CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
+import {
+  MintButton,
+  MintDialogHeader,
+  MintDrawer,
+  MintHint,
+  MintInput,
+  MintLabel,
+  cx,
+} from "@/components/mint";
 
 const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 
@@ -320,202 +327,277 @@ const basePayload = {
     !capturedImage ||
     !isLocationReady(locationAddress);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChangeAction}>
-      <DialogContent className="p-0 rounded-[28px] max-w-sm w-full mx-auto overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col">
-        <VisuallyHidden>
-          <DialogTitle>Create Attendance</DialogTitle>
-        </VisuallyHidden>
+  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
 
-        {/* ── Header ── */}
-        <div className="bg-brand-primary px-6 pt-5 pb-6 flex-shrink-0">
-          <div className="flex items-center gap-3 mb-5">
-            <button
-              onClick={() => onOpenChangeAction(false)}
-              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-            >
-              <ArrowLeft size={15} />
-            </button>
-            <div className="flex-1">
-              <h2 className="text-white font-semibold text-base leading-tight">Create Attendance</h2>
-              <p className="text-white/65 text-[11px] mt-0.5">Field log entry</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white/65 text-[11px]">
+  // Micro-copy so the agent always knows what happens next
+  const nextAction = lastStatus === "Login" ? "Logout" : "Login";
+  const footerHint = !online
+    ? "Saved to this phone — it uploads automatically once you have signal."
+    : formData.Status === "Logout"
+      ? "This ends your shift for today. Your supervisor sees the GPS and timestamp."
+      : "This starts your shift. You'll be able to log site visits after clocking in.";
+
+  return (
+    <MintDrawer
+      open={open}
+      onOpenChange={onOpenChangeAction}
+      onClose={() => onOpenChangeAction(false)}
+      title="Create Attendance"
+      description="Field log entry"
+      header={
+        <MintDialogHeader
+          title="Create Attendance"
+          subtitle="Field log entry"
+          onClose={() => onOpenChangeAction(false)}
+          right={
+            <div className="text-right shrink-0">
+              <p className="text-[11px] font-bold text-[var(--text-muted)]">
                 {new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric" })}
               </p>
-              <p className="text-white font-semibold text-[13px]">
+              <p className="mint-num text-[13px] font-black text-[var(--text)]">
                 {new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
+          }
+        />
+      }
+      footer={
+        capturedImage && formData.Status ? (
+          <div
+            className="px-5 pt-3.5 pb-4 shrink-0"
+            style={{
+              background: "var(--card)",
+              borderTop: "1px solid var(--border)",
+              paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            <MintButton
+              full
+              size="lg"
+              variant={formData.Status === "Logout" ? "clockout" : "primary"}
+              icon={<CheckCircle2 size={19} />}
+              loading={loading}
+              disabled={isSubmitDisabled}
+              onClick={handleCreate}
+            >
+              {online
+                ? formData.Status === "Logout"
+                  ? "Submit Clock Out"
+                  : "Submit Clock In"
+                : "Save Offline"}
+            </MintButton>
+            <p className="text-center text-[11px] font-semibold text-[var(--text-muted)] mt-2.5 leading-relaxed">
+              {footerHint}
+            </p>
           </div>
-        </div>
-
-        {/* ── Body ── */}
-        <div className="overflow-y-auto flex-1 bg-brand-bg">
-          <div className="flex flex-col gap-4 p-5">
-
-            {/* Current Status Banner */}
-            {lastStatus && (
-              <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${lastStatus === "Login" ? "bg-[#EEF7F2] border-green-200" : "bg-brand-light border-red-200"}`}>
-                {lastStatus === "Login"
-                  ? <CheckCircle2 size={18} className="text-[#1A7A4A] flex-shrink-0" />
-                  : <AlertCircle size={18} className="text-brand-primary flex-shrink-0" />}
-                <div>
-                  <p className={`text-[12px] font-semibold ${lastStatus === "Login" ? "text-[#1A7A4A]" : "text-brand-primary"}`}>
-                    Currently {lastStatus === "Login" ? "Logged In" : "Logged Out"}
-                  </p>
-                  {lastTime && <p className="text-[11px] text-gray-400 mt-0.5">Last activity: {lastStatus} at {lastTime}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Camera */}
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Photo Verification</p>
-              <Camera
-                registeredDescriptors={userDetails.faceDescriptors}
-                skipFaceVerification={userDetails.faceVerificationEnabled === false}
-                onCaptureAction={(img, face) => {
-                  setCapturedImage(img);
-                  setFaceData(face);
-                }}
-              />
-              {capturedImage && (
-                <div className="mt-2 flex items-center gap-2 bg-[#EEF7F2] rounded-xl px-3 py-2">
-                  <CheckCircle2 size={14} className="text-[#1A7A4A]" />
-                  <span className="text-[12px] font-semibold text-[#1A7A4A]">Photo captured successfully</span>
-                </div>
-              )}
-            </div>
-
-            {capturedImage && (
-              <>
-                {/* Attendance Status */}
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Attendance Status</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => onChangeAction("Status", "Login")}
-                      disabled={lastStatus === "Login"}
-                      className={`rounded-2xl border-[1.5px] p-4 flex flex-col items-center gap-2 transition-all ${
-                        formData.Status === "Login" ? "bg-[#EEF7F2] border-[#1A7A4A]" : "bg-white border-gray-200 hover:border-gray-300"
-                      } ${lastStatus === "Login" ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+        ) : undefined
+      }
+    >
+      <div className="flex flex-col gap-4 p-5" style={{ background: "var(--bg)" }}>
+              {/* Current status — always tells you the next action */}
+              {lastStatus ? (
+                <div
+                  className="rounded-[var(--r-card)] p-3.5 flex items-start gap-3"
+                  style={{
+                    background: lastStatus === "Login" ? "var(--mint-soft)" : "var(--alert-soft)",
+                  }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0"
+                    style={{ background: "var(--card)" }}
+                  >
+                    {lastStatus === "Login" ? (
+                      <CheckCircle2 size={17} style={{ color: "var(--mint-strong)" }} />
+                    ) : (
+                      <AlertCircle size={17} style={{ color: "var(--alert-ink)" }} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[13px] font-extrabold"
+                      style={{
+                        color: lastStatus === "Login" ? "var(--mint-strong)" : "var(--alert-ink)",
+                      }}
                     >
-                      <LogIn size={20} className={formData.Status === "Login" ? "text-[#1A7A4A]" : "text-gray-400"} />
-                      <span className={`text-[13px] font-semibold ${formData.Status === "Login" ? "text-[#1A7A4A]" : "text-gray-700"}`}>Login</span>
-                      <span className="text-[10px] text-gray-400">Start of shift</span>
-                    </button>
-                    <button
-                      onClick={() => onChangeAction("Status", "Logout")}
-                      disabled={lastStatus === "Logout"}
-                      className={`rounded-2xl border-[1.5px] p-4 flex flex-col items-center gap-2 transition-all ${
-                        formData.Status === "Logout" ? "bg-brand-light border-brand-primary" : "bg-white border-gray-200 hover:border-gray-300"
-                      } ${lastStatus === "Logout" ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <LogOut size={20} className={formData.Status === "Logout" ? "text-brand-primary" : "text-gray-400"} />
-                      <span className={`text-[13px] font-semibold ${formData.Status === "Logout" ? "text-brand-primary" : "text-gray-700"}`}>Logout</span>
-                      <span className="text-[10px] text-gray-400">End of shift</span>
-                    </button>
+                      Currently {lastStatus === "Login" ? "Clocked In" : "Clocked Out"}
+                    </p>
+                    {lastTime && (
+                      <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5">
+                        Last action at {lastTime}
+                      </p>
+                    )}
+                    <p className="text-[11.5px] font-bold text-[var(--text-muted)] mt-1.5 leading-relaxed">
+                      {lastStatus === "Login"
+                        ? "You can log client visits now. Use Clock Out when you head home."
+                        : "You're off duty. Clock In to start your shift and record site visits."}
+                    </p>
                   </div>
                 </div>
+              ) : (
+                <MintHint icon={<AlertCircle size={14} />}>
+                  We couldn&apos;t read your last clock action. Pick one below and it will be
+                  recorded either way.
+                </MintHint>
+              )}
 
-                {/* Remarks */}
-                <div>
-                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <FileText size={12} /> Remarks
-                  </label>
-                  <textarea
-                    value={formData.Remarks}
-                    onChange={(e) => onChangeAction("Remarks", e.target.value)}
-                    placeholder="Add notes or remarks (optional)..."
-                    rows={3}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[13px] text-gray-800 placeholder:text-gray-300 resize-none outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
-                  />
-                </div>
+              {/* Camera */}
+              <div>
+                <MintLabel>Photo Verification</MintLabel>
+                <Camera
+                  registeredDescriptors={userDetails.faceDescriptors}
+                  skipFaceVerification={userDetails.faceVerificationEnabled === false}
+                  onCaptureAction={(img, face) => {
+                    setCapturedImage(img);
+                    setFaceData(face);
+                  }}
+                />
+              </div>
 
-                {/* Location */}
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Location</p>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 flex gap-3 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-brand-light flex items-center justify-center flex-shrink-0">
-                      <MapPin size={16} className="text-brand-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-brand-primary uppercase tracking-wider mb-1">
-                        {locationAddress === LOCATION_PENDING ? "Detecting location..." : "Detected Location"}
-                      </p>
-                      <p className="text-[12px] text-gray-500 leading-snug">{locationAddress}</p>
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        <button
-                          onClick={getLocation}
-                          className="text-[11px] font-semibold text-brand-primary hover:underline"
-                        >
-                          🔄 Retry Location
-                        </button>
-                        {isLocationReady(locationAddress) && (
+              {capturedImage && (
+                <>
+                  {/* Attendance status */}
+                  <div>
+                    <MintLabel>Attendance Status</MintLabel>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {(
+                        [
+                          { v: "Login", label: "Clock In", sub: "Start of shift", Icon: LogIn },
+                          { v: "Logout", label: "Clock Out", sub: "End of shift", Icon: LogOut },
+                        ] as const
+                      ).map(({ v, label, sub, Icon }) => {
+                        const selected = formData.Status === v;
+                        const blocked = lastStatus === v;
+                        return (
                           <button
-                            onClick={() => {
-                              if (!navigator.onLine) {
-                                toast.error("Manual map is not available offline.");
-                                return;
-                              }
-                              setShowMap(!showMap);
-                            }}
-                            className="text-[11px] font-semibold text-brand-primary hover:underline"
+                            key={v}
+                            type="button"
+                            onClick={() => onChangeAction("Status", v)}
+                            disabled={blocked}
+                            aria-pressed={selected}
+                            className={cx(
+                              "mint-tap rounded-[var(--r-card)] border-2 p-3.5 flex flex-col items-center gap-1.5 text-left",
+                              selected
+                                ? "border-[var(--mint)] bg-[var(--mint-soft)]"
+                                : "border-[var(--border)] bg-[var(--card)]",
+                              blocked && "opacity-40 cursor-not-allowed"
+                            )}
                           >
-                            {showMap ? "Hide map" : "⚙ Set manually →"}
+                            <Icon
+                              size={20}
+                              style={{
+                                color: selected ? "var(--mint-strong)" : "var(--text-faint)",
+                              }}
+                            />
+                            <span
+                              className="text-[13px] font-extrabold"
+                              style={{
+                                color: selected ? "var(--mint-strong)" : "var(--text)",
+                              }}
+                            >
+                              {label}
+                            </span>
+                            <span className="text-[10px] font-semibold text-[var(--text-muted)]">
+                              {blocked ? "Already done" : sub}
+                            </span>
                           </button>
-                        )}
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Remarks */}
+                  <div>
+                    <MintLabel>
+                      <span className="inline-flex items-center gap-1.5">
+                        <FileText size={12} /> Remarks
+                      </span>
+                    </MintLabel>
+                    <MintInput
+                      textarea
+                      value={formData.Remarks}
+                      onChange={(e) => onChangeAction("Remarks", e.target.value)}
+                      placeholder="Add notes or remarks (optional)…"
+                    />
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <MintLabel>Location</MintLabel>
+                    <div
+                      className="rounded-[var(--r-card)] p-3.5 flex gap-3 items-start"
+                      style={{
+                        background: "var(--card)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <div
+                        className="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0"
+                        style={{ background: "var(--mint-soft)" }}
+                      >
+                        <MapPin size={16} style={{ color: "var(--mint-strong)" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-[10.5px] font-black uppercase tracking-wider"
+                          style={{ color: "var(--mint-strong)" }}
+                        >
+                          {locationAddress === LOCATION_PENDING
+                            ? "Detecting location…"
+                            : "Detected Location"}
+                        </p>
+                        <p className="text-[12.5px] font-semibold text-[var(--text)] mt-1 leading-relaxed">
+                          {locationAddress}
+                        </p>
+                        <div className="flex gap-2 mt-2.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={getLocation}
+                            className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
+                            style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+                          >
+                            Retry location
+                          </button>
+                          {isLocationReady(locationAddress) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!navigator.onLine) {
+                                  toast.error("Manual map is not available offline.");
+                                  return;
+                                }
+                                setShowMap(!showMap);
+                              }}
+                              className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
+                              style={{ background: "var(--bg)", color: "var(--text-muted)" }}
+                            >
+                              {showMap ? "Hide map" : "Set manually →"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    {showMap && (
+                      <div
+                        className="mt-2.5 rounded-[var(--r-card)] overflow-hidden"
+                        style={{ border: "1px solid var(--border)" }}
+                      >
+                        <ManualLocationPicker
+                          latitude={manualLat ?? latitude}
+                          longitude={manualLng ?? longitude}
+                          onChange={(lat, lng, address) => {
+                            setManualLat(lat);
+                            setManualLng(lng);
+                            if (address) setLocationAddress(address);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                  {showMap && (
-                    <div className="mt-2 rounded-2xl overflow-hidden border border-gray-200">
-                      <ManualLocationPicker
-                        latitude={manualLat ?? latitude}
-                        longitude={manualLng ?? longitude}
-                        onChange={(lat, lng, address) => {
-                          setManualLat(lat);
-                          setManualLng(lng);
-                          if (address) setLocationAddress(address);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
 
-                {/* Submit */}
-                <button
-                  onClick={handleCreate}
-                  disabled={isSubmitDisabled}
-                  className={`w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all ${
-                    isSubmitDisabled
-                      ? "bg-gray-100 text-gray-300 cursor-not-allowed" :"bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20"
-                  }`}
-                >
-                  {loading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={16} />
-                      {navigator.onLine ? "Submit Attendance" : "Save Offline"}
-                    </>
-                  )}
-                </button>
-
-                <p className="text-center text-[11px] text-gray-300 pb-2">
-                  {navigator.onLine
-                    ? "Submission will be recorded with timestamp & GPS location" :"Will sync automatically when you're back online"}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+                  {/* Submit lives in the drawer footer so it's always reachable */}
+                </>
+              )}
+      </div>
+    </MintDrawer>
   );
 }

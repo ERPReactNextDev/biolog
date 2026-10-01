@@ -15,6 +15,9 @@ import {
   ChevronLeft,
   Upload,
   Clock,
+  Check,
+  ImagePlus,
+  Loader2,
 } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
@@ -247,37 +250,48 @@ function GPSReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9F6F4] flex items-center justify-center">
+      <div
+        className="mint-ui mint-scope min-h-screen flex items-center justify-center"
+        style={{
+          background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 100%)",
+        }}
+        role="status"
+        aria-label="Loading GPS report"
+      >
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-gray-200 border-t-[#CC1318] rounded-full animate-spin" />
-          <p className="text-[12px] text-gray-400">Loading...</p>
+          <Loader2 size={30} className="animate-spin" style={{ color: "var(--mint)" }} />
+          <p className="text-[12.5px] font-bold" style={{ color: "var(--text-muted)" }}>
+            Loading your details…
+          </p>
         </div>
       </div>
     );
   }
-
   return (
-    <div className="min-h-screen bg-[#F9F6F4] flex flex-col">
-      {/* Header */}
+    <div className="mint-ui mint-scope min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
+      {/* Header — soft mint gradient, never a solid red banner */}
       <div
         className="px-5 pt-12 pb-6 flex-shrink-0"
         style={{
           background:
-            "linear-gradient(145deg, var(--brand-primary) 0%, var(--brand-primary-hover) 100%)",
+            "linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 100%)",
         }}
       >
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={goBack}
-            className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            aria-label="Go back"
+            className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0 transition-colors active:scale-95"
+            style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
           >
             <ChevronLeft size={20} />
           </button>
-          <div>
-            <h1 className="text-white text-[20px] font-semibold">
+          <div className="min-w-0">
+            <h1 className="text-[20px] font-black text-[var(--text)] leading-tight">
               Submit GPS Report
             </h1>
-            <p className="text-white/60 text-[12px]">
+            <p className="text-[12px] font-semibold text-[var(--text-muted)] mt-0.5">
               Offline attendance verification
             </p>
           </div>
@@ -285,20 +299,30 @@ function GPSReportPage() {
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-28">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* User Info Card */}
+      <div className="flex-1 overflow-y-auto mint-scroll px-4 pt-5 pb-28">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Who you are */}
           {userDetails && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <div
+              className="rounded-[var(--r-card-lg)] border p-4"
+              style={{
+                background: "var(--card)",
+                borderColor: "var(--border)",
+                boxShadow: "var(--sh-card)",
+              }}
+            >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-[14px] bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0">
-                  <FileText size={18} className="text-[var(--brand-primary)]" />
+                <div
+                  className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                  style={{ background: "var(--mint-soft)" }}
+                >
+                  <FileText size={18} style={{ color: "var(--mint-strong)" }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-gray-800">
+                  <p className="text-[13.5px] font-extrabold text-[var(--text)] truncate">
                     {userDetails.Firstname} {userDetails.Lastname}
                   </p>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11.5px] font-semibold text-[var(--text-muted)] truncate">
                     {userDetails.Role} · {userDetails.ReferenceID}
                   </p>
                 </div>
@@ -306,50 +330,68 @@ function GPSReportPage() {
             </div>
           )}
 
-          {/* Photo Upload */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          {/* Site photos */}
+          <div
+            className="rounded-[var(--r-card-lg)] border p-4"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              boxShadow: "var(--sh-card)",
+            }}
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-[14px] bg-[#E6F1FB] flex items-center justify-center flex-shrink-0">
-                <Camera size={18} className="text-[#185FA5]" />
+              <div
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--info-soft)" }}
+              >
+                <Camera size={18} style={{ color: "var(--info)" }} />
               </div>
-              <div>
-                <p className="text-[13px] font-semibold text-gray-800">
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-extrabold text-[var(--text)]">
                   Site Photos
                 </p>
-                <p className="text-[11px] text-gray-400">
-                  Upload photos as proof (max 5)
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
+                  Upload photos as proof — {photos.length} of 5 added
                 </p>
               </div>
             </div>
 
-            {/* Photo Preview Grid */}
             {photos.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {photos.map((photo, index) => (
-                  <div key={index} className="relative aspect-square">
+                  <div key={index} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo}
                       alt={`Site photo ${index + 1}`}
-                      className="w-full h-full object-cover rounded-xl"
+                      className="w-full h-24 object-cover rounded-[14px]"
+                      style={{ border: "1px solid var(--border)" }}
                     />
                     <button
                       type="button"
                       onClick={() => removePhoto(index)}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#CC1318] text-white flex items-center justify-center text-[10px]"
+                      aria-label={`Remove photo ${index + 1}`}
+                      className="absolute -top-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center"
+                      style={{ background: "var(--alert)" }}
                     >
-                      <X size={12} />
+                      <X size={13} className="text-white" />
                     </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Upload Button */}
             {photos.length < 5 && (
-              <label className="flex items-center justify-center gap-2 w-full py-4 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 cursor-pointer hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-light)]/20 transition-all">
-                <Upload size={18} className="text-gray-400" />
-                <span className="text-[13px] font-medium text-gray-500">
-                  Add Photos
+              <label
+                className="flex items-center justify-center gap-2 w-full min-h-[56px] border-2 border-dashed rounded-[var(--r-card)] cursor-pointer transition-colors"
+                style={{ borderColor: "var(--border-strong)", background: "var(--card-alt)" }}
+              >
+                <ImagePlus size={18} style={{ color: "var(--mint)" }} />
+                <span
+                  className="text-[12.5px] font-extrabold"
+                  style={{ color: "var(--mint-strong)" }}
+                >
+                  {photos.length === 0 ? "Add site photos" : "Add another photo"}
                 </span>
                 <input
                   type="file"
@@ -362,74 +404,92 @@ function GPSReportPage() {
             )}
           </div>
 
-          {/* Date Selection */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          {/* Time period */}
+          <div
+            className="rounded-[var(--r-card-lg)] border p-4"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              boxShadow: "var(--sh-card)",
+            }}
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-[14px] bg-[#EEF7F2] flex items-center justify-center flex-shrink-0">
-                <Calendar size={18} className="text-[#1A7A4A]" />
+              <div
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--mint-soft)" }}
+              >
+                <Calendar size={18} style={{ color: "var(--mint-strong)" }} />
               </div>
-              <div>
-                <p className="text-[13px] font-semibold text-gray-800">
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-extrabold text-[var(--text)]">
                   Time Period
                 </p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
                   When did you visit the site?
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-                  Login Date
+            <div className="grid grid-cols-2 gap-2.5">
+              {(
+                [
+                  { label: "Login Date", value: loginDate, set: setLoginDate },
+                  { label: "Logout Date", value: logoutDate, set: setLogoutDate },
+                ] as const
+              ).map((f) => (
+                <label key={f.label} className="flex flex-col gap-1.5">
+                  <span
+                    className="text-[10.5px] font-extrabold uppercase tracking-[0.12em] ml-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {f.label}
+                  </span>
+                  <div className="relative">
+                    <Clock
+                      size={14}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ color: "var(--text-faint)" }}
+                    />
+                    <input
+                      type="datetime-local"
+                      required
+                      value={f.value}
+                      onChange={(e) => f.set(e.target.value)}
+                      className="w-full rounded-[14px] border pl-9 pr-3 text-[12px] font-semibold outline-none transition-colors"
+                      style={{
+                        minHeight: 48,
+                        borderColor: "var(--border-strong)",
+                        background: "var(--card)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
                 </label>
-                <div className="relative">
-                  <Clock
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="datetime-local"
-                    required
-                    value={loginDate}
-                    onChange={(e) => setLoginDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 pl-9 pr-3 py-2.5 text-[12px] outline-none focus:border-[var(--brand-primary)] transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-                  Logout Date
-                </label>
-                <div className="relative">
-                  <Clock
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                  <input
-                    type="datetime-local"
-                    required
-                    value={logoutDate}
-                    onChange={(e) => setLogoutDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-100 bg-gray-50 pl-9 pr-3 py-2.5 text-[12px] outline-none focus:border-[var(--brand-primary)] transition-all"
-                  />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* GPS Location */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          {/* GPS location */}
+          <div
+            className="rounded-[var(--r-card-lg)] border p-4"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              boxShadow: "var(--sh-card)",
+            }}
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-[14px] bg-[#FDF4E7] flex items-center justify-center flex-shrink-0">
-                <MapPin size={18} className="text-[#A0611A]" />
+              <div
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--clay-soft)" }}
+              >
+                <MapPin size={18} style={{ color: "var(--clay-ink)" }} />
               </div>
-              <div className="flex-1">
-                <p className="text-[13px] font-semibold text-gray-800">
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-extrabold text-[var(--text)]">
                   GPS Location
                 </p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
                   {gpsLocation
                     ? "Location captured"
                     : "Capture your current location"}
@@ -438,22 +498,36 @@ function GPSReportPage() {
             </div>
 
             {gpsLocation ? (
-              <div className="bg-[#EEF7F2] rounded-xl p-3 border border-green-100">
-                <p className="text-[12px] font-medium text-[#1A7A4A]">
-                  ✓ Location Captured
+              <div
+                className="rounded-[var(--r-card)] p-3"
+                style={{ background: "var(--mint-soft)" }}
+              >
+                <p
+                  className="text-[12.5px] font-extrabold flex items-center gap-1.5"
+                  style={{ color: "var(--mint-strong)" }}
+                >
+                  <Check size={14} /> Location Captured
                 </p>
-                <p className="text-[11px] text-gray-600 mt-1">
+                <p
+                  className="mint-num text-[11.5px] font-semibold mt-1"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   Lat: {gpsLocation.lat.toFixed(6)}, Lng: {gpsLocation.lng.toFixed(6)}
                 </p>
                 {gpsLocation.address && (
-                  <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">
+                  <p
+                    className="text-[11.5px] font-semibold mt-1 leading-relaxed"
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     {gpsLocation.address}
                   </p>
                 )}
                 <button
                   type="button"
                   onClick={getCurrentLocation}
-                  className="mt-2 text-[11px] font-medium text-[#1A7A4A] underline"
+                  disabled={gettingLocation}
+                  className="mt-2 min-h-[40px] text-[11.5px] font-extrabold"
+                  style={{ color: "var(--mint-strong)" }}
                 >
                   Update Location
                 </button>
@@ -463,16 +537,17 @@ function GPSReportPage() {
                 type="button"
                 onClick={getCurrentLocation}
                 disabled={gettingLocation}
-                className="w-full py-3 rounded-xl bg-[var(--brand-primary)] text-white font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-[var(--brand-primary-hover)] transition-all disabled:opacity-50"
+                className="w-full min-h-[52px] rounded-[var(--r-btn)] text-white font-extrabold text-[13.5px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                style={{ background: "var(--mint-btn)" }}
               >
                 {gettingLocation ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Getting Location...
+                    <Loader2 size={17} className="animate-spin" />
+                    Getting Location…
                   </>
                 ) : (
                   <>
-                    <MapPin size={16} />
+                    <MapPin size={17} />
                     Capture GPS Location
                   </>
                 )}
@@ -481,16 +556,26 @@ function GPSReportPage() {
           </div>
 
           {/* Remarks */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <div
+            className="rounded-[var(--r-card-lg)] border p-4"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              boxShadow: "var(--sh-card)",
+            }}
+          >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-[14px] bg-gray-50 flex items-center justify-center flex-shrink-0">
-                <FileText size={18} className="text-gray-500" />
+              <div
+                className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+                style={{ background: "var(--bg)" }}
+              >
+                <FileText size={18} style={{ color: "var(--text-faint)" }} />
               </div>
-              <div>
-                <p className="text-[13px] font-semibold text-gray-800">
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-extrabold text-[var(--text)]">
                   Remarks / Reason
                 </p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
                   Why are you submitting this offline report?
                 </p>
               </div>
@@ -499,23 +584,29 @@ function GPSReportPage() {
             <textarea
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="e.g., Site visit with poor/no internet connection. Client meeting at remote location."
+              placeholder="e.g. Site visit with poor or no internet connection. Client meeting at a remote location."
               rows={4}
               required
-              className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-[13px] outline-none focus:border-[var(--brand-primary)] transition-all resize-none"
+              className="w-full rounded-[var(--r-btn)] border px-4 py-3 text-[13.5px] font-semibold outline-none transition-colors resize-none"
+              style={{
+                borderColor: "var(--border-strong)",
+                background: "var(--card)",
+                color: "var(--text)",
+              }}
             />
           </div>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-4 rounded-2xl bg-[var(--brand-primary)] text-white font-bold text-[14px] flex items-center justify-center gap-2 hover:bg-[var(--brand-primary-hover)] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-red-100"
+            className="w-full min-h-[56px] rounded-[20px] text-white font-extrabold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+            style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
           >
             {submitting ? (
               <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Submitting...
+                <Loader2 size={19} className="animate-spin" />
+                Submitting…
               </>
             ) : (
               <>
@@ -525,8 +616,12 @@ function GPSReportPage() {
             )}
           </button>
 
-          <p className="text-[11px] text-gray-400 text-center">
-            This report will be reviewed by your administrator.
+          <p
+            className="text-[11.5px] font-semibold text-center leading-relaxed"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Your administrator reviews this report. Add a clear reason and at least one photo so it
+            can be approved quickly.
           </p>
         </form>
       </div>

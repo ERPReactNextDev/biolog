@@ -1,18 +1,20 @@
-"use client";
+﻿"use client";
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import {
-  Eye, EyeOff, ArrowRight, Shield, Fingerprint,
-  UserPlus, X, ChevronRight, CheckCircle2, Clock,
-  User, Mail, Lock, Building2, Briefcase, Hash,
+  Eye, EyeOff, ArrowRight, ArrowLeft, Shield, Fingerprint,
+  UserPlus, X, ChevronRight, CheckCircle2, Clock, Loader2,
+  User, Mail, Lock, Building2, Briefcase, Hash, Info,
 } from "lucide-react";
+import RegisterSheet from "@/components/register-sheet";
+import ForgotPasswordFlow from "@/components/forgot-password-flow";
 
-/* ─────────────────────────────────────────────
-   GOOGLE ICON (inline SVG — no extra dep)
-───────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   GOOGLE ICON (inline SVG â€” no extra dep)
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -24,9 +26,9 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    SIGNUP FORM TYPES
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 interface SignUpForm {
   Firstname: string;
   Lastname: string;
@@ -44,9 +46,9 @@ const EMPTY_SIGNUP: SignUpForm = {
   Department: "", Company: "", ReferenceID: "",
 };
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    SIGNUP DIALOG
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [form, setForm] = useState<SignUpForm>(EMPTY_SIGNUP);
   const [showPass, setShowPass] = useState(false);
@@ -89,7 +91,7 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
           Department: form.Department,
           Company: form.Company,
           ReferenceID: form.ReferenceID,
-          // Status is always "Revoked" — set by the API
+          // Status is always "Revoked" â€” set by the API
         }),
       });
       const result = await res.json();
@@ -108,7 +110,7 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const handleGoogleSignUp = async () => {
     setGoogleLoading(true);
     try {
-      // Redirect to Google OAuth — adjust provider name if using NextAuth
+      // Redirect to Google OAuth â€” adjust provider name if using NextAuth
       window.location.href = "/api/auth/signin/google?callbackUrl=/pending-approval";
     } catch {
       toast.error("Google sign-up failed.");
@@ -136,7 +138,7 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
         </button>
 
         {done ? (
-          /* ── Success State ── */
+          /* â”€â”€ Success State â”€â”€ */
           <div className="flex flex-col items-center text-center p-10 gap-6">
             <div className="w-20 h-20 rounded-[2rem] bg-amber-50 flex items-center justify-center text-amber-500 shadow-inner">
               <Clock size={40} />
@@ -147,21 +149,26 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
                 Your account has been created and is <span className="font-bold text-amber-600">pending admin approval</span>. You'll be able to login once an administrator grants you access.
               </p>
             </div>
-            <div className="w-full bg-amber-50 rounded-2xl p-4 flex items-start gap-3 text-left border border-amber-100">
-              <CheckCircle2 size={16} className="text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700 font-medium leading-relaxed">
-                Account created for <span className="font-black">{form.Email}</span>. Contact your administrator to activate your account.
+            <div
+              className="w-full rounded-[var(--r-card)] p-4 flex items-start gap-3 text-left"
+              style={{ background: "var(--hint-bg)", color: "var(--hint-text)" }}
+            >
+              <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+              <p className="text-[12.5px] font-bold leading-relaxed">
+                Account created for <span className="font-black">{form.Email}</span>. Contact your
+                administrator to activate your account.
               </p>
             </div>
             <button
               onClick={handleClose}
-              className="w-full rounded-2xl py-3.5 text-sm font-bold bg-brand-primary text-white hover:bg-brand-primary-hover transition-all active:scale-[0.98]"
+              className="w-full min-h-[52px] rounded-[var(--r-btn)] text-[14.5px] font-extrabold text-white transition-all active:scale-[0.98]"
+              style={{ background: "var(--mint-btn)" }}
             >
               Back to Login
             </button>
           </div>
         ) : (
-          /* ── Sign Up Form ── */
+          /* â”€â”€ Sign Up Form â”€â”€ */
           <>
             {/* Header */}
             <div className="px-8 pt-8 pb-0">
@@ -180,7 +187,7 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
                 className="w-full flex items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white py-3.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mb-5"
               >
                 {googleLoading ? (
-                  <span className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
+                  <Loader2 size={16} className="animate-spin" style={{ color: "var(--mint)" }} />
                 ) : (
                   <GoogleIcon size={18} />
                 )}
@@ -294,21 +301,32 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
               </div>
 
               {/* Footer */}
-              <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex gap-3 mt-2">
+              <div
+                className="px-8 py-6 flex gap-3 mt-2"
+                style={{ background: "var(--bg)", borderTop: "1px solid var(--border)" }}
+              >
                 <button
                   type="button" onClick={handleClose}
-                  className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-[0.98]"
+                  className="flex-1 min-h-[52px] rounded-[var(--r-btn)] text-[14px] font-extrabold transition-all active:scale-[0.98]"
+                  style={{
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-muted)",
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit" disabled={submitting}
-                  className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-white bg-brand-primary hover:bg-brand-primary-hover transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 min-h-[52px] rounded-[var(--r-btn)] text-[14px] font-extrabold text-white transition-all active:scale-[0.98] disabled:opacity-45 flex items-center justify-center gap-2"
+                  style={{ background: "var(--mint-btn)" }}
                 >
                   {submitting ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <>Create Account <ChevronRight size={15} /></>
+                    <>
+                      Create Account <ChevronRight size={15} />
+                    </>
                   )}
                 </button>
               </div>
@@ -320,9 +338,9 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    FIELD WRAPPER (small helper)
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function Field({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -333,20 +351,21 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
       <style jsx>{`
         :global(.field-input) {
           width: 100%;
-          border-radius: 1rem;
-          border: 1px solid #f0f0f0;
-          background: #fafafa;
+          min-height: 48px;
+          border-radius: var(--r-btn, 18px);
+          border: 1px solid var(--border-strong, #cfe3da);
+          background: var(--card, #ffffff);
           padding: 0.75rem 1rem;
           font-size: 0.8125rem;
-          color: #111;
+          font-weight: 600;
+          color: var(--text, #0f172a);
           outline: none;
-          transition: all 0.15s;
+          transition: border-color 0.15s;
         }
-        :global(.field-input::placeholder) { color: #ccc; }
+        :global(.field-input::placeholder) { color: var(--text-faint, #94a3b8); }
         :global(.field-input:focus) {
-          border-color: var(--brand-primary);
-          background: white;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);
+          border-color: var(--mint, #0d9669);
+          box-shadow: 0 0 0 3px rgba(13, 150, 105, 0.1);
         }
       `}</style>
       {children}
@@ -354,9 +373,9 @@ function Field({ icon, label, children }: { icon: React.ReactNode; label: string
   );
 }
 
-/* ─────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    LOGIN FORM  (original + signup button)
-───────────────────────────────────────────── */
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 export function LoginForm({
   className,
   ...props
@@ -370,10 +389,32 @@ export function LoginForm({
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [settings, setSettings] = useState<any>(null);
-  const [signUpOpen, setSignUpOpen] = useState(false);
+  // Sign-up is a bottom drawer; "Forgot password?" swaps the whole panel for
+  // the 4-step reset flow (both specs call for a drawer / full-screen view).
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [googleLoginLoading, setGoogleLoginLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const router = useRouter();
+
+  /* "Remember me" keeps the email address only — never the password. */
+  useEffect(() => {
+    const saved = localStorage.getItem("acculog_login_email");
+    if (saved) {
+      setEmail(saved);
+      setRememberMe(true);
+    }
+  }, []);
+
+  const toggleRemember = (next: boolean) => {
+    setRememberMe(next);
+    if (next) {
+      if (Email.trim()) localStorage.setItem("acculog_login_email", Email.trim());
+    } else {
+      localStorage.removeItem("acculog_login_email");
+    }
+  };
 
   useEffect(() => {
     const syncOnlineState = () => {
@@ -402,10 +443,10 @@ export function LoginForm({
             document.documentElement.setAttribute("data-theme", cached.themeColor);
           }
         } catch {
-          // Corrupted cache — silently ignore; default logo/styles apply via built-in fallbacks
+          // Corrupted cache â€” silently ignore; default logo/styles apply via built-in fallbacks
         }
       }
-      // If no cache found, return without error — built-in fallbacks handle rendering
+      // If no cache found, return without error â€” built-in fallbacks handle rendering
       return;
     }
 
@@ -450,10 +491,10 @@ export function LoginForm({
           isPinLogin: false,
         });
         if (offlineResult) {
-          // ── Set session start time for session timeout hook ──────────────────────
+          // â”€â”€ Set session start time for session timeout hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           localStorage.setItem("acculog_session_start", Date.now().toString());
           
-          // ── Store userId in localStorage for future visits ───────────────────────
+          // â”€â”€ Store userId in localStorage for future visits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           localStorage.setItem("userId", offlineResult.userId);
           
           // Persist offline session so protected pages stay accessible
@@ -461,7 +502,7 @@ export function LoginForm({
             const { setOfflineSession } = await import("@/lib/offline-auth");
             await setOfflineSession(offlineResult.userId);
           } catch { /* silent */ }
-          toast.success("Offline login — using cached credentials.");
+          toast.success("Offline login â€” using cached credentials.");
           setTimeout(() => {
             router.push(`/activity-planner?id=${encodeURIComponent(offlineResult.userId)}`);
           }, 600);
@@ -494,15 +535,15 @@ export function LoginForm({
         if (res.ok && result.userId) {
           console.log("[LoginForm] Login successful! userId:", result.userId);
           
-          // ── Store userId in localStorage for future visits ───────────────────────
+          // â”€â”€ Store userId in localStorage for future visits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           localStorage.setItem("userId", result.userId);
           console.log("[LoginForm] Set userId in localStorage:", result.userId);
           
-          // ── Set session start time for session timeout hook ──────────────────────
+          // â”€â”€ Set session start time for session timeout hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           localStorage.setItem("acculog_session_start", Date.now().toString());
           console.log("[LoginForm] Set acculog_session_start in localStorage");
           
-          // ── Cache credentials for offline login ──────────────────────────
+          // â”€â”€ Cache credentials for offline login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           let cached = false;
           try {
             const { cacheCredential, setOfflineSession } = await import("@/lib/offline-auth");
@@ -516,7 +557,7 @@ export function LoginForm({
             console.log("[LoginForm] Offline credentials cached successfully");
             cached = true;
           } catch (cacheErr) {
-            // Log so we can debug — but don't block login
+            // Log so we can debug â€” but don't block login
             console.warn("[offline-auth] cacheCredential failed:", cacheErr);
           }
 
@@ -533,7 +574,7 @@ export function LoginForm({
           toast.error(result.message || "Login failed!");
         }
       } catch {
-        // Network failed mid-request — try the offline cache as a fallback.
+        // Network failed mid-request â€” try the offline cache as a fallback.
         try {
           const { verifyOfflineCredential } = await import("@/lib/offline-auth");
           const offlineResult = await verifyOfflineCredential({
@@ -542,10 +583,10 @@ export function LoginForm({
             isPinLogin: false,
           });
           if (offlineResult) {
-            // ── Set session start time for session timeout hook ──────────────────────
+            // â”€â”€ Set session start time for session timeout hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             localStorage.setItem("acculog_session_start", Date.now().toString());
             
-            // ── Store userId in localStorage for future visits ───────────────────────
+            // â”€â”€ Store userId in localStorage for future visits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             localStorage.setItem("userId", offlineResult.userId);
             
             // Persist offline session so protected pages stay accessible
@@ -553,7 +594,7 @@ export function LoginForm({
               const { setOfflineSession } = await import("@/lib/offline-auth");
               await setOfflineSession(offlineResult.userId);
             } catch { /* silent */ }
-            toast.success("Offline login — using cached credentials.");
+            toast.success("Offline login â€” using cached credentials.");
             setTimeout(() => {
               router.push(`/activity-planner?id=${encodeURIComponent(offlineResult.userId)}`);
             }, 600);
@@ -598,10 +639,10 @@ export function LoginForm({
       const result = await response.json();
       console.log("Login API response:", result);
       if (response.ok && result.userId) {
-        // ── Set session start time for session timeout hook ──────────────────────
+        // â”€â”€ Set session start time for session timeout hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         localStorage.setItem("acculog_session_start", Date.now().toString());
         
-        // ── Store userId in localStorage for future visits ───────────────────────
+        // â”€â”€ Store userId in localStorage for future visits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         localStorage.setItem("userId", result.userId);
         
         // Store offline session for protected page access
@@ -624,63 +665,94 @@ export function LoginForm({
 
   return (
     <>
-      {/* ── Sign Up Dialog ── */}
-      <SignUpDialog open={signUpOpen} onClose={() => setSignUpOpen(false)} />
+      {/* Sign-up drawer — the spec asks for a bottom sheet, not a page jump. */}
+      <RegisterSheet open={registerOpen} onOpenChange={setRegisterOpen} />
 
-      <div className={cn("min-h-screen w-full flex", className)} {...props}>
+      {/* `mint-ui` is required here: app/layout.tsx puts `font-mono` on <body>,
+          so without it the whole screen renders in monospace. */}
+      <div className={cn("mint-ui mint-scope min-h-svh w-full flex", className)} {...props}>
 
-        {/* ── Left Panel — Branding ── */}
+        {/* Left Panel - Branding (soft mint, not a dark red wall) */}
         <div
           className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
-          style={{ background: "linear-gradient(145deg, var(--brand-primary) 0%, var(--brand-primary-hover) 60%, #4A0608 100%)" }}
+          style={{ background: "linear-gradient(160deg, var(--mint-gradient) 0%, var(--bg) 55%, var(--mint-soft) 100%)" }}
         >
-          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/[0.04] pointer-events-none" />
-          <div className="absolute top-1/3 -left-16 w-64 h-64 rounded-full bg-white/[0.03] pointer-events-none" />
-          <div className="absolute -bottom-24 right-16 w-96 h-96 rounded-full bg-white/[0.03] pointer-events-none" />
+          <div
+            className="absolute -top-20 -right-20 w-80 h-80 rounded-full pointer-events-none"
+            style={{ background: "rgba(13,150,105,.05)" }}
+          />
+          <div
+            className="absolute top-1/3 -left-16 w-64 h-64 rounded-full pointer-events-none"
+            style={{ background: "rgba(13,150,105,.04)" }}
+          />
+          <div
+            className="absolute -bottom-24 right-16 w-96 h-96 rounded-full pointer-events-none"
+            style={{ background: "rgba(13,150,105,.035)" }}
+          />
 
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+              <div
+                className="w-11 h-11 rounded-[15px] flex items-center justify-center overflow-hidden"
+                style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
+              >
                 {settings?.logoUrl ? (
                   <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
                 ) : (
-                  <svg width="22" height="22" viewBox="0 0 18 18" fill="none">
-                    <rect x="2" y="8" width="14" height="2" rx="1" fill="var(--brand-primary)" />
-                    <rect x="2" y="4" width="9" height="2" rx="1" fill="var(--brand-primary)" />
-                    <rect x="2" y="12" width="11" height="2" rx="1" fill="var(--brand-primary)" />
+                  <svg width="22" height="22" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <rect x="2" y="8" width="14" height="2" rx="1" fill="white" />
+                    <rect x="2" y="4" width="9" height="2" rx="1" fill="white" />
+                    <rect x="2" y="12" width="11" height="2" rx="1" fill="white" />
                   </svg>
                 )}
               </div>
-              <span className="text-white text-[16px] font-bold tracking-[0.1em]">BIOLOG</span>
+              <span className="text-[16px] font-black tracking-[0.12em] text-[var(--mint-strong)]">
+                BIOLOG
+              </span>
             </div>
           </div>
 
           <div className="relative z-10 flex-1 flex flex-col justify-center py-16">
             <div className="mb-8">
-              <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-2 mb-6">
-                <Shield size={13} className="text-white/80" />
-                <span className="text-white/80 text-[12px] font-medium tracking-wide">Secure Time Tracking</span>
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-6"
+                style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+              >
+                <Shield size={13} />
+                <span className="text-[12px] font-extrabold tracking-wide">
+                  Secure Time Tracking
+                </span>
               </div>
-              <h2 className="text-white text-[40px] font-bold leading-[1.1] mb-5">
-                Track time.<br />
-                Stay on field.<br />
-                <span className="text-white/50">Stay accountable.</span>
+              <h2 className="text-[40px] font-black leading-[1.1] mb-5 text-[var(--text)]">
+                Track time.
+                <br />
+                Stay on field.
+                <br />
+                <span style={{ color: "var(--mint)" }}>Stay accountable.</span>
               </h2>
-              <p className="text-white/55 text-[15px] leading-relaxed max-w-sm">
-                A unified platform for field attendance, site visits, and timesheet management — built for your team's daily operations.
+              <p className="text-[15px] font-semibold leading-relaxed max-w-sm text-[var(--text-muted)]">
+                A unified platform for field attendance, site visits, and timesheet management
+                &mdash; built for your team&apos;s daily operations.
               </p>
             </div>
             <div className="flex flex-col gap-3">
               {[
-                { label: "Real-time GPS tracking", sub: "Know where your team is" },
-                { label: "Client visit logs", sub: "Track every site interaction" },
-                { label: "Automated timesheets", sub: "Hours calculated automatically" },
+                { label: "Real-time GPS tracking", sub: "know where your team is" },
+                { label: "Client visit logs", sub: "track every site interaction" },
+                { label: "Automated timesheets", sub: "hours calculated automatically" },
               ].map((f) => (
                 <div key={f.label} className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white/40 flex-shrink-0" />
+                  <div
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: "var(--mint)" }}
+                  />
                   <div>
-                    <span className="text-white text-[13px] font-semibold">{f.label} </span>
-                    <span className="text-white/45 text-[13px]">— {f.sub}</span>
+                    <span className="text-[13.5px] font-extrabold text-[var(--text)]">
+                      {f.label}
+                    </span>{" "}
+                    <span className="text-[13px] font-semibold text-[var(--text-muted)]">
+                      &mdash; {f.sub}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -688,116 +760,223 @@ export function LoginForm({
           </div>
 
           <div className="relative z-10">
-            <p className="text-white/30 text-[11px] tracking-wider">
-              © {new Date().getFullYear()} BIOLOG · Time Tracker Activity
+            <p className="text-[11px] font-bold tracking-wider text-[var(--text-faint)]">
+              &copy; {new Date().getFullYear()} BIOLOG &middot; Time Tracker Activity
             </p>
           </div>
         </div>
 
-        {/* ── Right Panel — Login Form ── */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-brand-bg px-6 py-12 relative">
+        {/* Right Panel - Login Form */}
+        <div
+          className="flex-1 flex flex-col pt-6 pb-6 relative overflow-hidden"
+          style={{ background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 42%, var(--card) 100%)" }}
+        >
+          {/* Decorative mint wash, per the design */}
+          <div
+            className="absolute -top-16 -right-16 w-56 h-56 rounded-full pointer-events-none"
+            style={{ background: "rgba(13,150,105,.06)" }}
+          />
+          <div
+            className="absolute top-24 -left-20 w-48 h-48 rounded-full pointer-events-none"
+            style={{ background: "rgba(13,150,105,.045)" }}
+          />
 
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 bg-[var(--brand-primary)] rounded-xl flex items-center justify-center overflow-hidden">
+          {/* Logo is pinned to the top so it always sits inside the gradient
+              band — centring the whole column left it stranded below it. */}
+          <div className="w-full lg:max-w-sm mx-auto px-5 flex items-center gap-2.5 mb-7 relative shrink-0">
+            <div
+              className="w-11 h-11 rounded-[15px] flex items-center justify-center overflow-hidden shrink-0"
+              style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
+            >
               {settings?.logoUrl ? (
                 <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
               ) : (
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden>
                   <rect x="2" y="8" width="14" height="2" rx="1" fill="white" />
                   <rect x="2" y="4" width="9" height="2" rx="1" fill="white" />
                   <rect x="2" y="12" width="11" height="2" rx="1" fill="white" />
                 </svg>
               )}
             </div>
-            <span className="text-[var(--brand-primary)] text-[15px] font-bold tracking-[0.1em]">BIOLOG</span>
+            <span className="text-[16px] font-black tracking-[0.12em] text-[var(--mint-strong)]">
+              BIOLOG
+            </span>
           </div>
 
-          <div className="w-full max-w-sm">
-
+          {/* Content takes the remaining height and centres within it, so short
+              screens (Forgot password) don't leave a void under the gradient. */}
+          <div className="flex-1 flex flex-col justify-center relative">
+            <div className="w-full lg:max-w-sm mx-auto px-5">
+            {resetOpen ? (
+              /* The 4-step reset journey replaces the login panel entirely. */
+              <ForgotPasswordFlow
+                initialEmail={Email}
+                onExit={() => setResetOpen(false)}
+              />
+            ) : (
+              <>
             {/* Heading */}
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <h1 className="text-[28px] font-bold text-gray-900 mb-2 leading-tight">Welcome back</h1>
-                <p className="text-[14px] text-gray-400 leading-relaxed">
-                  Sign in to your account to continue tracking your field activity.
-                </p>
-              </div>
+            <div className="mb-6">
+              <h1 className="text-[26px] font-black text-[var(--text)] mb-1.5 leading-tight tracking-tight">
+                Welcome back
+              </h1>
+              <p className="text-[13.5px] font-semibold text-[var(--text-muted)] leading-relaxed">
+                Sign in to clock in, log site visits, and see your attendance.
+              </p>
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-
               {/* Email */}
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="email" className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">
+                <label
+                  htmlFor="email"
+                  className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+                >
                   Email Address
                 </label>
-                <input
-                  id="email" type="email" value={Email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@acculog.com"
-                  required autoComplete="email" disabled={loading}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-300 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
-                />
+                <div className="relative">
+                  <span
+                    className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: "var(--text-faint)" }}
+                  >
+                    <Mail size={16} />
+                  </span>
+                  <input
+                    id="email" type="email" value={Email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@biolog.ph"
+                    required autoComplete="email" disabled={loading}
+                    className="w-full min-h-[52px] rounded-[var(--r-btn)] border border-[var(--border-strong)] bg-[var(--card)] pl-11 pr-4 text-[14px] font-semibold text-[var(--text)] placeholder:text-[var(--text-faint)] outline-none transition-colors focus:border-[var(--mint)]"
+                  />
+                </div>
               </div>
 
               {/* OTP (2FA) */}
               {twoFactorRequired && (
                 <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label htmlFor="otp" className="text-[11px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-2">
+                  <label
+                    htmlFor="otp"
+                    className="text-[11px] font-extrabold uppercase tracking-[0.14em] flex items-center gap-2"
+                    style={{ color: "var(--mint-strong)" }}
+                  >
                     <Shield size={12} /> Verification Code
                   </label>
                   <input
                     id="otp" type="text" maxLength={6}
                     value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Enter 6-digit code" required disabled={loading}
-                    className="w-full rounded-2xl border-2 border-brand-primary/20 bg-white px-4 py-3.5 text-center text-[20px] font-bold tracking-[8px] text-gray-900 placeholder:text-gray-300 placeholder:tracking-normal outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 transition-all"
+                    placeholder="000000" required disabled={loading}
+                    className="mint-num w-full min-h-[56px] rounded-[var(--r-btn)] border-2 bg-[var(--card)] px-4 text-center text-[20px] font-black tracking-[8px] text-[var(--text)] placeholder:text-[var(--text-faint)] placeholder:tracking-normal outline-none transition-colors"
+                    style={{ borderColor: "rgba(13,150,105,.25)" }}
                   />
-                  <p className="text-[11px] text-gray-400 text-center">Enter 6-digit code from authenticator app</p>
+                  <p className="text-[11.5px] font-semibold text-[var(--text-muted)] text-center">
+                    Enter the 6-digit code from your authenticator app
+                  </p>
                 </div>
               )}
 
               {/* Password */}
               {!twoFactorRequired && (
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="password" className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="password"
+                      className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+                    >
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setResetOpen(true)}
+                      className="min-h-[44px] -mb-1 text-[12px] font-extrabold"
+                      style={{ color: "var(--mint-strong)" }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <div className="relative">
+                    <span
+                      className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ color: "var(--text-faint)" }}
+                    >
+                      <Lock size={16} />
+                    </span>
                     <input
                       id="password" type={showPassword ? "text" : "password"}
                       value={Password} onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password" required autoComplete="current-password" disabled={loading}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3.5 pr-12 text-[14px] text-gray-900 placeholder:text-gray-300 outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
+                      className="w-full min-h-[52px] rounded-[var(--r-btn)] border border-[var(--border-strong)] bg-[var(--card)] pl-11 pr-14 text-[14px] font-semibold text-[var(--text)] placeholder:text-[var(--text-faint)] outline-none transition-colors focus:border-[var(--mint)]"
                     />
                     <button
                       type="button" tabIndex={-1}
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 rounded-[12px] flex items-center justify-center transition-colors"
+                      style={{ color: "var(--text-faint)" }}
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
                   </div>
                 </div>
               )}
 
+              {/* Remember me */}
+              {!twoFactorRequired && (
+                <label className="flex items-center gap-2.5 -mt-1 cursor-pointer select-none">
+                  <span className="relative flex items-center justify-center shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => toggleRemember(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <span
+                      aria-hidden
+                      className="w-[22px] h-[22px] rounded-[7px] border-2 flex items-center justify-center transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
+                      style={{
+                        borderColor: rememberMe ? "var(--mint-btn)" : "var(--border-strong)",
+                        background: rememberMe ? "var(--mint-btn)" : "var(--card)",
+                      }}
+                    >
+                      {rememberMe && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M20 6 9 17l-5-5"
+                            stroke="white"
+                            strokeWidth="3.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                  </span>
+                  <span className="text-[12.5px] font-bold text-[var(--text-muted)]">
+                    Remember me on this device
+                  </span>
+                </label>
+              )}
+
               {/* Submit */}
               <button
                 type="submit" disabled={loading || biometricLoading}
-                className={[
-                  "mt-2 w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all",
-                  loading || biometricLoading
-                    ? "bg-gray-100 text-gray-300 cursor-not-allowed" :"bg-brand-primary text-white hover:bg-brand-primary-hover active:scale-[0.98] shadow-lg shadow-brand-primary/20",
-                ].join(" ")}
+                className="mint-tap mt-1 w-full min-h-[56px] rounded-[20px] text-[16px] font-extrabold flex items-center justify-center gap-2.5 transition-all disabled:opacity-45"
+                style={{
+                  background: loading || biometricLoading ? "var(--border)" : "var(--mint-btn)",
+                  color: loading || biometricLoading ? "var(--text-faint)" : "white",
+                  boxShadow: loading || biometricLoading ? "none" : "var(--sh-btn)",
+                }}
               >
                 {loading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {twoFactorRequired ? "Verifying..." : "Signing in..."}
+                    <Loader2 size={18} className="animate-spin" />
+                    {twoFactorRequired ? "Verifyingâ€¦" : "Signing inâ€¦"}
                   </>
                 ) : (
-                  <>{twoFactorRequired ? "Complete Sign In" : "Sign In"}<ArrowRight size={16} /></>
+                  <>
+                    {twoFactorRequired ? "Complete Sign In" : "Sign In"}
+                    <ArrowRight size={17} />
+                  </>
                 )}
               </button>
 
@@ -806,9 +985,9 @@ export function LoginForm({
                 <button
                   type="button"
                   onClick={() => { setTwoFactorRequired(false); setOtp(""); }}
-                  className="text-[12px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+                  className="min-h-[44px] text-[12.5px] font-extrabold text-[var(--mint-strong)]"
                 >
-                  ← Back to Password
+                  &larr; Back to Password
                 </button>
               )}
 
@@ -817,22 +996,33 @@ export function LoginForm({
                 <>
                   {!isOnline ? (
                     <div
-                      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800"
+                      className="flex items-start gap-2.5 rounded-[var(--r-card)] px-4 py-3 text-[12px] font-bold leading-relaxed"
+                      style={{ background: "var(--info-soft)", color: "var(--info)" }}
                       data-testid="offline-login-note"
                     >
-                      Offline mode: Email and password login stays available when this device has cached credentials. Network-only sign-in options are disabled.
+                      <Info size={14} className="shrink-0 mt-px" />
+                      <span>
+                        You&apos;re offline. Email and password still work if this device has cached
+                        your credentials &mdash; Google and fingerprint sign-in are unavailable.
+                      </span>
                     </div>
                   ) : null}
-                  <div className="relative my-2">
+
+                  <div className="relative my-3">
                     <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-gray-100" />
+                      <span className="w-full border-t" style={{ borderColor: "var(--border-strong)" }} />
                     </div>
-                    <div className="relative flex justify-center text-[11px] uppercase tracking-widest">
-                      <span className="bg-[#F9F6F4] px-3 text-gray-300 font-semibold">Or</span>
+                    <div className="relative flex justify-center">
+                      <span
+                        className="px-3 text-[10.5px] uppercase tracking-[0.14em] font-extrabold"
+                        style={{ background: "var(--bg)", color: "var(--text-faint)" }}
+                      >
+                        Or
+                      </span>
                     </div>
                   </div>
 
-                  {/* ── Google Login ── */}
+                  {/* Google */}
                   <button
                     type="button"
                     onClick={() => {
@@ -840,73 +1030,88 @@ export function LoginForm({
                       window.location.href = "/api/auth/google";
                     }}
                     disabled={loading || biometricLoading || googleLoginLoading || !isOnline}
-                    className={[
-                      "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
-                      loading || biometricLoading || googleLoginLoading || !isOnline
-                        ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
-                    ].join(" ")}
+                    className="mint-tap w-full min-h-[52px] rounded-[var(--r-btn)] text-[14.5px] font-extrabold flex items-center justify-center gap-2.5 transition-all border disabled:opacity-45"
+                    style={{
+                      background: "var(--card)",
+                      borderColor: "var(--border)",
+                      color: "var(--text)",
+                    }}
                   >
                     {googleLoginLoading ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
-                        Redirecting...
+                        <Loader2 size={17} className="animate-spin" style={{ color: "var(--mint)" }} />
+                        Redirecting&hellip;
                       </>
                     ) : (
-                      <><GoogleIcon size={18} />Continue with Google</>
+                      <>
+                        <GoogleIcon size={18} /> Continue with Google
+                      </>
                     )}
                   </button>
 
-                  {/* ── Biometric ── */}
+                  {/* Biometric */}
                   <button
                     type="button" onClick={handleBiometricLogin}
                     disabled={loading || biometricLoading || googleLoginLoading || !isOnline}
-                    className={[
-                      "w-full rounded-2xl py-4 text-[15px] font-semibold flex items-center justify-center gap-2 transition-all border border-gray-200",
-                      loading || biometricLoading || googleLoginLoading || !isOnline
-                        ? "bg-gray-50 text-gray-300 cursor-not-allowed" :"bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98] hover:border-gray-300",
-                    ].join(" ")}
+                    className="mint-tap w-full min-h-[52px] rounded-[var(--r-btn)] text-[14.5px] font-extrabold flex items-center justify-center gap-2.5 transition-all disabled:opacity-45"
+                    style={{
+                      background: "var(--mint-soft)",
+                      color: "var(--mint-strong)",
+                    }}
                   >
                     {biometricLoading ? (
                       <>
-                        <span className="w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
-                        Verifying...
+                        <Loader2 size={17} className="animate-spin" style={{ color: "var(--mint-strong)" }} />
+                        Verifying&hellip;
                       </>
                     ) : (
-                      <><Fingerprint size={18} className="text-brand-primary" />Login with Fingerprint</>
+                      <>
+                        <Fingerprint size={18} style={{ color: "var(--mint-strong)" }} />
+                        Login with Fingerprint
+                      </>
                     )}
                   </button>
-                  <p className="text-[11px] text-gray-400 text-center -mt-1">
-                    Fingerprint login requires internet. Use Email/Password when offline.
+                  <p className="text-[11.5px] font-semibold text-[var(--text-muted)] text-center -mt-1">
+                    Fingerprint login needs internet. Use Email/Password when offline.
                   </p>
 
-                  {/* ── SIGN UP BUTTON ── */}
+                  {/* Sign up */}
                   <div className="flex items-center justify-center gap-2 mt-2">
-                    <span className="text-[13px] text-gray-400">Don't have an account?</span>
+                    <span className="text-[13px] font-semibold text-[var(--text-muted)]">
+                      Don&apos;t have an account?
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setSignUpOpen(true)}
+                      onClick={() => setRegisterOpen(true)}
                       disabled={!isOnline}
-                      className="text-[13px] font-bold text-brand-primary hover:underline flex items-center gap-1 transition-all disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                      className="min-h-[44px] text-[13px] font-extrabold flex items-center gap-1 transition-opacity disabled:opacity-50"
+                      style={{ color: "var(--mint-strong)" }}
                     >
-                      <UserPlus size={13} /> Sign Up
+                      <UserPlus size={14} /> Create account
                     </button>
                   </div>
                 </>
               )}
             </form>
 
-            {/* Security note */}
-            <div className="mt-6 flex items-center gap-2 justify-center">
-              <Shield size={12} className="text-gray-300" />
-              <p className="text-[11px] text-gray-400 text-center">
+            {/* Security note — inline so it never drifts from the text */}
+            <div
+              className="mt-6 flex items-start gap-2 rounded-[var(--r-card)] px-3.5 py-2.5"
+              style={{ background: "var(--mint-soft)" }}
+            >
+              <Shield size={14} style={{ color: "var(--mint-strong)" }} className="shrink-0 mt-px" />
+              <p className="text-[11.5px] font-bold leading-snug" style={{ color: "var(--mint-strong)" }}>
                 Your session is secured with device authentication
               </p>
+            </div>
+              </>
+            )}
             </div>
           </div>
 
           {/* Mobile footer */}
-          <p className="lg:hidden absolute bottom-6 text-[11px] text-gray-300">
-            © {new Date().getFullYear()} Acculog Time Tracker Activity
+          <p className="lg:hidden mt-6 text-[11px] font-semibold text-[var(--text-faint)] text-center relative shrink-0">
+            &copy; {new Date().getFullYear()} Biolog Time Tracker Activity
           </p>
         </div>
       </div>

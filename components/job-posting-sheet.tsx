@@ -70,7 +70,10 @@ export const JobSheet: React.FC<JobSheetProps> = ({
         {/* MODAL HEADER */}
         <div className="p-8 border-b border-gray-100 sticky top-0 bg-white/80 backdrop-blur-md z-20 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-50 text-[#d11a2a] rounded-xl">
+            <div
+              className="p-3 rounded-xl"
+              style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+            >
               <Briefcase size={24} />
             </div>
             <h3 className="font-black uppercase italic tracking-tighter text-2xl">
@@ -210,9 +213,13 @@ export const JobSheet: React.FC<JobSheetProps> = ({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="flex items-center gap-4 group bg-white p-3 border border-gray-100 rounded-2xl hover:border-[#d11a2a]/30 transition-all shadow-sm"
+                    className="flex items-center gap-4 group bg-white p-3 border border-gray-100 rounded-2xl transition-all shadow-sm"
+                    style={{ borderColor: "var(--border)" }}
                   >
-                    <span className="text-[10px] font-black text-[#d11a2a] w-8 h-8 flex items-center justify-center bg-red-50 rounded-xl shrink-0 italic shadow-inner">
+                    <span
+                      className="text-[10px] font-black w-8 h-8 flex items-center justify-center rounded-xl shrink-0 italic"
+                      style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+                    >
                       {index + 1}
                     </span>
                     <input
@@ -224,7 +231,9 @@ export const JobSheet: React.FC<JobSheetProps> = ({
                     <button
                       type="button"
                       onClick={() => removeQualification(index)}
-                      className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 transition-all scale-90 group-hover:scale-100"
+                      className="opacity-0 group-hover:opacity-100 p-2 transition-all scale-90 group-hover:scale-100"
+                      style={{ color: "var(--text-faint)" }}
+                      aria-label={`Remove requirement ${index + 1}`}
                     >
                       <X size={16} />
                     </button>

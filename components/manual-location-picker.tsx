@@ -11,6 +11,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import { toast } from "sonner";
+import { Loader2, MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 /* ================= TYPES ================= */
@@ -111,10 +112,26 @@ function LocateMeButton({
 
   return (
     <button
+      type="button"
       onClick={handleLocate}
-      className="absolute top-2 right-2 z-[1000] bg-white border rounded-md px-3 py-1 text-xs shadow hover:bg-gray-100"
+      className="absolute top-2.5 right-2.5 z-[1000] flex items-center gap-1.5 rounded-full px-3.5 min-h-[40px] text-[12px] font-extrabold shadow-lg transition-transform active:scale-95"
+      style={{
+        background: "var(--mint-btn)",
+        color: "white",
+        boxShadow: "var(--sh-btn)",
+      }}
     >
-      {locating ? "Locating..." : "📍 Locate Me"}
+      {locating ? (
+        <>
+          <Loader2 size={13} className="animate-spin" />
+          Locating…
+        </>
+      ) : (
+        <>
+          <MapPin size={13} />
+          Locate me
+        </>
+      )}
     </button>
   );
 }
@@ -158,8 +175,11 @@ export default function ManualLocationPicker({
 
   if (!fixedCenterRef.current || !position) {
     return (
-      <div className="text-xs text-gray-500 italic">
-        Location not available yet.
+      <div
+        className="rounded-[var(--r-card)] px-4 py-3 text-[12.5px] font-bold"
+        style={{ background: "var(--clay-soft)", color: "var(--clay-ink)" }}
+      >
+        Waiting for your GPS fix — the map appears once the phone gets a location lock.
       </div>
     );
   }
@@ -167,7 +187,10 @@ export default function ManualLocationPicker({
   const center = fixedCenterRef.current;
 
   return (
-    <div className="w-full h-[260px] rounded-lg overflow-hidden border relative">
+    <div
+      className="w-full h-[260px] overflow-hidden relative"
+      style={{ borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}
+    >
       <MapContainer
         center={center}
         zoom={16}
@@ -178,17 +201,16 @@ export default function ManualLocationPicker({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* 📍 Locate Me */}
         <LocateMeButton onLocate={updateLocation} />
 
-        {/* 🔵 Allowed radius */}
+        {/* Allowed radius - mint, matching the rest of the system */}
         <Circle
           center={center}
           radius={radiusMeters}
           pathOptions={{
-            color: "blue",
-            fillColor: "#3b82f6",
-            fillOpacity: 0.15,
+            color: "#0D9669",
+            fillColor: "#0D9669",
+            fillOpacity: 0.14,
           }}
         />
 
@@ -226,8 +248,11 @@ export default function ManualLocationPicker({
         />
       </MapContainer>
 
-      <div className="text-[10px] text-gray-500 px-2 py-1 bg-gray-50 border-t">
-        You can only pin within {radiusMeters} meters from your starting
+      <div
+        className="text-[11px] font-bold px-3 py-2 border-t"
+        style={{ background: "var(--bg)", color: "var(--text-muted)", borderColor: "var(--border)" }}
+      >
+        Drag the pin to fine-tune. You can only place it within {radiusMeters} m of your detected
         location.
       </div>
     </div>

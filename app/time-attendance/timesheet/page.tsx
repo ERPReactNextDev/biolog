@@ -8,18 +8,14 @@ import FileSaver from "file-saver";
 const { saveAs } = FileSaver;
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
+import { MintDrawer } from "@/components/mint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import ProtectedPageWrapper from "@/components/protected-page-wrapper";
-import { Search, DownloadCloud, Info, Clock, AlertCircle, ArrowDownLeft, ArrowUpRight, ArrowLeft, Calendar as CalendarIcon, WifiOff } from "lucide-react";
+import { Search, DownloadCloud, Info, Clock, AlertCircle, ArrowDownLeft, ArrowUpRight, ArrowLeft, Calendar as CalendarIcon, WifiOff, Loader2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { cacheLogs, getCachedLogs } from "@/lib/offline-logs-cache";
 import { getAllPendingLogs } from "@/lib/offline-store";
@@ -75,43 +71,79 @@ function MobileTimesheetCard({
   const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 p-4 shadow-sm mb-3">
+    <div
+      className="rounded-[var(--r-card-lg)] border p-4 shadow-[var(--sh-card)] mb-3"
+      style={{ background: "var(--card)", borderColor: "var(--border)" }}
+    >
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {profilePicture ? (
-            <img src={profilePicture} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+            <img
+              src={profilePicture}
+              alt=""
+              className="w-11 h-11 rounded-full object-cover shrink-0"
+              style={{ border: "2px solid var(--card)" }}
+            />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-[12px] font-bold text-brand-primary">
+            <div
+              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-black shrink-0"
+              style={{ background: "var(--mint-btn)", color: "white" }}
+            >
               {initials}
             </div>
           )}
-          <div>
-            <p className="text-[14px] font-bold text-gray-800 capitalize">{name}</p>
-            <p className="text-[11px] text-gray-400">Total: {total.toFixed(2)} hrs</p>
+          <div className="min-w-0">
+            <p className="text-[14px] font-extrabold text-[var(--text)] capitalize truncate">
+              {name}
+            </p>
+            <p className="mint-num text-[11.5px] font-bold text-[var(--text-muted)]">
+              Total: {total.toFixed(2)} hrs
+            </p>
           </div>
         </div>
-        <button 
+        <button
           onClick={onInfoClick}
-          className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-light hover:text-brand-primary transition-colors"
+          aria-label={`View computation details for ${name}`}
+          className="w-11 h-11 rounded-[14px] flex items-center justify-center transition-colors shrink-0"
+          style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
         >
-          <Info size={16} />
+          <Info size={17} />
         </button>
       </div>
 
+      {/* Late = red, Under = clay, Over = mint — never a bare number */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-brand-light rounded-2xl px-3 py-2.5 text-center border border-red-50">
-          <p className="text-[13px] font-bold text-brand-primary">{week.late.toFixed(1)}h</p>
-          <p className="text-brand-primary/60 text-[9px] font-semibold uppercase tracking-wider mt-0.5">Late</p>
-        </div>
-        <div className="bg-[#FDF4E7] rounded-2xl px-3 py-2.5 text-center border border-amber-50">
-          <p className="text-[13px] font-bold text-[#A0611A]">{week.undertime.toFixed(1)}h</p>
-          <p className="text-[#A0611A]/60 text-[9px] font-semibold uppercase tracking-wider mt-0.5">Under</p>
-        </div>
-        <div className="bg-[#EEF7F2] rounded-2xl px-3 py-2.5 text-center border border-green-50">
-          <p className="text-[13px] font-bold text-[#1A7A4A]">{week.overtime.toFixed(1)}h</p>
-          <p className="text-[#1A7A4A]/60 text-[9px] font-semibold uppercase tracking-wider mt-0.5">Over</p>
-        </div>
+        {(
+          [
+            { v: week.late, label: "Late", fg: "var(--alert-ink)", bg: "var(--alert-soft)" },
+            { v: week.undertime, label: "Under", fg: "var(--clay-ink)", bg: "var(--clay-soft)" },
+            { v: week.overtime, label: "Over", fg: "var(--mint-strong)", bg: "var(--mint-soft)" },
+          ] as const
+        ).map((t) => (
+          <div
+            key={t.label}
+            className="rounded-[var(--r-card)] px-3 py-2.5 text-center"
+            style={{ background: t.bg }}
+          >
+            <p className="mint-num text-[14px] font-black" style={{ color: t.fg }}>
+              {t.v.toFixed(1)}h
+            </p>
+            <p
+              className="text-[9.5px] font-extrabold uppercase tracking-wider mt-0.5"
+              style={{ color: t.fg, opacity: 0.75 }}
+            >
+              {t.label}
+            </p>
+          </div>
+        ))}
       </div>
+
+      {week.late > 0 && (
+        <p className="text-[11px] font-bold mt-3 leading-relaxed" style={{ color: "var(--alert-ink)" }}>
+          {week.late.toFixed(1)}h of late time this week. Clock in before{" "}
+          {week.late > 1 ? "your shift start" : "the shift start"} to avoid deductions.
+        </p>
+      )}
     </div>
   );
 }
@@ -518,34 +550,53 @@ function TimesheetPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <div className="mint-ui mint-scope min-h-screen" style={{ background: "var(--bg)" }}>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-gray-100 flex items-center justify-between px-4 h-14 gap-3">
+      {/* ── Header — soft mint gradient, never a solid red bar ── */}
+      <header
+        className="sticky top-0 z-30 flex items-center justify-between px-4 h-16 gap-3 border-b"
+        style={{
+          background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--card) 100%)",
+          borderColor: "var(--border)",
+        }}
+      >
         <div className="flex items-center gap-3">
 
           {/* Back button */}
           <button
             onClick={handleBack}
-            className="w-8 h-8 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-brand-primary transition-all active:scale-95"
-            title="Back to Activity Planner"
+            aria-label="Back to Activity Planner"
+            className="w-11 h-11 rounded-[14px] border flex items-center justify-center transition-colors active:scale-95"
+            style={{
+              background: "var(--mint-soft)",
+              borderColor: "transparent",
+              color: "var(--mint-strong)",
+            }}
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={17} />
           </button>
 
-          <div className="h-4 w-px bg-gray-200" />
+          <div className="h-5 w-px" style={{ background: "var(--border-strong)" }} />
 
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-brand-primary uppercase tracking-wider">Timesheet</p>
+              <p
+                className="text-[11px] font-black uppercase tracking-[0.14em]"
+                style={{ color: "var(--mint-strong)" }}
+              >
+                Timesheet
+              </p>
               {!isOnline && (
-                <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 flex items-center gap-1">
+                <span
+                  className="text-[10px] font-extrabold rounded-full px-2 py-0.5 flex items-center gap-1"
+                  style={{ background: "var(--clay-soft)", color: "var(--clay-ink)" }}
+                >
                   <WifiOff size={10} />
                   Offline
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-gray-400">
+            <p className="mint-num text-[11.5px] font-bold" style={{ color: "var(--text-muted)" }}>
               {dateCreatedFilterRange?.from
                 ? `${formatShortDate(new Date(dateCreatedFilterRange.from))}${dateCreatedFilterRange.to ? ` – ${formatShortDate(new Date(dateCreatedFilterRange.to))}` : ""}`
                 : "Current Week"}
@@ -594,7 +645,8 @@ function TimesheetPage() {
 
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 bg-brand-primary text-white h-9 px-4 rounded-2xl text-[12px] font-semibold hover:bg-brand-primary-hover transition-all shadow-md shadow-brand-primary/20 active:scale-[0.97]"
+            className="flex items-center gap-2 text-white h-11 px-4 rounded-[var(--r-btn)] text-[12.5px] font-extrabold transition-all active:scale-[0.97]"
+            style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
           >
             <DownloadCloud size={14} />
             <span className="hidden sm:inline">Export</span>
@@ -607,44 +659,86 @@ function TimesheetPage() {
         {/* ── Summary Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           {[
-            { label: "Total Hours", value: summaryStats.totalHours.toFixed(1), icon: <Clock size={15} />, color: "#185FA5", bg: "#E6F1FB" },
-            { label: "Total Late", value: summaryStats.totalLate.toFixed(1) + "h", icon: <AlertCircle size={15} />, color: "var(--brand-primary)", bg: "var(--brand-light)" },
-            { label: "Undertime", value: summaryStats.totalUndertime.toFixed(1) + "h", icon: <ArrowDownLeft size={15} />, color: "#A0611A", bg: "#FDF4E7" },
-            { label: "Overtime", value: summaryStats.totalOvertime.toFixed(1) + "h", icon: <ArrowUpRight size={15} />, color: "#1A7A4A", bg: "#EEF7F2" },
+            { label: "Total Hours", value: summaryStats.totalHours.toFixed(1), icon: <Clock size={15} />, color: "var(--info)", bg: "var(--info-soft)" },
+            { label: "Total Late", value: summaryStats.totalLate.toFixed(1) + "h", icon: <AlertCircle size={15} />, color: "var(--alert-ink)", bg: "var(--alert-soft)" },
+            { label: "Undertime", value: summaryStats.totalUndertime.toFixed(1) + "h", icon: <ArrowDownLeft size={15} />, color: "var(--clay-ink)", bg: "var(--clay-soft)" },
+            { label: "Overtime", value: summaryStats.totalOvertime.toFixed(1) + "h", icon: <ArrowUpRight size={15} />, color: "var(--mint-strong)", bg: "var(--mint-soft)" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <div className="w-7 h-7 rounded-[9px] flex items-center justify-center mb-2.5 flex-shrink-0" style={{ background: s.bg, color: s.color }}>
+            <div
+              key={s.label}
+              className="rounded-[var(--r-card)] border p-4"
+              style={{ background: "var(--card)", borderColor: "var(--border)", boxShadow: "var(--sh-card)" }}
+            >
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center mb-2.5 flex-shrink-0" style={{ background: s.bg, color: s.color }}>
                 {s.icon}
               </div>
-              <p className="text-[20px] font-semibold text-gray-900 leading-tight">{s.value}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">{s.label}</p>
+              <p className="mint-num text-[21px] font-black leading-tight" style={{ color: "var(--text)" }}>
+                {s.value}
+              </p>
+              <p className="text-[11px] font-bold mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {s.label}
+              </p>
             </div>
           ))}
         </div>
 
         {/* ── Search ── */}
         <div className="mb-4 relative max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }} />
           <input
             type="text"
-            placeholder="Search by name..."
+            placeholder="Search by name…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-4 py-2.5 text-[13px] outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10 transition-all"
+            aria-label="Search agents by name"
+            className="w-full rounded-[var(--r-btn)] border pl-10 pr-4 text-[13.5px] font-semibold outline-none transition-colors"
+            style={{
+              minHeight: 48,
+              borderColor: "var(--border-strong)",
+              background: "var(--card)",
+              color: "var(--text)",
+            }}
           />
           {loading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-brand-primary rounded-full animate-spin" />
+            <Loader2
+              size={16}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin"
+              style={{ color: "var(--mint)" }}
+            />
           )}
         </div>
 
         {/* ── Mobile Card List (Visible on Mobile only) ── */}
         <div className="sm:hidden">
           {visibleRows.length === 0 ? (
-            <div className="bg-white rounded-3xl border border-gray-100 px-4 py-12 text-center shadow-sm">
-              <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
-                <Clock size={18} className="text-gray-300" />
+            <div
+              className="rounded-[var(--r-card-lg)] border px-4 py-12 text-center"
+              style={{ background: "var(--card)", borderColor: "var(--border)" }}
+            >
+              <div
+                className="w-12 h-12 rounded-[16px] flex items-center justify-center mx-auto mb-3"
+                style={{ background: "var(--mint-soft)", color: "var(--mint)" }}
+              >
+                <Clock size={22} />
               </div>
-              <p className="text-[12px] text-gray-400">No records found.</p>
+              <p className="text-[13.5px] font-extrabold" style={{ color: "var(--text)" }}>
+                No records found
+              </p>
+              <p
+                className="text-[12px] font-semibold mt-1 mb-4"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {searchQuery
+                  ? "Nobody matches that name. Try a different search."
+                  : "No attendance was logged in this date range. Pick another range to see hours."}
+              </p>
+              <button
+                onClick={() => setDateCreatedFilterRange(undefined)}
+                className="min-h-[44px] px-4 rounded-full text-[12.5px] font-extrabold text-white"
+                style={{ background: "var(--mint-btn)" }}
+              >
+                Reset date range
+              </button>
             </div>
           ) : (
             visibleRows.map(([ref, week]) => {
@@ -693,8 +787,8 @@ function TimesheetPage() {
                   ))}
                   <th className="text-right px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Total Hrs</th>
                   <th className="text-right px-4 py-3 text-[10px] font-semibold text-brand-primary uppercase tracking-wider whitespace-nowrap">Late</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#A0611A] uppercase tracking-wider whitespace-nowrap">Undertime</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-[#1A7A4A] uppercase tracking-wider whitespace-nowrap">Overtime</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--clay-ink)] uppercase tracking-wider whitespace-nowrap">Undertime</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--mint-strong)] uppercase tracking-wider whitespace-nowrap">Overtime</th>
                 </tr>
               </thead>
 
@@ -747,7 +841,7 @@ function TimesheetPage() {
                         return (
                           <td key={dateStr} className="text-center px-3 py-3 font-mono whitespace-nowrap">
                             {hrs > 0 ? (
-                              <span className="inline-flex items-center justify-center w-12 h-6 rounded-lg bg-[#E6F1FB] text-[#185FA5] text-[11px] font-semibold">
+                              <span className="inline-flex items-center justify-center w-12 h-6 rounded-lg bg-[var(--info-soft)] text-[var(--info)] text-[11px] font-semibold">
                                 {hrs.toFixed(1)}
                               </span>
                             ) : (
@@ -774,7 +868,7 @@ function TimesheetPage() {
                       {/* Undertime */}
                       <td className="text-right px-4 py-3 whitespace-nowrap">
                         {week.undertime > 0 ? (
-                          <span className="inline-flex items-center justify-center rounded-xl bg-[#FDF4E7] text-[#A0611A] px-2.5 py-0.5 text-[11px] font-semibold">
+                          <span className="inline-flex items-center justify-center rounded-xl bg-[var(--clay-soft)] text-[var(--clay-ink)] px-2.5 py-0.5 text-[11px] font-semibold">
                             {week.undertime.toFixed(2)}h
                           </span>
                         ) : <span className="text-gray-300">—</span>}
@@ -783,7 +877,7 @@ function TimesheetPage() {
                       {/* Overtime */}
                       <td className="text-right px-4 py-3 whitespace-nowrap">
                         {week.overtime > 0 ? (
-                          <span className="inline-flex items-center justify-center rounded-xl bg-[#EEF7F2] text-[#1A7A4A] px-2.5 py-0.5 text-[11px] font-semibold">
+                          <span className="inline-flex items-center justify-center rounded-xl bg-[var(--mint-soft)] text-[var(--mint-strong)] px-2.5 py-0.5 text-[11px] font-semibold">
                             {week.overtime.toFixed(2)}h
                           </span>
                         ) : <span className="text-gray-300">—</span>}
@@ -797,68 +891,131 @@ function TimesheetPage() {
         </div>
       </main>
 
-      {/* ── Computation Details Dialog ── */}
+      {/* ── Computation Breakdown — bottom drawer, not a centred dialog ── */}
       {selectedRef && details && (
-        <Dialog open onOpenChange={() => setSelectedRef(null)}>
-          <DialogContent className="p-0 rounded-[28px] max-w-sm w-full border-0 shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="bg-brand-primary px-6 pt-5 pb-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-[14px]">
-                  {details.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                </div>
-                <div>
-                  <DialogTitle className="text-white font-semibold text-[15px] leading-tight">{details.name}</DialogTitle>
-                  <p className="text-white/65 text-[11px] mt-0.5">Computation Breakdown</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Late", value: details.week.late.toFixed(2) + "h", color: "text-red-200" },
-                  { label: "Undertime", value: details.week.undertime.toFixed(2) + "h", color: "text-amber-200" },
-                  { label: "Overtime", value: details.week.overtime.toFixed(2) + "h", color: "text-green-200" },
-                ].map((s) => (
-                  <div key={s.label} className="bg-white/15 rounded-2xl px-3 py-2.5 text-center">
-                    <p className={`text-[14px] font-bold ${s.color}`}>{s.value}</p>
-                    <p className="text-white/60 text-[10px] mt-0.5">{s.label}</p>
+        <MintDrawer
+          open
+          onOpenChange={(o) => {
+            if (!o) setSelectedRef(null);
+          }}
+          onClose={() => setSelectedRef(null)}
+          title="Computation Breakdown"
+          description={details.name}
+          header={
+            <>
+              <div
+                className="px-5 pb-5"
+                style={{
+                  background:
+                    "linear-gradient(180deg, var(--mint-gradient) 0%, var(--card) 100%)",
+                }}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-[14px] shrink-0"
+                    style={{ background: "var(--mint-btn)" }}
+                  >
+                    {details.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Daily breakdown */}
-            <div className="bg-[#F9F6F4] px-5 py-4 max-h-80 overflow-y-auto">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Daily Hours</p>
-              <div className="flex flex-col gap-2">
-                {details.dayHeaders.map(({ dateStr, label }: DailyLog) => {
-                  const hrs = details.week[dateStr] ?? 0;
-                  return (
-                    <div key={dateStr} className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-4 py-3">
-                      <span className="text-[12px] text-gray-600 font-medium">{label}</span>
-                      {hrs > 0 ? (
-                        <span className="inline-flex items-center justify-center rounded-xl bg-[#E6F1FB] text-[#185FA5] px-3 py-1 text-[12px] font-bold">
-                          {hrs.toFixed(2)}h
-                        </span>
-                      ) : (
-                        <span className="text-[12px] text-gray-300 font-medium">No data</span>
-                      )}
+                  <div className="min-w-0">
+                    <h2 className="text-[17px] font-black text-[var(--text)] leading-tight truncate">
+                      {details.name}
+                    </h2>
+                    <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5">
+                      Computation Breakdown
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Late", value: details.week.late.toFixed(2) + "h", fg: "var(--alert-ink)", bg: "var(--alert-soft)" },
+                    { label: "Undertime", value: details.week.undertime.toFixed(2) + "h", fg: "var(--clay-ink)", bg: "var(--clay-soft)" },
+                    { label: "Overtime", value: details.week.overtime.toFixed(2) + "h", fg: "var(--mint-strong)", bg: "var(--mint-soft)" },
+                  ].map((s) => (
+                    <div
+                      key={s.label}
+                      className="rounded-[var(--r-card)] px-3 py-2.5 text-center"
+                      style={{ background: s.bg }}
+                    >
+                      <p className="mint-num text-[15px] font-black" style={{ color: s.fg }}>
+                        {s.value}
+                      </p>
+                      <p
+                        className="text-[10px] font-extrabold mt-0.5"
+                        style={{ color: s.fg, opacity: 0.8 }}
+                      >
+                        {s.label}
+                      </p>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Close */}
-            <div className="bg-white px-5 py-4 border-t border-gray-100">
+            </>
+          }
+          footer={
+            <div
+              className="px-5 pt-3.5 pb-4"
+              style={{
+                background: "var(--card)",
+                borderTop: "1px solid var(--border)",
+                paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
               <button
                 onClick={() => setSelectedRef(null)}
-                className="w-full rounded-2xl py-3 bg-brand-primary text-white font-semibold text-[14px] hover:bg-brand-primary-hover transition-colors active:scale-[0.98]"
+                className="w-full min-h-[52px] rounded-[var(--r-btn)] text-white font-extrabold text-[14px] transition-all active:scale-[0.98]"
+                style={{ background: "var(--mint-btn)" }}
               >
                 Close
               </button>
             </div>
-          </DialogContent>
-        </Dialog>
+          }
+        >
+          <div className="px-5 py-4" style={{ background: "var(--bg)" }}>
+            <p
+              className="text-[10px] font-extrabold uppercase tracking-[0.14em] mb-3"
+              style={{ color: "var(--text-faint)" }}
+            >
+              Daily Hours
+            </p>
+            <div className="flex flex-col gap-2">
+              {details.dayHeaders.map(({ dateStr, label }: DailyLog) => {
+                const hrs = details.week[dateStr] ?? 0;
+                return (
+                  <div
+                    key={dateStr}
+                    className="flex items-center justify-between rounded-[var(--r-card)] border px-4 py-3"
+                    style={{ background: "var(--card)", borderColor: "var(--border)" }}
+                  >
+                    <span className="text-[12.5px] font-bold" style={{ color: "var(--text)" }}>
+                      {label}
+                    </span>
+                    {hrs > 0 ? (
+                      <span
+                        className="inline-flex items-center justify-center rounded-[12px] px-3 py-1 text-[12px] font-extrabold"
+                        style={{ background: "var(--info-soft)", color: "var(--info)" }}
+                      >
+                        {hrs.toFixed(2)}h
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[12px] font-bold"
+                        style={{ color: "var(--text-faint)" }}
+                      >
+                        No data
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </MintDrawer>
       )}
     </div>
   );

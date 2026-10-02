@@ -211,7 +211,7 @@ export function ClockDrawer({
       const res = await fetch("/api/ModuleSales/Activity/AddLog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "include", cache: "no-store",
         body: JSON.stringify({ ...payload, PhotoURL: photoURL }),
       });
       if (!res.ok) {

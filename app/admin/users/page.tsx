@@ -1,760 +1,1328 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { UserProvider, useUser } from "@/contexts/UserContext";
-import { FormatProvider } from "@/contexts/FormatContext";
-import { toast } from "sonner";
+/* ============================================================================
+   USERS — System Users
+   ----------------------------------------------------------------------------
+   Layout per the approved design: breadcrumb, "System Users" header, a search
+   bar paired with a total-users card, and a grouped table
+   (USER DETAILS · ROLE & ID · DEPARTMENT · STATUS) with per-row `…` menus.
+
+   Reads /api/admin/users (already RBAC-guarded by lib/rbac.ts) and mutates via
+   the same route, plus /api/admin/reset-password for temporary credentials.
+   ========================================================================== */
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-    Search,
-    MoreHorizontal,
-    Pencil,
-    Trash2,
-    UserPlus,
-    Users as UsersIcon,
-    ShieldCheck,
-    Building2,
-    CheckCircle2,
-    XCircle,
-    Loader2,
-    ArrowLeft,
-    RefreshCcw
+  ArrowLeft,
+  Building2,
+  Check,
+  Copy,
+  KeyRound,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Users as UsersIcon,
 } from "lucide-react";
+import { toast } from "sonner";
+import { MintDrawer, MintInput, MintLabel } from "@/components/mint";
+import { Button, Card, Pill } from "@/app/activity-planner/mint/ui";
 
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbList,
-    BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { Card } from "@/components/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+/* ── Data ───────────────────────────────────────────────────────────────── */
 
-import ProtectedPageWrapper from "@/components/protected-page-wrapper";
+type UserItem = {
+  _id: string;
+  Firstname: string;
+  Lastname: string;
+  Email: string;
+  Role: string;
+  Department: string;
+  Status: string;
+  Company?: string;
+  /** Tenant FK. Null until an admin assigns the user to a company. */
+  company_id?: number | string | null;
+  ReferenceID: string;
+  LoginAttempts?: number;
+  LockUntil?: string | null;
+  Manager?: string;
+  TSM?: string;
+  ContactNumber?: string;
+  Location?: string;
+  TargetQuota?: string;
+  profilePicture?: string | null;
+  /** Per-user overrides read by lib/rbac.ts. Shape varies by row. */
+  permissions?: Record<string, unknown> | null;
+};
 
-/* ================= TYPES ================= */
+/* ── Attendance access defaults ──────────────────────────────────────────────
+   Mirrors lib/rbac.ts so the drawer shows what the agent will ACTUALLY get
+   rather than a guess:
 
-interface UserItem {
-    _id: string;
-    Firstname: string;
-    Lastname: string;
-    Email: string;
-    Role: string;
-    Department: string;
-    Status: string;
-    Company?: string;
-    ReferenceID: string;
-    createdAt?: string;
-    permissions?: {
-        canCreateAttendance: boolean;
-        canCreateSiteVisit: boolean;
-    };
+     can_create_sales_attendance explicitly set -> that decides
+     otherwise                                   -> the sales role decides
+     can_lookup_clients unset                    -> true (matches the server)
+
+   The role fallback is duplicated because this page has no session user to hand
+   to the server helper, and defaulting everything to "basic" would silently push
+   a sales agent onto the wrong screen the moment an admin opened their profile. */
+
+const SALES_ROLE_HINTS = ["territory sales associate", "tsa", "sales associate"];
+
+function isSalesRole(role?: string | null): boolean {
+  const r = (role || "").trim().replace(/\s+/g, " ").toLowerCase();
+  return SALES_ROLE_HINTS.includes(r);
 }
 
-interface UserForm {
-    Firstname: string;
-    Lastname: string;
-    Email: string;
-    Password?: string;
-    Role: string;
-    Department: string;
-    ReferenceID: string;
-    Status: string;
-    Company?: string;
-    permissions?: {
-        canCreateAttendance: boolean;
-        canCreateSiteVisit: boolean;
-    };
+function readPerm(user: UserItem | null, key: string): boolean | undefined {
+  const p = user?.permissions as Record<string, unknown> | null | undefined;
+  if (!p || typeof p !== "object") return undefined;
+  if (!Object.prototype.hasOwnProperty.call(p, key)) return undefined;
+
+  const v = p[key];
+  if (v === true || v === "true" || v === 1 || v === "1") return true;
+  if (v === false || v === "false" || v === 0 || v === "0") return false;
+  return undefined;
 }
 
-/* ================= SHARED FORM FIELDS ================= */
-
-function UserFormFields({
-    formData,
-    onInput,
-    onSelect,
-    onPermission,
-    isEdit = false,
-}: {
-    formData: UserForm;
-    onInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onSelect: (name: string, value: string) => void;
-    onPermission: (perm: string, checked: boolean) => void;
-    isEdit?: boolean;
-}) {
-    return (
-        <div className="grid gap-5">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor={`${isEdit ? "edit-" : ""}Firstname`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">First Name</Label>
-                    <Input id={`${isEdit ? "edit-" : ""}Firstname`} name="Firstname" value={formData.Firstname} onChange={onInput} required className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor={`${isEdit ? "edit-" : ""}Lastname`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Last Name</Label>
-                    <Input id={`${isEdit ? "edit-" : ""}Lastname`} name="Lastname" value={formData.Lastname} onChange={onInput} required className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                </div>
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor={`${isEdit ? "edit-" : ""}Email`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Email Address</Label>
-                <Input id={`${isEdit ? "edit-" : ""}Email`} name="Email" type="email" value={formData.Email} onChange={onInput} required className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor={`${isEdit ? "edit-" : ""}Password`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">
-                    {isEdit ? "New Password (leave blank to keep current)" : "Password"}
-                </Label>
-                <Input
-                    id={`${isEdit ? "edit-" : ""}Password`}
-                    name="Password"
-                    type="password"
-                    value={formData.Password}
-                    onChange={onInput}
-                    required={!isEdit}
-                    className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4"
-                />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor={`${isEdit ? "edit-" : ""}ReferenceID`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Reference ID</Label>
-                    <Input id={`${isEdit ? "edit-" : ""}ReferenceID`} name="ReferenceID" value={formData.ReferenceID} onChange={onInput} required className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                </div>
-                <div className="grid gap-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Role</Label>
-                    <Select onValueChange={(v) => onSelect("Role", v)} value={formData.Role}>
-                        <SelectTrigger className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 px-4">
-                            <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Manager">Manager</SelectItem>
-                            <SelectItem value="User">User</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor={`${isEdit ? "edit-" : ""}Department`} className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Department</Label>
-                    <Input id={`${isEdit ? "edit-" : ""}Department`} name="Department" value={formData.Department} onChange={onInput} required className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                </div>
-                {isEdit ? (
-                    <div className="grid gap-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Account Status</Label>
-                        <Select onValueChange={(v) => onSelect("Status", v)} value={formData.Status}>
-                            <SelectTrigger className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 px-4">
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="Active">Active</SelectItem>
-                                <SelectItem value="Resigned">Resigned</SelectItem>
-                                <SelectItem value="Terminated">Terminated</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                ) : (
-                    <div className="grid gap-2">
-                        <Label htmlFor="Company" className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Company (Optional)</Label>
-                        <Input id="Company" name="Company" value={formData.Company} onChange={onInput} className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                    </div>
-                )}
-            </div>
-
-            {isEdit && (
-                <div className="grid gap-2">
-                    <Label htmlFor="edit-Company" className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Company (Optional)</Label>
-                    <Input id="edit-Company" name="Company" value={formData.Company} onChange={onInput} className="rounded-2xl border-gray-100 h-11 bg-gray-50/50 focus:bg-white px-4" />
-                </div>
-            )}
-
-            <div className="grid gap-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Permissions</Label>
-                <div className="grid grid-cols-2 gap-3 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-                    <div className="flex items-center space-x-2">
-                        <Checkbox
-                            id={`${isEdit ? "edit-" : ""}canCreateAttendance`}
-                            checked={formData.permissions?.canCreateAttendance}
-                            onCheckedChange={(checked: boolean) => onPermission("canCreateAttendance", checked)}
-                        />
-                        <label htmlFor={`${isEdit ? "edit-" : ""}canCreateAttendance`} className="text-xs font-semibold text-gray-600 cursor-pointer leading-snug">Attendance (Time In/Out)</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Checkbox
-                            id={`${isEdit ? "edit-" : ""}canCreateSiteVisit`}
-                            checked={formData.permissions?.canCreateSiteVisit}
-                            onCheckedChange={(checked: boolean) => onPermission("canCreateSiteVisit", checked)}
-                        />
-                        <label htmlFor={`${isEdit ? "edit-" : ""}canCreateSiteVisit`} className="text-xs font-semibold text-gray-600 cursor-pointer leading-snug">Site Visit</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+function attendanceDefaults(user: UserItem | null): {
+  attendanceDrawer: "basic" | "sales";
+  canLookupClients: boolean;
+} {
+  const explicit = readPerm(user, "can_create_sales_attendance");
+  const drawer = (explicit ?? isSalesRole(user?.Role)) ? "sales" : "basic";
+  return { attendanceDrawer: drawer, canLookupClients: readPerm(user, "can_lookup_clients") ?? true };
 }
 
-/* ================= PAGE ================= */
+const ROLES = [
+  "Territory Sales Associate",
+  "Admin / IT",
+  "Manager",
+  "Default User",
+  "Super Admin",
+];
 
-export default function UserManagementPage() {
-    return (
-        <UserProvider>
-            <FormatProvider>
-                <UserManagementContent />
-            </FormatProvider>
-        </UserProvider>
-    );
+const MAX_ATTEMPTS = 5;
+
+/** Locked once attempts reach the threshold and the lock hasn't expired. */
+function isLocked(u: UserItem): boolean {
+  if ((u.LoginAttempts ?? 0) < MAX_ATTEMPTS) return false;
+  if (!u.LockUntil) return true;
+  const t = new Date(u.LockUntil).getTime();
+  return Number.isNaN(t) ? true : t > Date.now();
 }
 
-function UserManagementContent() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { userId, setUserId } = useUser();
+/** ACTIVE / REVOKED / LOCKED — the wording the design uses. */
+function statusOf(u: UserItem): { label: string; tone: "mint" | "alert" | "clay" } {
+  if (isLocked(u)) return { label: "LOCKED", tone: "alert" };
+  const s = (u.Status || "").trim().toLowerCase();
+  if (s !== "active") return { label: "REVOKED", tone: "clay" };
+  return { label: "ACTIVE", tone: "mint" };
+}
 
-    const [users, setUsers] = useState<UserItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [verifying, setVerifying] = useState(true);
-    const [adminDetails, setAdminDetails] = useState<{ Firstname: string; Lastname: string } | null>(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
-    const [submitting, setSubmitting] = useState(false);
+const initials = (u: UserItem) =>
+  `${u.Firstname?.[0] || ""}${u.Lastname?.[0] || ""}`.toUpperCase() || "?";
 
-    const defaultForm: UserForm = {
-        Firstname: "", Lastname: "", Email: "", Password: "",
-        Role: "User", Department: "", ReferenceID: "", Status: "Active", Company: "",
-        permissions: { canCreateAttendance: true, canCreateSiteVisit: true },
-    };
+/** Role label, collapsed to the short form the design shows. */
+function roleLabel(u: UserItem): string {
+  const r = (u.Role || "").trim();
+  if (!r) return "User";
+  if (/super\s*admin/i.test(r)) return "Super Admin";
+  if (/territory sales/i.test(r)) return "Territory Sales Associate";
+  if (/^admin|administrator|\bit\b/i.test(r)) return "Admin / IT";
+  if (/manager/i.test(r)) return "Manager";
+  return "User";
+}
 
-    const [formData, setFormData] = useState<UserForm>(defaultForm);
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "tsa", label: "Territory Sales Assoc." },
+  { key: "admin", label: "Admin / IT" },
+  { key: "manager", label: "Manager" },
+  { key: "default", label: "Default User" },
+  { key: "locked", label: "Locked Out" },
+] as const;
 
-    const queryUserId = searchParams?.get("id") ?? "";
+/* ── Page ───────────────────────────────────────────────────────────────── */
 
-    useEffect(() => {
-        if (queryUserId && queryUserId !== userId) setUserId(queryUserId);
-    }, [queryUserId, userId, setUserId]);
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<string>("all");
 
-    /* Verify admin access */
-    useEffect(() => {
-        if (!queryUserId) return;
-        (async () => {
-            try {
-                setVerifying(true);
-                const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`);
-                if (!res.ok) { router.push("/Login"); return; }
-                const data = await res.json();
-                if (data.Role !== "Admin" && data.Role !== "SuperAdmin" && data.Department !== "IT") {
-                    toast.error("Unauthorized access");
-                    router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
-                    return;
-                }
-                setAdminDetails({ Firstname: data.Firstname, Lastname: data.Lastname });
-                setVerifying(false);
-            } catch { router.push("/Login"); }
-        })();
-    }, [queryUserId, router]);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [editing, setEditing] = useState<UserItem | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [resetFor, setResetFor] = useState<UserItem | null>(null);
+  const live = useRef(true);
 
-    /* Fetch users */
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch("/api/admin/users");
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-            setUsers(Array.isArray(data) ? data : []);
-        } catch {
-            toast.error("Failed to load users");
-        } finally {
-            setLoading(false);
-        }
-    };
+  /* Row menu placement.
+     The users table sits inside an `overflow-x-auto` wrapper so it can scroll
+     horizontally on a narrow screen. Per CSS, setting one axis to a scroll
+     container makes the other axis `auto` too — so an absolutely-positioned
+     dropdown inside the table is CLIPPED by that wrapper, and it also scrolls
+     away with the rows. That is why the menu used to disappear.
 
-    useEffect(() => { fetchUsers(); }, []);
+     Fixed on <body> with coordinates measured from the trigger: it escapes the
+     scroll container entirely and can be placed above the button when the row
+     is near the bottom of the viewport. */
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
-    const filteredUsers = useMemo(() => {
-        const q = searchQuery.toLowerCase();
-        return users.filter((u) =>
-            [u.Firstname, u.Lastname, u.Email, u.ReferenceID, u.Department]
-                .some((v) => (v || "").toLowerCase().includes(q))
-        );
-    }, [users, searchQuery]);
+  const placeMenu = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
 
-    /* Form handlers */
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const menuH = 96; // two MenuItems
+    const width = 208; // w-52
 
-    const handleSelectChange = (name: string, value: string) => {
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
-
-    const handlePermissionChange = (perm: string, checked: boolean) => {
-        setFormData((prev) => ({
-            ...prev,
-            permissions: { ...prev.permissions!, [perm]: checked },
-        }));
-    };
-
-    const resetForm = () => {
-        setFormData(defaultForm);
-        setSelectedUser(null);
-    };
-
-    const adminName = adminDetails ? `${adminDetails.Firstname} ${adminDetails.Lastname}` : "Admin";
-
-    const handleAddUser = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            setSubmitting(true);
-            const res = await fetch("/api/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...formData, adminId: userId, adminName }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || "Failed to create user");
-            }
-            toast.success("User created successfully");
-            setIsAddDialogOpen(false);
-            resetForm();
-            fetchUsers();
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleEditUser = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedUser) return;
-        try {
-            setSubmitting(true);
-            const { Password, ...updateData } = formData;
-            const body: any = { userId: selectedUser._id, ...updateData, adminId: userId, adminName };
-            if (Password) body.Password = Password;
-            const res = await fetch("/api/admin/users", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || "Failed to update user");
-            }
-            toast.success("User updated successfully");
-            setIsEditDialogOpen(false);
-            resetForm();
-            fetchUsers();
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDeleteUser = async () => {
-        if (!selectedUser) return;
-        try {
-            setSubmitting(true);
-            const res = await fetch("/api/admin/users", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: selectedUser._id, adminId: userId, adminName }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || "Failed to delete user");
-            }
-            toast.success("User deleted successfully");
-            setIsDeleteDialogOpen(false);
-            resetForm();
-            fetchUsers();
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const openEditDialog = (user: UserItem) => {
-        setSelectedUser(user);
-        setFormData({
-            Firstname: user.Firstname, Lastname: user.Lastname, Email: user.Email,
-            Password: "", Role: user.Role, Department: user.Department,
-            ReferenceID: user.ReferenceID, Status: user.Status, Company: user.Company || "",
-            permissions: user.permissions || { canCreateAttendance: true, canCreateSiteVisit: true },
-        });
-        setIsEditDialogOpen(true);
-    };
-
-    const handleToggleAccess = async (user: UserItem) => {
-        const newStatus = user.Status === "Active" ? "Revoked" : "Active";
-        try {
-            setSubmitting(true);
-            const res = await fetch("/api/admin/users", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: user._id, Status: newStatus, adminId: userId, adminName }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error);
-            }
-            toast.success(`Access ${newStatus === "Active" ? "granted" : "revoked"} for ${user.Firstname}`);
-            fetchUsers();
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    if (verifying) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-[#F9F6F4]">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-[#CC1318]" />
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Verifying access...</p>
-                </div>
-            </div>
-        );
+    let left = r.right - width;
+    if (left < margin) left = margin;
+    if (left + width > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - margin - width);
     }
 
-    /* ── Shared dialog content class: scrollable on mobile ── */
-    const dialogContentClass =
-        "sm:max-w-[600px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden " +
-        /* Mobile: limit height + allow scrolling without zooming viewport */
-        "max-h-[92dvh] flex flex-col";
+    // Prefer below; flip above when the row sits near the bottom edge.
+    let top = r.bottom + gap;
+    if (top + menuH > window.innerHeight - margin) {
+      const above = r.top - gap - menuH;
+      top = above > margin ? above : Math.max(margin, r.bottom + gap);
+    }
 
-    return (
-        <ProtectedPageWrapper>
-            <div className="flex min-h-screen flex-col bg-[#F9F6F4]">
-                {/* Header */}
-                <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6 shadow-sm">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`)}
-                        className="h-9 w-9 rounded-xl border border-gray-100 text-gray-500 hover:bg-gray-50 hover:text-[#CC1318] transition-all"
+    setMenuPos({ left: Math.round(left), top: Math.round(top) });
+  }, []);
+
+  useEffect(() => {
+    if (!menuFor) {
+      setMenuPos(null);
+      return;
+    }
+    placeMenu();
+    const onScrollOrResize = () => placeMenu();
+    window.addEventListener("resize", onScrollOrResize);
+    // The table scrolls horizontally; the page scrolls vertically.
+    window.addEventListener("scroll", onScrollOrResize, true);
+    return () => {
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+    };
+  }, [menuFor, placeMenu]);
+
+  // Click-away. The menu is portaled, so test both nodes or every click would
+  // read as "outside" and close it before the item registers.
+  useEffect(() => {
+    if (!menuFor) return;
+
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
+      setMenuFor(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuFor(null);
+    };
+
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuFor]);
+
+  const load = useCallback(async (isRefresh = false) => {
+    isRefresh ? setRefreshing(true) : setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", { credentials: "include", cache: "no-store" });
+      if (res.status === 401) return setError("Your session expired. Sign in again.");
+      if (res.status === 403) return setError("You do not have permission to manage users.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(data?.message || "Could not load users.");
+      if (!live.current) return;
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      if (live.current) setError("Network problem. Check your connection.");
+    } finally {
+      if (live.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    live.current = true;
+    load();
+    return () => {
+      live.current = false;
+    };
+  }, [load]);
+
+  /* Close the row menu on an outside click. */
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = () => setMenuFor(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menuFor]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return users.filter((u) => {
+      if (needle) {
+        const hay = `${u.Firstname} ${u.Lastname} ${u.Email} ${u.ReferenceID} ${u.Department} ${u.Company || ""}`;
+        if (!hay.toLowerCase().includes(needle)) return false;
+      }
+      if (filter === "all") return true;
+      if (filter === "locked") return isLocked(u);
+      if (filter === "tsa") return /territory sales/i.test(u.Role || "");
+      if (filter === "admin") return /admin|\bit\b/i.test(u.Role || "") && !/manager/i.test(u.Role || "");
+      if (filter === "manager") return /manager/i.test(u.Role || "");
+      if (filter === "default") return !u.Role || /default|user/i.test(u.Role || "");
+      return true;
+    });
+  }, [users, q, filter]);
+
+  const lockedCount = users.filter(isLocked).length;
+
+  return (
+    <div>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 mb-5">
+        <span
+          className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+          style={{ background: "var(--bg)", color: "var(--text-faint)" }}
+        >
+          Admin
+        </span>
+        <span className="text-[12.5px] font-extrabold" style={{ color: "var(--mint-strong)" }}>
+          User Management
+        </span>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
+        <div>
+          <h1 className="text-[26px] font-black text-[var(--text)] leading-tight tracking-tight">
+            System Users
+          </h1>
+          <p className="text-[13px] font-semibold text-[var(--text-muted)] mt-1">
+            Manage user accounts, roles, and system permissions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => load(true)}
+            aria-label="Refresh users"
+            className="w-11 h-11 rounded-[13px] border flex items-center justify-center transition-colors active:scale-95"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+            }}
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+          </button>
+          <Button
+            size="lg"
+            icon={<Plus size={17} />}
+            onClick={() => setCreating(true)}
+          >
+            Add New User
+          </Button>
+        </div>
+      </div>
+
+      {/* Search + total */}
+      <div className="flex items-stretch gap-3 flex-wrap mb-5">
+        <label
+          className="flex items-center gap-2.5 h-[60px] px-4 rounded-[var(--r-card-lg)] border bg-[var(--card)] flex-1 min-w-[260px]"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <Search size={17} style={{ color: "var(--text-faint)" }} className="shrink-0" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, email, ID, or department…"
+            className="flex-1 min-w-0 bg-transparent outline-none text-[13.5px] font-semibold"
+            style={{ color: "var(--text)" }}
+          />
+        </label>
+
+        <div
+          className="h-[60px] px-5 rounded-[var(--r-card-lg)] border flex items-center gap-3 bg-[var(--card)]"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div
+            className="w-10 h-10 rounded-[13px] flex items-center justify-center"
+            style={{ background: "var(--clay-soft)", color: "var(--clay-ink)" }}
+          >
+            <UsersIcon size={18} />
+          </div>
+          <div>
+            <p className="mint-num text-[20px] font-black leading-none text-[var(--text)]">
+              {users.length}
+            </p>
+            <p className="text-[9.5px] font-black uppercase tracking-[0.12em] text-[var(--text-muted)] mt-0.5">
+              System Users
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          const n =
+            f.key === "all"
+              ? users.length
+              : f.key === "locked"
+                ? lockedCount
+                : users.filter((u) => {
+                    if (f.key === "tsa") return /territory sales/i.test(u.Role || "");
+                    if (f.key === "admin") return /admin|\bit\b/i.test(u.Role || "") && !/manager/i.test(u.Role || "");
+                    if (f.key === "manager") return /manager/i.test(u.Role || "");
+                    return !u.Role || /default|user/i.test(u.Role || "");
+                  }).length;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className="min-h-[40px] px-3.5 rounded-full text-[11.5px] font-extrabold border transition-all active:scale-95 flex items-center gap-1.5"
+              style={{
+                background: active ? "var(--mint-btn)" : "var(--card)",
+                color: active ? "#fff" : "var(--text-muted)",
+                borderColor: active ? "transparent" : "var(--border)",
+              }}
+            >
+              {f.label}
+              <span
+                className="min-w-[18px] h-[16px] px-1 rounded-full flex items-center justify-center text-[10px] font-black"
+                style={{
+                  background: active ? "rgba(255,255,255,0.25)" : "var(--bg)",
+                  color: active ? "#fff" : "var(--text-muted)",
+                }}
+              >
+                {n}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <Card className="p-10 text-center">
+          <RefreshCw size={22} className="animate-spin mx-auto" style={{ color: "var(--mint)" }} />
+          <p className="text-[12.5px] font-bold text-[var(--text-muted)] mt-2">Loading users…</p>
+        </Card>
+      ) : error ? (
+        <Card className="p-8 text-center">
+          <p className="text-[14px] font-black text-[var(--text)]">Could not load users</p>
+          <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mt-1">{error}</p>
+          <button
+            type="button"
+            onClick={() => load()}
+            className="mt-4 min-h-[44px] px-5 rounded-[var(--r-btn)] text-[12.5px] font-extrabold"
+            style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+          >
+            Try again
+          </button>
+        </Card>
+      ) : (
+        <Card className="overflow-visible">
+          {/* Grouped header */}
+          <div
+            className="grid items-center gap-4 px-5 py-3 border-b"
+            style={{ gridTemplateColumns: "minmax(200px,1.4fr) minmax(180px,1fr) minmax(160px,1fr) 120px 44px", borderColor: "var(--border)" }}
+          >
+            {["User Details", "Role & ID", "Department", "Status"].map((h) => (
+              <span
+                key={h}
+                className="text-[9.5px] font-black uppercase tracking-[0.14em]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {h}
+              </span>
+            ))}
+            <span />
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="min-w-[820px]">
+              {filtered.length === 0 ? (
+                <p className="text-center text-[12.5px] font-semibold text-[var(--text-muted)] py-12">
+                  No users match this search.
+                </p>
+              ) : (
+                filtered.map((u) => {
+                  const st = statusOf(u);
+                  return (
+                    <div
+                      key={u._id}
+                      className="grid items-center gap-4 px-5 py-3 border-b transition-colors"
+                      style={{
+                        gridTemplateColumns:
+                          "minmax(200px,1.4fr) minmax(180px,1fr) minmax(160px,1fr) 120px 44px",
+                        borderColor: "var(--border)",
+                      }}
                     >
-                        <ArrowLeft size={18} />
-                    </Button>
-                    <Separator orientation="vertical" className="h-4" />
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="text-gray-400 font-medium">Admin</BreadcrumbPage>
-                            </BreadcrumbItem>
-                            <Separator orientation="vertical" className="mx-2 h-4" />
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="font-bold text-[#CC1318]">User Management</BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </header>
-
-                <main className="flex-1 overflow-auto p-4 md:p-8 lg:p-12">
-                    <div className="mx-auto max-w-7xl flex flex-col gap-8">
-                        {/* Header Actions */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight text-gray-900">System Users</h1>
-                                <p className="text-sm text-gray-500 mt-1">Manage user accounts, roles, and system permissions.</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={fetchUsers}
-                                    disabled={loading}
-                                    className="h-12 w-12 rounded-2xl border-gray-100 bg-white text-gray-400 hover:text-[#CC1318] transition-all"
-                                >
-                                    <RefreshCcw size={20} className={loading ? "animate-spin" : ""} />
-                                </Button>
-
-                                <Dialog open={isAddDialogOpen} onOpenChange={(o) => { setIsAddDialogOpen(o); if (!o) resetForm(); }}>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-[#CC1318] hover:bg-[#A8100F] text-white gap-2 rounded-2xl h-12 px-8 shadow-lg shadow-red-200 font-bold">
-                                            <UserPlus size={20} />
-                                            Add New User
-                                        </Button>
-                                    </DialogTrigger>
-                                    {/* KEY FIX: flex flex-col + overflow-y-auto on form keeps dialog scrollable without viewport zoom */}
-                                    <DialogContent className={dialogContentClass}>
-                                        <form onSubmit={handleAddUser} className="flex flex-col flex-1 min-h-0">
-                                            <div className="p-6 pb-0 flex-shrink-0">
-                                                <DialogHeader>
-                                                    <DialogTitle className="text-xl font-bold text-gray-900">Create New User</DialogTitle>
-                                                    <DialogDescription className="text-gray-500 text-sm">
-                                                        Enter the user's information below to register them in the system.
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                            </div>
-                                            {/* Scrollable body */}
-                                            <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-                                                <UserFormFields
-                                                    formData={formData}
-                                                    onInput={handleInputChange}
-                                                    onSelect={handleSelectChange}
-                                                    onPermission={handlePermissionChange}
-                                                />
-                                            </div>
-                                            {/* Sticky footer */}
-                                            <div className="flex-shrink-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
-                                                <Button type="button" variant="ghost" onClick={() => setIsAddDialogOpen(false)} className="rounded-xl h-11 px-6 font-semibold">Cancel</Button>
-                                                <Button type="submit" disabled={submitting} className="bg-[#CC1318] hover:bg-[#A8100F] text-white rounded-xl h-11 px-8 font-bold min-w-[130px] shadow-lg shadow-red-100">
-                                                    {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save User"}
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
+                      {/* User */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {u.profilePicture ? (
+                          <img
+                            src={u.profilePicture}
+                            alt=""
+                            className="w-10 h-10 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-black shrink-0"
+                            style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+                          >
+                            {initials(u)}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-extrabold text-[var(--text)] truncate">
+                            {`${u.Firstname || ""} ${u.Lastname || ""}`.trim() || "—"}
+                          </p>
+                          <p className="text-[11px] font-semibold text-[var(--text-muted)] truncate">
+                            {u.Email || "—"}
+                          </p>
                         </div>
+                      </div>
 
-                        {/* Search + stat */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <Card className="md:col-span-3 rounded-[2rem] border-none shadow-sm overflow-hidden bg-white">
-                                <div className="p-2 flex items-center">
-                                    <div className="pl-5 text-gray-400"><Search size={22} /></div>
-                                    <Input
-                                        placeholder="Search by name, email, ID, or department..."
-                                        className="border-none focus-visible:ring-0 text-base h-14 rounded-none bg-transparent"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                            </Card>
-                            <Card className="rounded-[2rem] border-none shadow-sm bg-white p-6 flex items-center justify-center gap-5">
-                                <div className="w-14 h-14 rounded-2xl bg-[#FEF0F0] flex items-center justify-center text-[#CC1318]">
-                                    <UsersIcon size={28} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-3xl font-black text-gray-900">{users.length}</span>
-                                    <span className="text-[11px] uppercase tracking-[0.15em] font-black text-gray-400">System Users</span>
-                                </div>
-                            </Card>
-                        </div>
+                      {/* Role & ID */}
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-[var(--text)] truncate">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{
+                              background: isAdminishRole(u.Role)
+                                ? "var(--info)"
+                                : "var(--mint)",
+                            }}
+                          />
+                          {roleLabel(u)}
+                        </p>
+                        <p className="mint-num text-[11px] font-semibold text-[var(--text-faint)] truncate">
+                          ID: {u.ReferenceID || "—"}
+                        </p>
+                      </div>
 
-                        {/* Table */}
-                        <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                            <Table>
-                                <TableHeader className="bg-gray-50/50">
-                                    <TableRow className="border-gray-100 hover:bg-transparent">
-                                        <TableHead className="w-[300px] font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6 pl-10">User Details</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Role & ID</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Department</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Status</TableHead>
-                                        <TableHead className="w-[100px] text-right pr-10" />
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-80 text-center">
-                                                <div className="flex flex-col items-center justify-center gap-4">
-                                                    <div className="w-12 h-12 border-4 border-gray-100 border-t-[#CC1318] rounded-full animate-spin" />
-                                                    <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">Fetching users...</p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : filteredUsers.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-80 text-center">
-                                                <div className="flex flex-col items-center justify-center gap-4">
-                                                    <div className="w-20 h-20 rounded-[2.5rem] bg-gray-50 flex items-center justify-center text-gray-200">
-                                                        <Search size={40} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-lg font-bold text-gray-400">No results found</p>
-                                                        <p className="text-xs text-gray-400 mt-1">No users matching "{searchQuery}"</p>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredUsers.map((user) => (
-                                            <TableRow key={user._id} className="border-gray-50 hover:bg-gray-50/30 transition-all group">
-                                                <TableCell className="pl-10 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500 font-black uppercase text-lg shadow-inner group-hover:bg-white group-hover:shadow-md transition-all">
-                                                            {user.Firstname[0]}{user.Lastname[0]}
-                                                        </div>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <span className="font-bold text-gray-900 group-hover:text-[#CC1318] transition-colors truncate">{user.Firstname} {user.Lastname}</span>
-                                                            <span className="text-[11px] text-gray-400 font-medium truncate">{user.Email}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col gap-1.5">
-                                                        <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#CC1318]" />
-                                                            {user.Role}
-                                                        </div>
-                                                        <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider ml-3.5">ID: {user.ReferenceID}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                                                            <Building2 size={14} className="text-gray-300" />
-                                                            {user.Department}
-                                                        </div>
-                                                        {user.Company && (
-                                                            <span className="text-[10px] text-gray-400 uppercase tracking-tight ml-[22px] italic">{user.Company}</span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        className={`rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest ${user.Status === "Active"
-                                                            ? "bg-green-50 text-green-600 hover:bg-green-100 border-green-100"
-                                                            : "bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
-                                                        }`}
-                                                        variant="outline"
-                                                    >
-                                                        {user.Status === "Active"
-                                                            ? <CheckCircle2 size={10} className="mr-1.5" />
-                                                            : <XCircle size={10} className="mr-1.5" />}
-                                                        {user.Status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="pr-10 text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" className="h-10 w-10 p-0 rounded-xl group-hover:bg-white group-hover:shadow-md transition-all">
-                                                                <MoreHorizontal className="h-5 w-5 text-gray-400" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="rounded-[1.5rem] w-[200px] p-2 shadow-2xl border-none">
-                                                            <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-black px-4 py-3">Quick Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleToggleAccess(user)}
-                                                                className={`gap-3 px-4 py-3 cursor-pointer rounded-xl font-bold text-sm transition-colors ${user.Status === "Active" ? "text-orange-600 focus:bg-orange-50" : "text-green-600 focus:bg-green-50"}`}
-                                                            >
-                                                                <ShieldCheck size={16} />
-                                                                {user.Status === "Active" ? "Revoke System Access" : "Grant System Access"}
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator className="my-1 bg-gray-50" />
-                                                            <DropdownMenuItem onClick={() => openEditDialog(user)} className="gap-3 px-4 py-3 cursor-pointer rounded-xl font-bold text-sm focus:bg-[#FEF0F0] focus:text-[#CC1318] transition-colors">
-                                                                <Pencil size={16} />
-                                                                Modify User & Permissions
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator className="my-1 bg-gray-50" />
-                                                            <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsDeleteDialogOpen(true); }} className="gap-3 px-4 py-3 cursor-pointer rounded-xl font-bold text-sm text-red-600 focus:bg-red-50 focus:text-red-700 transition-colors">
-                                                                <Trash2 size={16} />
-                                                                Remove User
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </Card>
+                      {/* Department */}
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-[var(--text)] truncate">
+                          <Building2
+                            size={12}
+                            style={{ color: "var(--text-faint)" }}
+                            className="shrink-0"
+                          />
+                          {u.Department || "—"}
+                        </p>
+                        {u.Company && (
+                          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[var(--text-faint)] truncate">
+                            {u.Company}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <Pill tone={st.tone}>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
+                            {st.label}
+                          </span>
+                        </Pill>
+                      </div>
+
+                      {/* Row menu */}
+                      <div className="relative flex justify-end">
+                        <button
+                          ref={menuFor === u._id ? triggerRef : undefined}
+                          type="button"
+                          aria-label={`Actions for ${u.Firstname}`}
+                          aria-haspopup="menu"
+                          aria-expanded={menuFor === u._id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuFor(menuFor === u._id ? null : u._id);
+                          }}
+                          className="w-11 h-11 rounded-[12px] flex items-center justify-center transition-colors"
+                          style={{ color: "var(--text-faint)" }}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+
+                        {menuFor === u._id && menuPos && createPortal(
+                          <div
+                            ref={menuRef}
+                            className="fixed z-[80] w-52 rounded-[14px] border overflow-hidden"
+                            style={{
+                              left: menuPos.left,
+                              top: menuPos.top,
+                              background: "var(--card)",
+                              borderColor: "var(--border)",
+                              boxShadow: "var(--sh-card-lg)",
+                            }}
+                            role="menu"
+                            aria-label={`Actions for ${u.Firstname}`}
+                          >
+                            <MenuItem
+                              icon={<Pencil size={14} />}
+                              label="Edit user"
+                              onClick={() => {
+                                setMenuFor(null);
+                                setEditing(u);
+                              }}
+                            />
+                            <MenuItem
+                              icon={<KeyRound size={14} />}
+                              label="Reset password"
+                              onClick={() => {
+                                setMenuFor(null);
+                                setResetFor(u);
+                              }}
+                            />
+                          </div>,
+                          document.body
+                        )}
+                      </div>
                     </div>
-                </main>
-
-                {/* Edit Dialog */}
-                <Dialog open={isEditDialogOpen} onOpenChange={(o) => { setIsEditDialogOpen(o); if (!o) resetForm(); }}>
-                    <DialogContent className={dialogContentClass}>
-                        <form onSubmit={handleEditUser} className="flex flex-col flex-1 min-h-0">
-                            <div className="p-6 pb-0 flex-shrink-0">
-                                <DialogHeader>
-                                    <DialogTitle className="text-xl font-bold text-gray-900">Modify User Profile</DialogTitle>
-                                    <DialogDescription className="text-gray-500 text-sm">
-                                        Update information for {selectedUser?.Firstname} {selectedUser?.Lastname}.
-                                    </DialogDescription>
-                                </DialogHeader>
-                            </div>
-                            <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
-                                <UserFormFields
-                                    formData={formData}
-                                    onInput={handleInputChange}
-                                    onSelect={handleSelectChange}
-                                    onPermission={handlePermissionChange}
-                                    isEdit
-                                />
-                            </div>
-                            <div className="flex-shrink-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
-                                <Button type="button" variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="rounded-xl h-11 px-6 font-semibold">Cancel</Button>
-                                <Button type="submit" disabled={submitting} className="bg-[#CC1318] hover:bg-[#A8100F] text-white rounded-xl h-11 px-8 font-bold min-w-[130px] shadow-lg shadow-red-100">
-                                    {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Update User"}
-                                </Button>
-                            </div>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Delete Dialog */}
-                <Dialog open={isDeleteDialogOpen} onOpenChange={(o) => { setIsDeleteDialogOpen(o); if (!o) setSelectedUser(null); }}>
-                    <DialogContent className="sm:max-w-[420px] rounded-[2.5rem] border-none shadow-2xl p-8">
-                        <div className="flex flex-col items-center text-center gap-6">
-                            <div className="w-20 h-20 rounded-[2.5rem] bg-red-50 flex items-center justify-center text-red-600">
-                                <Trash2 size={40} />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <DialogHeader>
-                                    <DialogTitle className="text-xl font-bold text-gray-900 text-center">Confirm Deletion</DialogTitle>
-                                    <DialogDescription className="text-gray-500 text-center">
-                                        Are you sure you want to remove <span className="font-black text-gray-900">{selectedUser?.Firstname} {selectedUser?.Lastname}</span>? This action is permanent.
-                                    </DialogDescription>
-                                </DialogHeader>
-                            </div>
-                            <div className="flex w-full gap-3 pt-2">
-                                <Button type="button" variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="flex-1 rounded-2xl h-12 font-bold">Cancel</Button>
-                                <Button type="button" onClick={handleDeleteUser} disabled={submitting} className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-2xl h-12 font-bold shadow-lg shadow-red-100">
-                                    {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Delete Account"}
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                  );
+                })
+              )}
             </div>
-        </ProtectedPageWrapper>
-    );
+          </div>
+        </Card>
+      )}
+
+      <p className="text-[11.5px] font-semibold text-[var(--text-faint)] mt-3">
+        {filtered.length} of {users.length} user{users.length === 1 ? "" : "s"}
+        {lockedCount > 0 ? ` · ${lockedCount} locked out` : ""}
+      </p>
+
+      {/* Drawers */}
+      <UserFormDrawer
+        open={creating || !!editing}
+        user={editing}
+        onClose={() => {
+          setCreating(false);
+          setEditing(null);
+        }}
+        onSaved={() => {
+          setCreating(false);
+          setEditing(null);
+          load(true);
+        }}
+      />
+
+      <ResetPasswordDrawer
+        user={resetFor}
+        onClose={() => setResetFor(null)}
+        onDone={() => {
+          setResetFor(null);
+          load(true);
+        }}
+      />
+    </div>
+  );
+}
+
+const isAdminishRole = (r?: string) => /super\s*admin|^admin|\bit\b/i.test(r || "");
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full min-h-[44px] px-4 flex items-center gap-2.5 text-[12.5px] font-bold text-left transition-colors"
+      style={{ color: "var(--text)" }}
+    >
+      <span style={{ color: "var(--text-faint)" }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/* ── Add / Edit ─────────────────────────────────────────────────────────── */
+
+function UserFormDrawer({
+  open,
+  user,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  user: UserItem | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [f, setF] = useState({
+    Firstname: "",
+    Lastname: "",
+    Email: "",
+    Role: "Default User",
+    Department: "",
+    Company: "",
+    company_id: "" as string,
+    ReferenceID: "",
+    Status: "Active",
+    Manager: "",
+    TSM: "",
+    ContactNumber: "",
+    Location: "",
+    TargetQuota: "",
+    // Attendance access. Seeded from users.permissions, falling back to the
+    // role default the server would use (TSA -> sales).
+    attendanceDrawer: "basic" as "basic" | "sales",
+    canLookupClients: true,
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  /* Company options for the picker.
+     The tenant assignment is the company_id FK — that is what the Companies tab
+     counts and what every company_id filter reads. `Company` is a separate
+     free-text field and setting it does NOT put a user in a company, which is
+     why it can silently disagree with the picker. */
+  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
+  const [companiesErr, setCompaniesErr] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/companies", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setCompaniesErr(json?.message || "Could not load companies.");
+          return;
+        }
+        setCompanies((json.companies ?? []).map((c: any) => ({ id: c.id, name: c.name })));
+        setCompaniesErr("");
+      } catch {
+        if (!cancelled) setCompaniesErr("Could not load companies.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setErr("");
+    if (user) {
+      setF({
+        Firstname: user.Firstname || "",
+        Lastname: user.Lastname || "",
+        Email: user.Email || "",
+        Role: user.Role || "Default User",
+        Department: user.Department || "",
+        Company: user.Company || "",
+        company_id: user.company_id != null ? String(user.company_id) : "",
+        ReferenceID: user.ReferenceID || "",
+        Status: user.Status || "Active",
+        Manager: user.Manager || "",
+        TSM: user.TSM || "",
+        ContactNumber: user.ContactNumber || "",
+        Location: user.Location || "",
+        TargetQuota: user.TargetQuota || "",
+        ...attendanceDefaults(user),
+      });
+    } else {
+      setF({
+        Firstname: "",
+        Lastname: "",
+        Email: "",
+        Role: "Default User",
+        Department: "",
+        Company: "",
+        company_id: "",
+        ReferenceID: "",
+        Status: "Active",
+        Manager: "",
+        TSM: "",
+        ContactNumber: "",
+        Location: "",
+        TargetQuota: "",
+        attendanceDrawer: "basic",
+        canLookupClients: true,
+      });
+    }
+  }, [open, user]);
+
+  /* The form holds strings except the two attendance-access fields, so the setter
+     is typed against the state rather than assuming `string`. */
+  const set =
+    <K extends keyof typeof f>(k: K) =>
+    (v: (typeof f)[K]) =>
+      setF((p) => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    if (busy) return;
+    setErr("");
+    if (!f.Firstname.trim() || !f.Lastname.trim()) return setErr("Enter first and last name.");
+    if (!/^\S+@\S+\.\S+$/.test(f.Email.trim())) return setErr("Enter a valid email address.");
+
+    setBusy(true);
+    try {
+      /* The drawer choice is stored as explicit permission flags, so it
+         overrides the role rather than being inferred from it. The API merges
+         these into any existing users.permissions jsonb rather than replacing
+         it, so unrelated flags survive the save. */
+      const { attendanceDrawer, canLookupClients, ...fields } = f;
+      const payload = {
+        ...fields,
+        permissions: {
+          can_create_sales_attendance: attendanceDrawer === "sales",
+          can_lookup_clients: canLookupClients,
+        },
+      };
+
+      const res = await fetch("/api/admin/users", {
+        method: user ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", cache: "no-store",
+        // `userId` (not `id`) — the API reads that field for the row to update.
+        body: JSON.stringify(user ? { ...payload, userId: user._id } : payload),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d?.success === false) {
+        setErr(d?.message || d?.error || "Could not save that user.");
+        return;
+      }
+      toast.success(user ? "User updated." : "User created.");
+      onSaved();
+    } catch {
+      setErr("Network problem — nothing was saved.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <MintDrawer
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      onClose={onClose}
+      title={user ? "Edit user" : "Add New User"}
+      maxHeight="92vh"
+      header={
+        <div
+          className="px-6 pt-5 pb-6 flex-shrink-0"
+          style={{ background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--card) 100%)" }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-11 h-11 rounded-[15px] flex items-center justify-center shrink-0"
+              style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+            >
+              <ShieldCheck size={21} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[19px] font-black text-[var(--text)] leading-tight">
+                {user ? "Edit user" : "Add New User"}
+              </h2>
+              <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mt-1">
+                {user ? "Update account details, role and permissions." : "Create an account for a new team member."}
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+      footer={
+        <div
+          className="px-5 pt-3.5 pb-4 border-t flex gap-2.5 shrink-0"
+          style={{
+            borderColor: "var(--border)",
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <Button size="lg" variant="secondary" className="shrink-0 px-6" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" size="lg" full loading={busy} onClick={save} icon={busy ? undefined : <Check size={17} />}>
+            {busy ? "Saving…" : user ? "Save Changes" : "Create User"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4 px-5 pb-2">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="First name">
+            <MintInput value={f.Firstname} onChange={(e) => set("Firstname")(e.target.value)} placeholder="Juan" />
+          </Field>
+          <Field label="Last name">
+            <MintInput value={f.Lastname} onChange={(e) => set("Lastname")(e.target.value)} placeholder="Dela Cruz" />
+          </Field>
+        </div>
+
+        <Field label="Email">
+          <MintInput type="email" value={f.Email} onChange={(e) => set("Email")(e.target.value)} placeholder="you@biolog.ph" />
+        </Field>
+
+        <Field label="Role">
+          <select
+            value={f.Role}
+            onChange={(e) => set("Role")(e.target.value)}
+            className="w-full min-h-[48px] px-4 rounded-[var(--r-btn)] border bg-[var(--card)] text-[13.5px] font-semibold outline-none"
+            style={{ borderColor: "var(--border-strong)", color: "var(--text)" }}
+          >
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Department">
+          <MintInput value={f.Department} onChange={(e) => set("Department")(e.target.value)} placeholder="Sales" />
+        </Field>
+
+        {/* Tenant assignment. THIS is what puts a user under a company on the
+            Companies tab — the free-text `Company` field below does not. */}
+        <Field label="Company (tenant)">
+          <select
+            value={f.company_id}
+            onChange={(e) => {
+              const id = e.target.value;
+              set("company_id")(id);
+              // Mirror the picker's name into the legacy free-text column so the
+              // two stop disagreeing on the user's row.
+              if (id) {
+                const picked = companies.find((c) => String(c.id) === id);
+                if (picked) set("Company")(picked.name);
+              }
+            }}
+            disabled={companies.length === 0 && !!companiesErr}
+            className="w-full min-h-[48px] px-4 rounded-[var(--r-btn)] border bg-[var(--card)] text-[13.5px] font-semibold outline-none disabled:opacity-50"
+            style={{ borderColor: "var(--border-strong)", color: "var(--text)" }}
+          >
+            <option value="">— Not assigned —</option>
+            {companies.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {companiesErr ? (
+            <p className="text-[11px] font-semibold text-[var(--alert-ink)] mt-1.5">
+              {companiesErr} Manage them under Admin → Companies.
+            </p>
+          ) : (
+            <p className="text-[11px] font-semibold text-[var(--text-faint)] mt-1.5">
+              Controls tenant isolation and the Companies tab. Leave blank to keep the user
+              unassigned.
+            </p>
+          )}
+        </Field>
+
+        <Field label="Company (as written on the form)">
+          <MintInput value={f.Company} onChange={(e) => set("Company")(e.target.value)} placeholder="Biolog Inc." />
+          <p className="text-[11px] font-semibold text-[var(--text-faint)] mt-1.5">
+            Free text, shown on printed forms. It does not assign a tenant.
+          </p>
+        </Field>
+
+        <Field label="Reference / Employee ID">
+          <MintInput value={f.ReferenceID} onChange={(e) => set("ReferenceID")(e.target.value)} placeholder="BIO-2026-0143" />
+        </Field>
+
+        <Field label="Status">
+          <select
+            value={f.Status}
+            onChange={(e) => set("Status")(e.target.value)}
+            className="w-full min-h-[48px] px-4 rounded-[var(--r-btn)] border bg-[var(--card)] text-[13.5px] font-semibold outline-none"
+            style={{ borderColor: "var(--border-strong)", color: "var(--text)" }}
+          >
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </Field>
+
+        {/* ── Attendance access ────────────────────────────────────────────
+            Which drawer this agent gets. Decided HERE, by permission, rather
+            than inferred from their position — a Territory Sales Associate can
+            be moved onto the standard drawer and vice versa. */}
+        <div
+          className="rounded-[var(--r-card)] p-3.5"
+          style={{ background: "var(--bg)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)] mb-1">
+            Attendance access
+          </p>
+          <p className="text-[11px] font-semibold text-[var(--text-faint)] mb-3 leading-snug">
+            Chooses which clock-in screen the agent sees. This overrides their
+            role.
+          </p>
+
+          <div className="grid grid-cols-1 gap-2">
+            {(
+              [
+                {
+                  key: "basic",
+                  title: "Standard attendance",
+                  sub: "Photo, location and remarks only",
+                },
+                {
+                  key: "sales",
+                  title: "Sales & client visits",
+                  sub: "Adds client type, account and sales remarks",
+                },
+              ] as const
+            ).map((o) => {
+              const on = f.attendanceDrawer === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => set("attendanceDrawer")(o.key)}
+                  className="flex items-center gap-3 w-full rounded-[14px] border-2 p-3 text-left transition-colors"
+                  style={{
+                    background: on ? "var(--mint-soft)" : "var(--card)",
+                    borderColor: on ? "var(--mint)" : "var(--border)",
+                  }}
+                >
+                  <span
+                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                    style={{
+                      borderColor: on ? "var(--mint)" : "var(--border-strong)",
+                      background: on ? "var(--mint)" : "transparent",
+                    }}
+                  >
+                    {on && <Check size={11} className="text-white" strokeWidth={4} />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-extrabold text-[var(--text)]">
+                      {o.title}
+                    </span>
+                    <span className="block text-[11px] font-semibold text-[var(--text-muted)]">
+                      {o.sub}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Only meaningful for the sales drawer — the standard one has no
+              client field at all, so the toggle would be a lie. */}
+          {f.attendanceDrawer === "sales" && (
+            <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-extrabold text-[var(--text)] leading-tight">
+                    Allow client lookup
+                  </p>
+                  <p className="text-[11px] font-semibold text-[var(--text-muted)] mt-0.5 leading-snug">
+                    Shows &ldquo;New Client&rdquo; / &ldquo;Existing Client&rdquo; and the account
+                    search.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={f.canLookupClients}
+                  aria-label="Allow client lookup"
+                  onClick={() => set("canLookupClients")(!f.canLookupClients)}
+                  className="w-[52px] h-[30px] rounded-full p-[3px] flex items-center transition-colors shrink-0"
+                  style={{
+                    background: f.canLookupClients ? "var(--mint-btn)" : "var(--border-strong)",
+                  }}
+                >
+                  <span
+                    className="w-6 h-6 rounded-full bg-white shadow-sm transition-transform"
+                    style={{ transform: f.canLookupClients ? "translateX(22px)" : "translateX(0)" }}
+                  />
+                </button>
+              </div>
+
+              {!f.canLookupClients && (
+                <p
+                  className="text-[11px] font-semibold mt-2.5 leading-relaxed"
+                  style={{ color: "var(--clay-ink)" }}
+                >
+                  Client type and account fields will be hidden on the agent&apos;s screen. They
+                  can still log their visit and time out.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Manager">
+            <MintInput value={f.Manager} onChange={(e) => set("Manager")(e.target.value)} placeholder="—" />
+          </Field>
+          <Field label="TSM">
+            <MintInput value={f.TSM} onChange={(e) => set("TSM")(e.target.value)} placeholder="—" />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Contact number">
+            <MintInput value={f.ContactNumber} onChange={(e) => set("ContactNumber")(e.target.value)} placeholder="—" />
+          </Field>
+          <Field label="Target quota">
+            <MintInput value={f.TargetQuota} onChange={(e) => set("TargetQuota")(e.target.value)} placeholder="—" />
+          </Field>
+        </div>
+
+        <Field label="Location">
+          <MintInput value={f.Location} onChange={(e) => set("Location")(e.target.value)} placeholder="—" />
+        </Field>
+
+        {err && (
+          <p role="alert" className="text-[12px] font-bold" style={{ color: "var(--alert-ink)" }}>
+            {err}
+          </p>
+        )}
+      </div>
+    </MintDrawer>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <MintLabel>{label}</MintLabel>
+      {children}
+    </label>
+  );
+}
+
+/* ── Reset password ─────────────────────────────────────────────────────── */
+
+function ResetPasswordDrawer({
+  user,
+  onClose,
+  onDone,
+}: {
+  user: UserItem | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [forceChange, setForceChange] = useState(true);
+  const [issued, setIssued] = useState<{ password: string; emailed: boolean } | null>(null);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setIssued(null);
+      setErr("");
+      setCopied(false);
+      setForceChange(true);
+    }
+  }, [user]);
+
+  const submit = async () => {
+    if (!user || busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", cache: "no-store",
+        body: JSON.stringify({ userId: user._id, forceChangeOnLogin: forceChange }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d?.success === false) {
+        setErr(d?.message || "Could not reset that password.");
+        return;
+      }
+      setIssued({ password: d.tempPassword || "", emailed: Boolean(d.emailed) });
+      toast.success(`Password reset for ${user.Email}.`);
+      onDone();
+    } catch {
+      setErr("Network problem — nothing was changed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!issued?.password) return;
+    try {
+      await navigator.clipboard.writeText(issued.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error("Couldn't copy — select it manually.");
+    }
+  };
+
+  return (
+    <MintDrawer
+      open={!!user}
+      onOpenChange={(o) => !o && onClose()}
+      onClose={onClose}
+      title="Reset password"
+      maxHeight="88vh"
+      header={
+        <div
+          className="px-6 pt-5 pb-6 flex-shrink-0"
+          style={{ background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--card) 100%)" }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-11 h-11 rounded-[15px] flex items-center justify-center shrink-0"
+              style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
+            >
+              <KeyRound size={21} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[19px] font-black text-[var(--text)] leading-tight">Reset password</h2>
+              <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mt-1 break-all">
+                {user ? user.Email : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+      footer={
+        <div
+          className="px-5 pt-3.5 pb-4 border-t shrink-0"
+          style={{
+            borderColor: "var(--border)",
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <Button
+            size="lg"
+            full
+            loading={busy}
+            onClick={issued ? onClose : submit}
+            icon={busy ? undefined : <Check size={17} />}
+          >
+            {issued ? "Done" : busy ? "Resetting…" : "Generate temporary password"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4 px-5 pb-2">
+        {!issued ? (
+          <>
+            <p className="text-[12.5px] font-semibold text-[var(--text-muted)] leading-relaxed">
+              This sets a new temporary password, clears any lockout, signs the user out of every
+              device, and emails the password to them.
+            </p>
+
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <span className="relative flex items-center justify-center shrink-0 mt-px">
+                <input
+                  type="checkbox"
+                  checked={forceChange}
+                  onChange={(e) => setForceChange(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <span
+                  aria-hidden
+                  className="w-5 h-5 rounded-[7px] border-2 flex items-center justify-center transition-colors"
+                  style={{
+                    borderColor: forceChange ? "var(--mint-btn)" : "var(--border-strong)",
+                    background: forceChange ? "var(--mint-btn)" : "var(--card)",
+                  }}
+                >
+                  {forceChange && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M20 6 9 17l-5-5"
+                        stroke="white"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
+              </span>
+              <span>
+                <span className="block text-[12.5px] font-extrabold text-[var(--text)]">
+                  Force password change on next login
+                </span>
+                <span className="block text-[11px] font-semibold text-[var(--text-muted)]">
+                  They&apos;ll be asked to choose their own password after signing in.
+                </span>
+              </span>
+            </label>
+
+            {err && (
+              <p role="alert" className="text-[12px] font-bold" style={{ color: "var(--alert-ink)" }}>
+                {err}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div
+              className="rounded-[var(--r-card)] p-3.5"
+              style={{ background: "var(--mint-soft)" }}
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--mint-strong)" }}>
+                Temporary password
+              </p>
+              <p
+                className="text-[17px] font-black tracking-[0.06em] break-all"
+                style={{ color: "var(--mint-strong)", fontFamily: "ui-monospace, Menlo, monospace" }}
+              >
+                {issued.password}
+              </p>
+            </div>
+
+            <Button size="lg" variant="secondary" full icon={copied ? <Check size={16} /> : <Copy size={16} />} onClick={copy}>
+              {copied ? "Copied" : "Copy password"}
+            </Button>
+
+            <p className="text-[11.5px] font-semibold text-[var(--text-muted)] leading-relaxed">
+              {issued.emailed
+                ? "Emailed to the user. It is shown here only once and is never stored in plain text."
+                : "The email could not be sent — share this password manually. It is shown only once."}
+            </p>
+          </>
+        )}
+      </div>
+    </MintDrawer>
+  );
 }

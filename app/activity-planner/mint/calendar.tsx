@@ -350,7 +350,7 @@ export function CalendarScreen({
                 ? (item as Meeting).Location || (item as Meeting).CompanyName || "Meeting"
                 : isVisit
                   ? log.SiteVisitAccount || "Client visit"
-                  : "Headquarters";
+                  : "Attendance";
 
               const Icon = isMeeting
                 ? Users

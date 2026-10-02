@@ -97,29 +97,120 @@ function ActivityPlanner() {
   }, []);
 
   const sales = isSales(data.userDetails);
+
+  /* Attendance drawer config from the server — the authority on what this agent
+     may open. Admin -> Users decides it; the role is only the fallback.
+
+     Kept NULL until the server answers rather than seeded from the role, because
+     useState captures its initial value on the FIRST render — when
+     data.userDetails is still null and `isSales` is therefore false. Seeding
+     there froze "basic" for the whole session, so a TSA was sent to
+     CreateAttendance even with an explicit sales permission. Deriving the
+     fallback per render below re-evaluates once the profile lands. */
+  const [drawerCfg, setDrawerCfg] = React.useState<{
+    drawer: "sales" | "basic";
+    canLookupClients: boolean;
+  } | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/attendance/drawer", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const j = await res.json();
+        if (cancelled || !j?.drawer) return;
+        setDrawerCfg({
+          drawer: j.drawer === "sales" ? "sales" : "basic",
+          canLookupClients: j.canLookupClients !== false,
+        });
+      } catch {
+        /* Fall back to the role. drawerCfg stays null, so the per-render
+           fallback below keeps using the live role rather than a frozen seed. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const showFab = data.activeTab === "home" || data.activeTab === "calendar";
   const shift = useSystemSettings();
+
+  /* How many group visits this agent could join right now.
+     The server applies the team restriction, so a restricted visit is never in
+     the response and cannot inflate the badge. Fetched only while Home is
+     visible, and failures are silent — a missing badge must never break Home. */
+  const [gvJoinable, setGvJoinable] = React.useState(0);
+
+  React.useEffect(() => {
+    if (data.activeTab !== "home") return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/group-visits?scope=feed", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const n = (json.visits || []).filter(
+          (v: any) => v.canJoin && v.Status !== "Completed" && v.Status !== "Cancelled"
+        ).length;
+        if (!cancelled) setGvJoinable(n);
+      } catch {
+        /* decorative — ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data.activeTab]);
 
   // Clock In / Clock Out uses the dedicated drawer — not the components/
   // CreateAttendance dialog. It reuses the same route + offline queue.
   const openPrimary = () => setClockDrawerOpen(true);
 
+  /* THE SERVER DECIDES, NOT THE ROLE.
+     These three all used to branch on `isSales(userDetails)`, which is a pure
+     role check — so setting "Standard attendance" in Admin -> Users had no
+     effect and a TSA kept getting the sales drawer. `drawerCfg.drawer` comes
+     from /api/attendance/drawer, which applies the admin's explicit
+     can_create_sales_attendance override and only falls back to the role when
+     it is unset. Until that resolves, drawerCfg is seeded with the role default
+     so there is no flash of the wrong drawer. */
+  const salesDrawer = (drawerCfg?.drawer ?? (sales ? "sales" : "basic")) === "sales";
+
   // The centre FAB keeps its old meaning for Sales (their main task is a site
   // visit); everyone else gets the clock drawer.
   const openFab = () => {
-    if (sales) setSalesVisitOpen(true);
+    if (salesDrawer) setSalesVisitOpen(true);
     else setClockDrawerOpen(true);
   };
 
+  /* A sales agent is only allowed the sales drawer when the server said so.
+     Rendering CreateSalesAttainment unconditionally left it mounted (and its
+     fields in the DOM) for standard-attendance users; keep it mounted so the
+     drawer animation/focus state survives, but never open it for them. */
+  const salesDrawerVisible = salesDrawer && salesVisitOpen;
+
   const openSiteVisit = () => {
-    if (sales) setSalesVisitOpen(true);
-    else setSiteVisitOpen(true);
+    if (salesDrawer) setSalesVisitOpen(true);
+    // Standard attendance. CreateAttendance is the "basic" form
+    // (Attendance Type / Location / Remarks — no client). SiteVisitSheet was
+    // the other candidate but it ALSO renders a Client Type picker, which is
+    // exactly what a client-lookup-disabled agent must not see.
+    else setAttendanceOpen(true);
   };
 
   const submitSiteVisit = async (p: SiteVisitPayload) => {
     // Persist through the existing sales flow when available; otherwise surface
     // the payload so nothing is silently dropped.
-    if (sales) {
+    if (salesDrawer) {
       setSalesVisitOpen(true);
     } else {
       try {
@@ -168,6 +259,7 @@ function ActivityPlanner() {
         return (
           <HomeScreen
             data={data}
+            groupVisitJoinable={gvJoinable}
             onOpenSiteVisit={openSiteVisit}
             onOpenAttendance={openPrimary}
           />
@@ -232,9 +324,14 @@ function ActivityPlanner() {
         onDone={data.refresh}
       />
 
-      {/* ── Site Visit Log bottom sheet ─────────────────────────────────────── */}
+      {/* ── Site Visit Log bottom sheet ───────────────────────────────────────
+          Unreachable: the sales path opens CreateSalesAttenance and the
+          standard path opens CreateAttendance. SiteVisitSheet also renders a
+          Client Type picker, so it is not a valid standard-attendance screen.
+          Left mounted-but-closed so nothing else that depends on it breaks;
+          safe to delete once you confirm the two drawers cover the flow. */}
       <SiteVisitSheet
-        open={siteVisitOpen}
+        open={false}
         onClose={() => setSiteVisitOpen(false)}
         onSubmit={submitSiteVisit}
         visitCountToday={data.todayVisits.length}
@@ -270,7 +367,7 @@ function ActivityPlanner() {
       />
 
       <CreateSalesAttendance
-        open={salesVisitOpen}
+        open={salesDrawerVisible}
         onOpenChangeAction={setSalesVisitOpen}
         formData={salesForm}
         onChangeAction={onSalesFormChange}
@@ -285,6 +382,7 @@ function ActivityPlanner() {
         } as any}
         fetchAccountAction={data.refresh}
         setFormAction={setSalesForm as any}
+        canLookupClients={drawerCfg?.canLookupClients ?? true}
       />
 
       {/* ── Meetings ───────────────────────────────────────────────────────── */}

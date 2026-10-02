@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { RESET_TTL_MS, signTicket, verifyTicket, type SignedPayload } from "@/lib/password-reset";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/password-reset-verify
@@ -9,6 +10,9 @@ import { RESET_TTL_MS, signTicket, verifyTicket, type SignedPayload } from "@/li
  * returns a short-lived `resetToken` that authorises the actual reset.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  /* The OTP space is only 10^6, so guessing must stay impractical. */
+  if (!checkRateLimit(req, res, LIMITS.otpVerify)) return;
+
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ success: false, message: "Method Not Allowed" });

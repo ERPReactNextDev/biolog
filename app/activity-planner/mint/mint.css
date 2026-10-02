@@ -52,6 +52,11 @@
   --info: #2563eb;
   --info-soft: #e8f0fd;
 
+  /* ── Status: violet = escalated to COO (OB requests) ──────────────────── */
+  --violet: #7c3aed;
+  --violet-ink: #5b21b6;
+  --violet-soft: #ede9fe;
+
   /* ── Helpful hint ─────────────────────────────────────────────────────── */
   --hint-bg: #fef3c7;
   --hint-text: #92400e;
@@ -109,6 +114,10 @@
   --info: #60a5fa;
   --info-soft: rgba(96, 165, 250, 0.15);
 
+  --violet: #a78bfa;
+  --violet-ink: #c4b5fd;
+  --violet-soft: rgba(167, 139, 250, 0.15);
+
   --hint-bg: rgba(232, 180, 74, 0.14);
   --hint-text: #f0c674;
 
@@ -159,6 +168,10 @@
   --info: #2563eb;
   --info-soft: #e8f0fd;
 
+  --violet: #7c3aed;
+  --violet-ink: #5b21b6;
+  --violet-soft: #ede9fe;
+
   --hint-bg: #fef3c7;
   --hint-text: #92400e;
 
@@ -204,6 +217,10 @@
 
   --info: #60a5fa;
   --info-soft: rgba(96, 165, 250, 0.15);
+
+  --violet: #a78bfa;
+  --violet-ink: #c4b5fd;
+  --violet-soft: rgba(167, 139, 250, 0.15);
 
   --hint-bg: rgba(232, 180, 74, 0.14);
   --hint-text: #f0c674;
@@ -352,6 +369,19 @@
 .mint-num {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+/* Splash / loading indicator.
+   The old bar used `animate-pulse-soft`, a class that was never defined
+   anywhere, so it sat frozen at 70% and read as a crash. An indeterminate
+   sweep at least shows that something is still happening. */
+@keyframes mint-splash-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

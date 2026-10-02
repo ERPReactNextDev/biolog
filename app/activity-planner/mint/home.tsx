@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   FileSpreadsheet,
+  Image as ImageIcon,
   MapPin,
   Megaphone,
   ThermometerSun,
@@ -23,6 +24,7 @@ import {
   Plus,
   Repeat,
   Store,
+  Users,
 } from "lucide-react";
 import {
   Button,
@@ -34,6 +36,9 @@ import {
   ProgressRing,
   SectionLabel,
 } from "./ui";
+import { useAdminAuth } from "./admin-home";
+import { SplashScreen } from "./states";
+import NotificationBell from "@/components/notifications/notification-bell";
 import {
   attendanceAdvice,
   computeLate,
@@ -117,12 +122,15 @@ function QuickAction({
   subtitle,
   tone,
   onClick,
+  badge,
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   tone: "mint" | "clay" | "info";
   onClick: () => void;
+  /** Optional count rendered on the icon tile, e.g. joinable group visits. */
+  badge?: number;
 }) {
   const map = {
     mint: { bg: "var(--mint-soft)", fg: "var(--mint-strong)" },
@@ -137,10 +145,18 @@ function QuickAction({
       className="mint-tap text-left rounded-[var(--r-card-lg)] border border-[var(--border)] bg-[var(--card)] p-3.5 shadow-[var(--sh-card)] active:bg-[var(--mint-soft)]"
     >
       <div
-        className="w-10 h-10 rounded-[13px] flex items-center justify-center mb-2.5"
+        className="w-10 h-10 rounded-[13px] flex items-center justify-center mb-2.5 relative"
         style={{ background: map.bg, color: map.fg }}
       >
         {icon}
+        {!!badge && badge > 0 && (
+          <span
+            className="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center text-[9.5px] font-black text-white"
+            style={{ background: "var(--alert)", boxShadow: "0 0 0 2px var(--card)" }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </div>
       <p className="text-[13.5px] font-extrabold text-[var(--text)] leading-tight">{title}</p>
       <p className="text-[11px] font-semibold text-[var(--text-muted)] mt-0.5 leading-snug">
@@ -152,16 +168,20 @@ function QuickAction({
 
 export function HomeScreen({
   data,
+  groupVisitJoinable = 0,
   onOpenSiteVisit,
   onOpenAttendance,
 }: {
   data: ActivityData;
+  /** Group visits this agent can join right now — badge on the quick action. */
+  groupVisitJoinable?: number;
   onOpenSiteVisit: () => void;
   onOpenAttendance: () => void;
 }) {
   const router = useRouter();
   const settings = useSystemSettings();
   const clock = useLiveClock();
+  const adminAuth = useAdminAuth();
   const { userDetails, todayLogs, monthlyStats, currentMonth, setActiveTab, isOnline } = data;
 
   const monthLabel = currentMonth.toLocaleString("en-US", { month: "long" });
@@ -206,6 +226,35 @@ export function HomeScreen({
           openVisits > 0 ? `, ${openVisits} still open` : " done"
         }. Clock out once when you finish for the day.`;
 
+  /* ── Super Admin sees an admin dashboard, not the agent Home ───────────────
+     Decided by the SESSION, never by `?id=`. Gating on the URL param meant a
+     Super Admin who landed on a TSA's id was demoted to the agent screen, and
+     a TSA who landed on an admin's id was shown the admin dashboard — which
+     leaked user counts and GPS report locations.
+
+     While the session is still being checked we show the splash rather than
+     the agent screen, so the agent view never flashes for an admin. */
+  if (adminAuth.status === "loading") {
+    return (
+      <div className="px-5 pt-12 pb-8 bg-[var(--bg)]">
+        <SplashScreen />
+      </div>
+    );
+  }
+
+  if (adminAuth.status === "yes") {
+    // Redirect to the full desktop admin console — rendering inside the mobile
+    // shell clips the sidebar layout and shows the old card dashboard.
+    if (typeof window !== "undefined") {
+      window.location.replace("/admin");
+    }
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 bg-[var(--bg)]">
+        <SplashScreen />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
       {/* ── Header (soft mint gradient, never solid red) ──────────────────── */}
@@ -240,6 +289,12 @@ export function HomeScreen({
             </div>
             <div className="flex items-center gap-2">
               <WeatherChip />
+              <NotificationBell
+                bell="agent"
+                agentUserId={data.userId}
+                tone="surface"
+                size={18}
+              />
               <button
                 type="button"
                 onClick={() => setActiveTab("profile")}
@@ -426,6 +481,29 @@ export function HomeScreen({
             subtitle="Record client visit"
             tone="clay"
             onClick={onOpenSiteVisit}
+          />
+          <QuickAction
+            icon={<Users size={19} />}
+            title="Group Visitation"
+            subtitle="Join or create a team visit"
+            tone="mint"
+            badge={groupVisitJoinable}
+            onClick={() =>
+              router.push(
+                `/group-visitation${data.userId ? `?id=${encodeURIComponent(data.userId)}` : ""}`
+              )
+            }
+          />
+          <QuickAction
+            icon={<ImageIcon size={19} />}
+            title="OB Request"
+            subtitle="Upload signed OB form"
+            tone="clay"
+            onClick={() =>
+              router.push(
+                `/ob-request${data.userId ? `?id=${encodeURIComponent(data.userId)}` : ""}`
+              )
+            }
           />
           <QuickAction
             icon={<CalendarDays size={19} />}

@@ -175,7 +175,7 @@ function GPSReportsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F9F6F4] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-gray-200 border-t-[#CC1318] rounded-full animate-spin" />
           <p className="text-[12px] text-gray-400">Loading...</p>
@@ -186,7 +186,7 @@ function GPSReportsPage() {
 
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-[#F9F6F4] flex flex-col">
+      <div className="min-h-screen bg-[var(--bg)] flex flex-col">
         <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(145deg, var(--brand-primary) 0%, var(--brand-primary-hover) 100%)" }}>
           <div className="flex items-center gap-3">
             <button onClick={goBack} className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
@@ -217,7 +217,7 @@ function GPSReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F6F4] flex flex-col">
+    <div className="min-h-screen bg-[var(--bg)] flex flex-col">
       {/* Header */}
       <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(145deg, var(--brand-primary) 0%, var(--brand-primary-hover) 100%)" }}>
         <div className="flex items-center gap-3 mb-4">
@@ -305,7 +305,7 @@ function GPSReportsPage() {
                       report.reviewStatus === "rejected" ? "bg-[#FEF0F0]" : "bg-[#FDF4E7]"
                     }`}>
                       {report.reviewStatus === "approved" ? <CheckCircle size={18} className="text-[#1A7A4A]" /> :
-                       report.reviewStatus === "rejected" ? <XCircle size={18} className="text-[#CC1318]" /> :
+                       report.reviewStatus === "rejected" ? <XCircle size={18} className="text-[var(--mint-strong)]" /> :
                        <Clock size={18} className="text-[#A0611A]" />}
                     </div>
                     <div>
@@ -315,7 +315,7 @@ function GPSReportsPage() {
                   </div>
                   <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                     report.reviewStatus === "approved" ? "bg-[#EEF7F2] text-[#1A7A4A]" :
-                    report.reviewStatus === "rejected" ? "bg-[#FEF0F0] text-[#CC1318]" :
+                    report.reviewStatus === "rejected" ? "bg-[#FEF0F0] text-[var(--mint-strong)]" :
                     "bg-[#FDF4E7] text-[#A0611A]"
                   }`}>
                     {report.reviewStatus}
@@ -368,7 +368,7 @@ function GPSReportsPage() {
                 <span className="text-[12px] text-gray-400">Status</span>
                 <span className={`px-3 py-1.5 rounded-full text-[12px] font-bold uppercase ${
                   selectedReport.reviewStatus === "approved" ? "bg-[#EEF7F2] text-[#1A7A4A]" :
-                  selectedReport.reviewStatus === "rejected" ? "bg-[#FEF0F0] text-[#CC1318]" :
+                  selectedReport.reviewStatus === "rejected" ? "bg-[#FEF0F0] text-[var(--mint-strong)]" :
                   "bg-[#FDF4E7] text-[#A0611A]"
                 }`}>
                   {selectedReport.reviewStatus}
@@ -398,7 +398,7 @@ function GPSReportsPage() {
                     <p className="text-[13px] font-semibold text-gray-800">{formatDateTime(selectedReport.loginDate)}</p>
                   </div>
                   <div className="bg-[#FEF0F0] rounded-xl p-3">
-                    <p className="text-[10px] text-[#CC1318] font-bold uppercase">Logout</p>
+                    <p className="text-[10px] text-[var(--mint-strong)] font-bold uppercase">Logout</p>
                     <p className="text-[13px] font-semibold text-gray-800">{formatDateTime(selectedReport.logoutDate)}</p>
                   </div>
                 </div>

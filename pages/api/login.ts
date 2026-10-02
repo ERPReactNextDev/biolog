@@ -4,8 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { UAParser } from "ua-parser-js";
 import bcrypt from "bcryptjs";
 import { verify } from "otplib";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  /* Password + TOTP guessing. The limit sits above the method check so the
+     flood is cheap to absorb even for malformed requests. */
+  if (!checkRateLimit(req, res, LIMITS.login)) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

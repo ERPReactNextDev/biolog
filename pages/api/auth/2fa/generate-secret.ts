@@ -3,8 +3,11 @@ import { supabase } from "@/lib/supabase";
 import { parse } from "cookie";
 import { generateSecret, generateURI } from "otplib";
 import QRCode from "qrcode";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!checkRateLimit(req, res, LIMITS.twoFactor)) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }

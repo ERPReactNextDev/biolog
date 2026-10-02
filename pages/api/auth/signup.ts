@@ -1,8 +1,11 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!checkRateLimit(req, res, LIMITS.register)) return;
+
   if (!supabase) {
     console.error("[Signup] Supabase client not initialized.");
     return res.status(500).json({ message: "Database connection error" });

@@ -51,6 +51,18 @@ interface CreateAttendanceProps {
   userDetails: UserDetails;
   fetchAccountAction: () => void;
   setFormAction: React.Dispatch<React.SetStateAction<FormData>>;
+  /**
+   * Whether this agent may pick/search a client at all. Set per-user in
+   * Admin -> Users (can_lookup_clients) and delivered by
+   * GET /api/attendance/drawer.
+   *
+   * Defaults to true so the drawer is unchanged until an admin opts somebody
+   * out. When false the New/Existing client picker, the client-name fields and
+   * the account search are all hidden, and the Logout validation stops
+   * demanding a client — otherwise the agent would be permanently unable to
+   * clock out.
+   */
+  canLookupClients?: boolean;
 }
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
@@ -63,7 +75,11 @@ export default function CreateSalesAttendance({
   userDetails,
   fetchAccountAction,
   setFormAction,
+  canLookupClients = true,
 }: CreateAttendanceProps) {
+  /* Single source of truth for the whole drawer: when the admin has turned
+     client lookup off, nothing below should query for or render a client. */
+  const clientLookupOn = canLookupClients;
   const [locationAddress, setLocationAddress] = useState("Fetching location...");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -228,7 +244,7 @@ export default function CreateSalesAttendance({
     }
 
     fetch(`/api/ModuleSales/Activity/LastStatus?referenceId=${userDetails.ReferenceID}&type=Client Visit`, {
-      credentials: "include"
+      credentials: "include", cache: "no-store"
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch status");
@@ -295,7 +311,7 @@ export default function CreateSalesAttendance({
 
   /* ── Fetch accounts when Existing Client selected ── */
   useEffect(() => {
-    if (!open || clientType !== "Existing Client") {
+    if (!open || clientType !== "Existing Client" || !clientLookupOn) {
       setSiteVisitAccounts([]);
       setSiteVisitAccountsCount(0);
       setAccountsError(null);
@@ -363,7 +379,8 @@ export default function CreateSalesAttendance({
   /* ── Submit ── */
   const handleCreate = async () => {
     if (!capturedImage) return toast.error("Please capture a photo first.");
-    if (formData.Status === "Logout" && !clientType) return toast.error("Please select client type.");
+    if (formData.Status === "Logout" && clientLookupOn && !clientType)
+      return toast.error("Please select client type.");
     if (formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) {
       return toast.error("Please select a company.");
     }
@@ -461,7 +478,7 @@ export default function CreateSalesAttendance({
         const res = await fetch("/api/ModuleSales/Activity/AddLog", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
+          credentials: "include", cache: "no-store",
           body:    JSON.stringify({ ...basePayload, PhotoURL: photoURL }),
         });
         if (!res.ok) throw new Error("Failed to save attendance");
@@ -488,13 +505,15 @@ export default function CreateSalesAttendance({
   // Determine UI state
   const isLogout = lastStatus === "Login";
   const nextAction = formData.Status; // Use the Status from formData which we set in useEffect
+  /* Client requirements only apply when the admin has left client lookup on.
+     With it off, the agent must still be able to clock out. */
   const isSubmitDisabled =
     loading ||
     !capturedImage ||
     loadingStatus ||
-    (formData.Status === "Logout" && !clientType) ||
-    (formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) ||
-    (formData.Status === "Logout" && clientType === "New Client" && !formData.company_name);
+    (clientLookupOn && formData.Status === "Logout" && !clientType) ||
+    (clientLookupOn && formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) ||
+    (clientLookupOn && formData.Status === "Logout" && clientType === "New Client" && !formData.company_name);
   /* ── Render: bottom drawer (not a centred dialog) ── */
   // The brief calls for a slide-up bottom sheet with a drag handle. All the
   // attributes must precede the `>` that opens the children — JSX does not
@@ -664,8 +683,9 @@ export default function CreateSalesAttendance({
         {/* Everything below needs a photo first */}
         {capturedImage && !loadingStatus && (
           <>
-            {/* Client type — only meaningful on Logout */}
-            {formData.Status === "Logout" && (
+            {/* Client type — only meaningful on Logout, and only when the admin has
+                left client lookup enabled for this user. */}
+            {formData.Status === "Logout" && clientLookupOn && (
               <div>
                 <MintLabel>Client Type</MintLabel>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -732,7 +752,7 @@ export default function CreateSalesAttendance({
             )}
 
             {/* New client details */}
-            {formData.Status === "Logout" && clientType === "New Client" && (
+            {formData.Status === "Logout" && clientLookupOn && clientType === "New Client" && (
               <div className="flex flex-col gap-3">
                 <div>
                   <MintLabel>Company Name</MintLabel>
@@ -788,7 +808,7 @@ export default function CreateSalesAttendance({
             )}
 
             {/* Existing client — account picker */}
-            {formData.Status === "Logout" && clientType === "Existing Client" && (
+            {formData.Status === "Logout" && clientLookupOn && clientType === "Existing Client" && (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">

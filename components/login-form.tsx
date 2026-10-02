@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import RegisterSheet from "@/components/register-sheet";
 import ForgotPasswordFlow from "@/components/forgot-password-flow";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    GOOGLE ICON (inline SVG â€” no extra dep)
@@ -80,7 +81,7 @@ function SignUpDialog({ open, onClose }: { open: boolean; onClose: () => void })
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetchWithTimeout("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -514,10 +515,10 @@ export function LoginForm({
       }
 
       try {
-        const res = await fetch("/api/login", {
+        const res = await fetchWithTimeout("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include", // Important: receive cookies in response!
+          credentials: "include", cache: "no-store", // Important: receive cookies in response!
           body: JSON.stringify({
             Email,
             Password,
@@ -630,10 +631,10 @@ export function LoginForm({
       }) as any;
       if (!credential) throw new Error("Biometric authentication failed.");
       console.log("Biometric credential obtained:", credential);
-      const response = await fetch("/api/login", {
+      const response = await fetchWithTimeout("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include", // Important: receive cookies in response!
+          credentials: "include", cache: "no-store", // Important: receive cookies in response!
           body: JSON.stringify({ credentialId: credential.id, deviceId }),
         });
       const result = await response.json();
@@ -994,20 +995,6 @@ export function LoginForm({
               {/* Biometric + Sign Up */}
               {!twoFactorRequired && (
                 <>
-                  {!isOnline ? (
-                    <div
-                      className="flex items-start gap-2.5 rounded-[var(--r-card)] px-4 py-3 text-[12px] font-bold leading-relaxed"
-                      style={{ background: "var(--info-soft)", color: "var(--info)" }}
-                      data-testid="offline-login-note"
-                    >
-                      <Info size={14} className="shrink-0 mt-px" />
-                      <span>
-                        You&apos;re offline. Email and password still work if this device has cached
-                        your credentials &mdash; Google and fingerprint sign-in are unavailable.
-                      </span>
-                    </div>
-                  ) : null}
-
                   <div className="relative my-3">
                     <div className="absolute inset-0 flex items-center">
                       <span className="w-full border-t" style={{ borderColor: "var(--border-strong)" }} />
@@ -1071,9 +1058,30 @@ export function LoginForm({
                       </>
                     )}
                   </button>
-                  <p className="text-[11.5px] font-semibold text-[var(--text-muted)] text-center -mt-1">
-                    Fingerprint login needs internet. Use Email/Password when offline.
-                  </p>
+
+                  {/* One info box, not two. The design shows a single blue note
+                      under the fingerprint button; it used to be duplicated as a
+                      separate offline banner further up the form. */}
+                  <div
+                    className="flex items-start gap-2.5 rounded-[var(--r-card)] px-3.5 py-2.5"
+                    style={{ background: "var(--info-soft)", color: "var(--info)" }}
+                    data-testid={isOnline ? "fingerprint-note" : "offline-login-note"}
+                  >
+                    <Info size={14} className="shrink-0 mt-px" />
+                    <p className="text-[11.5px] font-bold leading-relaxed">
+                      {isOnline ? (
+                        <>
+                          Fingerprint login needs internet. Use email and password when
+                          you&apos;re offline.
+                        </>
+                      ) : (
+                        <>
+                          You&apos;re offline. Email and password still work on this device.
+                          Google and fingerprint sign-in need a connection.
+                        </>
+                      )}
+                    </p>
+                  </div>
 
                   {/* Sign up */}
                   <div className="flex items-center justify-center gap-2 mt-2">

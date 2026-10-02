@@ -75,22 +75,34 @@ function AuditLogsContent() {
     /* ================= VERIFY ADMIN ACCESS ================= */
 
     useEffect(() => {
-        if (!queryUserId) return;
+        /* ADMGATE_V2 — the early return here used to strand `verifying`,
+           leaving the page on "Verifying access..." forever when opened
+           from the sidebar (no ?id=). Fall through instead: the session
+           endpoint below decides, and the spinner always clears. */
 
         const verifyAdmin = async () => {
             try {
                 setVerifying(true);
-                const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`);
-                if (!res.ok) {
-                    router.push("/Login");
-                    return;
-                }
-                const data = await res.json();
-                if (data.Role !== "Admin" && data.Role !== "SuperAdmin" && data.Department !== "IT") {
-                    toast.error("Unauthorized access");
-                    router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
-                    return;
-                }
+              const sess = await fetch('/api/admin/session', { credentials: 'include' });
+              if (sess.status === 401) { router.push('/Login'); return; }
+              if (sess.ok) {
+                  const s = await sess.json();
+                  // Session endpoint already enforced the role server-side.
+                  setVerifying(false);
+                  return;
+              }
+              // Legacy ?id= link and no session probe — fall back to it.
+              if (!queryUserId) { setVerifying(false); return; }
+              const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`);
+              if (!res.ok) { setVerifying(false); return; }
+              const data = await res.json();
+              const r = (data.Role || '').trim().toLowerCase();
+              const d = (data.Department || '').trim().toLowerCase();
+              if (r !== 'admin' && r !== 'superadmin' && r !== 'super admin' && d !== 'it') {
+                  toast.error('Unauthorized access');
+                  router.push('/activity-planner');
+                  return;
+              }
                 setVerifying(false);
             } catch (err) {
                 router.push("/Login");
@@ -198,7 +210,7 @@ function AuditLogsContent() {
                 </header>
 
                 <main className="flex-1 overflow-auto p-4 md:p-8 lg:p-12">
-                    <div className="mx-auto max-w-7xl flex flex-col gap-8">
+                    <div className="w-full flex flex-col gap-8">
                         {/* Header Actions */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div>

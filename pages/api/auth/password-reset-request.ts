@@ -6,6 +6,7 @@ import {
   sendOtpEmail,
   signTicket,
 } from "@/lib/password-reset";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/password-reset-request
@@ -16,6 +17,10 @@ import {
  * which email addresses have accounts.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  /* Every accepted request sends a real email, so this is the most abusable
+     endpoint in the app — capped hard to stop mail-bombing a victim. */
+  if (!checkRateLimit(req, res, LIMITS.resetRequest)) return;
+
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ success: false, message: "Method Not Allowed" });

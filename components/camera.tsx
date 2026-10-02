@@ -44,6 +44,8 @@ export default function Camera({
   const modeRef = useRef(mode);
   const registeredDescriptorsRef = useRef(registeredDescriptors);
   const skipFaceVerificationRef = useRef(skipFaceVerification);
+  /** The preview box itself — the element we ask to go fullscreen. */
+  const previewRef = useRef<HTMLDivElement | null>(null);
 
   // Keep refs in sync with props/state
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -351,17 +353,46 @@ export default function Camera({
   }, [selectedDevice, permissionGiven, cameraStarted]);
 
   const toggleFullscreen = async () => {
+    const el = previewRef.current;
+    if (!el) return;
+
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-        setIsFullscreen(true);
-      } else {
-          await document.exitFullscreen();
-          setIsFullscreen(false);
+      // ── Leaving fullscreen ────────────────────────────────────────────────
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+        return;
+      }
+
+      // ── Entering ──────────────────────────────────────────────────────────
+      // Fullscreen the PREVIEW BOX, not <html>. Fullscreening the document
+      // left the camera as a letterboxed strip with the rest of the app around
+      // it. The browser puts a fullscreened element in its own top layer, so
+      // this also sidesteps the drawer's z-index and containing block.
+      const canUseApi =
+        typeof el.requestFullscreen === "function" ||
+        typeof (el as any).webkitRequestFullscreen === "function";
+
+      if (canUseApi) {
+        try {
+          const req = el.requestFullscreen ?? (el as any).webkitRequestFullscreen;
+          await req.call(el);
+          setIsFullscreen(true);
+          return;
+        } catch {
+          // Denied (iOS Safari has no API; some webviews block it) — fall
+          // through to the CSS overlay below.
         }
+      }
+
+      // ── Fallback: iOS Safari / webview, where there is no Fullscreen API.
+      // A fixed overlay is only viewport-relative while no ancestor has a
+      // transform, so keep z-index above Radix's z-50 portal.               ──
+      setIsFullscreen(true);
     } catch (err) {
       console.error("Error toggling fullscreen:", err);
-      toast.error("Failed to enter fullscreen");
+      setIsFullscreen(false);
+      toast.error("Couldn't open fullscreen.");
     }
   };
 
@@ -373,6 +404,29 @@ export default function Camera({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  /* Escape closes the CSS fallback. Native fullscreen handles its own Escape,
+     and on some Android builds it does not fire keydown, so only act when we
+     are NOT in a native fullscreen element. */
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.fullscreenElement) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isFullscreen]);
+
+  /* Never leave an orphaned overlay behind when the drawer unmounts. */
+  useEffect(() => {
+    return () => {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
     };
   }, []);
 
@@ -612,26 +666,44 @@ export default function Camera({
           )}
 
           <div
-            className={`relative w-full select-none overflow-hidden rounded-[var(--r-card-lg)] bg-black transition-all ${canTap ? "cursor-pointer active:scale-[0.995]" : "cursor-not-allowed"} ${isFullscreen ? "fixed inset-0 z-50 rounded-none aspect-video" : ""}`}
+            ref={previewRef}
+            className={`relative w-full select-none overflow-hidden bg-black transition-all ${canTap ? "cursor-pointer active:scale-[0.995]" : "cursor-not-allowed"} ${isFullscreen ? "fixed inset-0 z-[9999] rounded-none" : "rounded-[var(--r-card-lg)]"}`}
             onClick={handleTap}
             onTouchStart={(e) => { e.preventDefault(); handleTap(); }}
             style={{
+              // 100dvh tracks the mobile URL bar; 100vh would overflow and
+              // leave a black strip when the bar collapses.
+              height: isFullscreen ? "100dvh" : undefined,
               aspectRatio: isFullscreen ? undefined : "4/3",
               border: isFullscreen ? undefined : "1px solid var(--border)",
             }}
           >
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!skipFaceVerification && <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" />}
-            
-            {/* Fullscreen button */}
+
+            {/* Fullscreen toggle — 44px minimum touch target */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFullscreen();
               }}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors z-10"
+              aria-label={isFullscreen ? "Exit full screen" : "Open full screen"}
+              className={`absolute z-10 rounded-full flex items-center gap-1.5 backdrop-blur-sm transition-colors active:scale-95 ${isFullscreen ? "top-4 right-4 h-11 px-4" : "top-3 right-3 h-11 w-11 justify-center"}`}
+              style={{
+                background: "rgba(0,0,0,0.55)",
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.28)",
+              }}
             >
-              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFullscreen ? (
+                <>
+                  <Minimize2 size={16} />
+                  <span className="text-[12.5px] font-extrabold">Exit</span>
+                </>
+              ) : (
+                <Maximize2 size={17} />
+              )}
             </button>
 
             {countdown !== null && countdown > 0 && (

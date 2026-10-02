@@ -525,10 +525,20 @@ export function useActivityData() {
           setLoading(false);
         }
         try {
+          /* `cache: "no-store"` is essential, not an optimisation. Without it
+             the browser revalidates this request and the server answers 304,
+             for which `res.ok` is FALSE (304 is 3xx) — so a perfectly good
+             response was being treated as a failure and the whole app dropped
+             to "Failed to load user data". It also served a STALE role/dept
+             from cache, which is how the admin dashboard kept flipping back
+             to the agent screen after a role change. */
           const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`, {
             credentials: "include",
+            cache: "no-store",
           });
-          if (!res.ok) throw new Error("Failed to fetch user data");
+          if (!res.ok && res.status !== 304) {
+            throw new Error(`Failed to fetch user data (${res.status})`);
+          }
           const fresh = await res.json();
           if (!cancelled) {
             applyData(fresh);
@@ -1062,15 +1072,44 @@ export type ActivityData = ReturnType<typeof useActivityData>;
 
 // ── Shared derived helpers for screens ───────────────────────────────────────
 
+/**
+ * Sales-role check.
+ *
+ * The RBAC rule is keyed on Role = "Territory Sales Associate", NOT on
+ * Department. Department alone was wrong: it is free-text, so "Sales",
+ * "sales " and "SALES" all appear in real rows, and a non-TSA sitting in the
+ * Sales department would wrongly unlock the sales drawer.
+ *
+ * Department is kept as a secondary signal so an existing TSA row that never
+ * had its Role filled in still gets the sales drawer.
+ */
 export function isSales(user: UserDetails | null): boolean {
-  return user?.Department === "Sales";
+  if (!user) return false;
+  const role = (user.Role || "").trim().replace(/\s+/g, " ").toLowerCase();
+  if (role) return role === "territory sales associate";
+  return (user.Department || "").trim().toLowerCase() === "sales";
 }
 
+/**
+ * Admin-role check.
+ *
+ * Uses the same normalisation as lib/rbac.ts — trimmed, whitespace-collapsed,
+ * case-insensitive. Exact `=== "SuperAdmin"` was too brittle: this column is
+ * hand-edited in Supabase and the live row reads "SuperAdmin" while other rows
+ * hold "SUPERADMIN", "Super Admin" and "superadmin". A single mismatch here
+ * silently showed a field agent the Clock In / Site Visit screen.
+ */
 export function isAdminish(user: UserDetails | null): boolean {
+  if (!user) return false;
+  const n = (s?: string | null) => (s || "").trim().replace(/\s+/g, " ").toLowerCase();
+  const role = n(user.Role);
+  const dept = n(user.Department);
   return (
-    user?.Role === "SuperAdmin" ||
-    user?.Role === "Admin" ||
-    user?.Department === "IT"
+    role === "superadmin" ||
+    role === "super admin" ||
+    role === "admin" ||
+    role === "administrator" ||
+    dept === "it"
   );
 }
 

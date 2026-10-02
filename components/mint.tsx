@@ -464,7 +464,17 @@ export function MintDrawer({
           className
         )}
         style={{
-          maxHeight,
+          // A bottom sheet with only a max-height and no height sizes to its
+          // CONTENT, so the flex-1 body below never gets a bounded box to
+          // scroll inside — the sticky footer is then pushed past the viewport
+          // and clipped instead. Pinning height to the cap makes the body the
+          // scrolling region and keeps the footer on screen, which is what a
+          // sticky footer is for.
+          height: `min(${maxHeight}, 100dvh)`,
+          maxHeight: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
           background: "var(--card)",
           borderTopLeftRadius: "var(--r-sheet)",
           borderTopRightRadius: "var(--r-sheet)",
@@ -475,7 +485,7 @@ export function MintDrawer({
         <SheetTitle className="sr-only">{title}</SheetTitle>
         {description && <span className="sr-only">{description}</span>}
 
-        <div className="mint-ui flex flex-col min-h-0 max-h-[inherit]">
+        <div className="mint-ui flex flex-col min-h-0 flex-1">
           {/* Drag handle — signals it can be swiped, per the design brief */}
           <div className="pt-2.5 pb-1 flex justify-center shrink-0">
             <div className="mint-drag-handle" />
@@ -483,11 +493,16 @@ export function MintDrawer({
 
           {header}
 
-          <div className={cx("flex-1 overflow-y-auto mint-scroll", bodyClassName)}>
+          {/* min-h-0 is required on a flex child that scrolls — without it the
+              item refuses to shrink below its content height, which is what let
+              the body grow past the drawer and hide the footer. */}
+          <div className={cx("flex-1 min-h-0 overflow-y-auto overscroll-contain mint-scroll", bodyClassName)}>
             {children}
           </div>
 
-          {footer}
+          {/* Wrapped so a footer passed as a bare element still cannot be
+              squashed by a tall body. */}
+          {footer && <div className="shrink-0">{footer}</div>}
         </div>
       </SheetContent>
     </Sheet>

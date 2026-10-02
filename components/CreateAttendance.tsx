@@ -205,7 +205,7 @@ export default function CreateAttendance({
     }
     
     fetch(`/api/ModuleSales/Activity/LastStatus?referenceId=${userDetails.ReferenceID}&type=On Field`, {
-      credentials: "include"
+      credentials: "include", cache: "no-store"
     })
       .then((r) => r.json())
       .then((data) => {
@@ -298,7 +298,7 @@ const basePayload = {
         const res = await fetch("/api/ModuleSales/Activity/AddLog", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
+          credentials: "include", cache: "no-store",
           body:    JSON.stringify({ ...basePayload, PhotoURL: photoURL }),
         });
         const data = await res.json();

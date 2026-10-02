@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import bcrypt from "bcryptjs";
 import { supabase } from "@/lib/supabase";
 import { sendPasswordChangedEmail, verifyTicket, type SignedPayload } from "@/lib/password-reset";
+import { checkRateLimit, LIMITS } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/password-reset-complete
@@ -11,6 +12,8 @@ import { sendPasswordChangedEmail, verifyTicket, type SignedPayload } from "@/li
  * A confirmation email is sent afterwards (best effort).
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!checkRateLimit(req, res, LIMITS.resetComplete)) return;
+
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ success: false, message: "Method Not Allowed" });

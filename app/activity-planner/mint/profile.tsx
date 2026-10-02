@@ -4,6 +4,9 @@
    PROFILE — identity card, contact details, security, settings, logout
    ========================================================================== */
 
+/** Bundled visual guide. Served straight out of /public. */
+const GUIDE_PDF = "/BIOLOG_Visual_Guide.pdf";
+
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -194,7 +197,6 @@ export function ProfileScreen({ data }: { data: ActivityData }) {
           {userDetails?.ReferenceID && (
             <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-[var(--mint-soft)] px-3 py-1.5 text-[11px] font-extrabold text-[var(--mint-strong)]">
               <ShieldCheck size={12} /> ID: {userDetails.ReferenceID}
-              {userDetails.TSM ? ` · Zone ${userDetails.TSM}` : ""}
             </span>
           )}
         </div>
@@ -463,10 +465,18 @@ export function ProfileScreen({ data }: { data: ActivityData }) {
         <RowGroup className="mb-4">
           <Row
             icon={<CircleHelp size={18} />}
-            title="Help & Support"
-            subtitle="Guides and contact for your supervisor"
+            title="Guide"
+            subtitle="How to use Biolog — step by step"
             tone="info"
-            onClick={() => toast.info("Ask your TSM to raise a ticket, or call the Biolog helpdesk.")}
+            onClick={() => {
+              /* Opens the bundled visual guide in a new tab. `noopener` keeps the
+                 PDF tab from reaching back into this one via window.opener. */
+              const win = window.open(GUIDE_PDF, "_blank", "noopener,noreferrer");
+              if (!win) {
+                // Popup blocked — fall back to a same-tab navigation.
+                window.location.href = GUIDE_PDF;
+              }
+            }}
           />
           <Row
             icon={<Info size={18} />}

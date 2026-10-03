@@ -23,8 +23,10 @@ import {
   History,
   Info,
   Mail,
+  MapPin,
   Megaphone,
   Save,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -244,6 +246,32 @@ export default function AdminSettingsPage() {
           actionBg="var(--clay-soft)"
           actionFg="var(--clay-ink)"
           onAction={() => router.push("/admin/audit-logs")}
+        />
+
+        {/* Amber, not red: a low-accuracy fix or a visit logged from outside the
+            fence is something to look at, not a failure. */}
+        <SettingRow
+          icon={<MapPin size={19} />}
+          iconBg="var(--amber-soft)"
+          iconFg="var(--amber-ink)"
+          title="Client Site Fences"
+          subtitle="Where each client is, and how far agents may stray"
+          actionLabel="Configure"
+          actionBg="var(--amber-soft)"
+          actionFg="var(--amber-ink)"
+          onAction={() => router.push("/admin/client-sites")}
+        />
+
+        <SettingRow
+          icon={<ShieldAlert size={19} />}
+          iconBg="var(--amber-soft)"
+          iconFg="var(--amber-ink)"
+          title="Location Review"
+          subtitle="Attendance whose GPS or boundary needs a second look"
+          actionLabel="Review"
+          actionBg="var(--amber-soft)"
+          actionFg="var(--amber-ink)"
+          onAction={() => router.push("/admin/location-review")}
         />
       </div>
 

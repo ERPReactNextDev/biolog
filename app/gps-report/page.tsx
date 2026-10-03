@@ -21,6 +21,13 @@ import {
 } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
+import {
+  POOR_ACCURACY_MESSAGE,
+  captureBestPosition,
+  gradeAccuracy,
+  reverseGeocode,
+} from "@/lib/geo";
+import type { FixSource } from "@/lib/geo";
 
 interface UserDetails {
   UserId: string;
@@ -46,7 +53,15 @@ function GPSReportPage() {
   const [loginDate, setLoginDate] = useState<string>("");
   const [logoutDate, setLogoutDate] = useState<string>("");
   const [remarks, setRemarks] = useState<string>("");
-  const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [gpsLocation, setGpsLocation] = useState<{
+    lat: number;
+    lng: number;
+    address?: string;
+    accuracyM?: number | null;
+    source?: FixSource;
+    stale?: boolean;
+    note?: string;
+  } | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
 
   useEffect(() => {
@@ -80,42 +95,41 @@ function GPSReportPage() {
     }
   };
 
-  const getCurrentLocation = useCallback(() => {
+  /* Uses the same engine as the attendance sheets (lib/geo.ts) rather than its
+     own getCurrentPosition, for two reasons: the first reading from the radio
+     stack is routinely 40-300 m out, and the accuracy figure is the only way
+     the agent can tell a trustworthy fix from a guess. This page previously
+     accepted the first reading and silently dropped coords.accuracy. */
+  const getCurrentLocation = useCallback(async () => {
     setGettingLocation(true);
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by this browser.");
+
+    const result = await captureBestPosition({ windowMs: 15_000 });
+
+    if (!result.ok) {
+      toast.error(result.message);
       setGettingLocation(false);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        // Try to get address from coordinates
-        let address = "";
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            address = data.display_name || "";
-          }
-        } catch {
-          // Silent fail - we still have coordinates
-        }
+    const fix = result.fix;
+    const geo = await reverseGeocode(fix.lat, fix.lng);
 
-        setGpsLocation({ lat: latitude, lng: longitude, address });
-        setGettingLocation(false);
-        toast.success("Location captured successfully!");
-      },
-      (error) => {
-        toast.error("Failed to get location. Please enable location services.");
-        setGettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    setGpsLocation({
+      lat: fix.lat,
+      lng: fix.lng,
+      address: geo.address ?? undefined,
+      accuracyM: fix.accuracyM,
+      source: fix.source,
+      stale: fix.stale,
+      note: result.note,
+    });
+    setGettingLocation(false);
+
+    if (gradeAccuracy(fix.accuracyM).warn) {
+      toast.warning(`${POOR_ACCURACY_MESSAGE}`, { duration: 6000 });
+    } else {
+      toast.success("Location captured successfully!");
+    }
   }, []);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,7 +521,28 @@ function GPSReportPage() {
                   style={{ color: "var(--mint-strong)" }}
                 >
                   <Check size={14} /> Location Captured
+                  {gpsLocation.stale && " (last known)"}
                 </p>
+
+                {/* Accuracy badge. `good` is deliberately quiet — only a poor
+                    fix interrupts, because 26-50 m is normal indoors and
+                    alarming someone about it every shift trains them to
+                    ignore the badge entirely. */}
+                {gpsLocation.accuracyM != null && (
+                  <div className="mt-1.5">
+                    <span
+                      className="text-[9.5px] font-extrabold px-1.5 py-[3px] rounded-full leading-none inline-block"
+                      style={{
+                        background: gradeAccuracy(gpsLocation.accuracyM).bg,
+                        color: gradeAccuracy(gpsLocation.accuracyM).fg,
+                      }}
+                    >
+                      {gradeAccuracy(gpsLocation.accuracyM).label} ·{" "}
+                      {gradeAccuracy(gpsLocation.accuracyM).detail}
+                    </span>
+                  </div>
+                )}
+
                 <p
                   className="mint-num text-[11.5px] font-semibold mt-1"
                   style={{ color: "var(--text-muted)" }}
@@ -522,6 +557,22 @@ function GPSReportPage() {
                     {gpsLocation.address}
                   </p>
                 )}
+
+                {gpsLocation.note && (
+                  <p
+                    className="text-[11px] font-bold mt-1.5 leading-relaxed"
+                    style={{
+                      color:
+                        gpsLocation.accuracyM != null &&
+                        gpsLocation.accuracyM > 50
+                          ? "var(--amber-ink)"
+                          : "var(--text-muted)",
+                    }}
+                  >
+                    {gpsLocation.note}
+                  </p>
+                )}
+
                 <button
                   type="button"
                   onClick={getCurrentLocation}

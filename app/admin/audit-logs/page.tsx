@@ -1,326 +1,388 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { UserProvider, useUser } from "@/contexts/UserContext";
-import { FormatProvider } from "@/contexts/FormatContext";
-import { format } from "date-fns";
-import { toast } from "sonner";
-import { Search, ArrowLeft, Loader2, ShieldCheck, User, X, History, Settings, UserPlus, Trash2, ShieldAlert } from "lucide-react";
+/* ============================================================================
+   ADMIN · Audit Logs
+   ----------------------------------------------------------------------------
+   REBUILT IN THE CALM MINT SYSTEM.
 
+   This page was the last one still on the legacy theme: `bg-brand-bg`,
+   `text-gray-*`, shadcn Card/Table/Input, 2rem radii — and it rendered its own
+   sticky header with a back arrow and breadcrumb INSIDE the admin layout, which
+   already draws a sidebar and a top bar. So it was visually a different app
+   from every page beside it.
+
+   It now uses the same primitives as the rest of the console (mint Card/Button,
+   the --card / --mint-strong token palette) and renders NO header of its own —
+   the admin layout supplies the chrome.
+
+   Layout follows the house pattern: page title, filter chips with counts, then a
+   grouped list rather than a wide table, which reads better on the narrow
+   screens this app is mostly used on.
+   ========================================================================== */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbList,
-    BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-
-import ProtectedPageWrapper from "@/components/protected-page-wrapper";
-
-/* ================= TYPES ================= */
+  DatabaseBackup,
+  FileSpreadsheet,
+  History,
+  KeyRound,
+  Loader2,
+  Mail,
+  PlaneTakeoff,
+  Search,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import { Button, Card } from "@/app/activity-planner/mint/ui";
+import { ErrorOverlay } from "@/app/activity-planner/mint/states";
+import { formatPHDate, formatPHDateTime } from "@/lib/ph-time";
 
 interface AuditLog {
-    _id: string;
-    adminId: string;
-    adminName: string;
-    action: string;
-    targetId: string;
-    targetName: string;
-    details: string;
-    date_created: string;
+  _id: string;
+  adminId: string;
+  adminName: string;
+  action: string;
+  targetId: string;
+  targetName: string;
+  details: string;
+  date_created: string;
 }
 
-/* ================= PAGE ================= */
+/* ── Action vocabulary ─────────────────────────────────────────────────────
+   recordAuditLog() takes a free-text action string, so new verbs appear
+   whenever a feature is added. Unmapped actions fall back to a neutral pill
+   rather than disappearing — an unrecognised entry is still an audit record and
+   hiding it would be the wrong failure mode. */
 
-export default function AdminAuditLogsPage() {
-    return (
-        <UserProvider>
-            <FormatProvider>
-                <AuditLogsContent />
-            </FormatProvider>
-        </UserProvider>
-    );
+type ActionTone = { bg: string; fg: string; Icon: typeof History };
+
+const ACTION_TONE: Record<string, ActionTone> = {
+  CREATE_USER: { bg: "var(--mint-soft)", fg: "var(--mint-strong)", Icon: UserPlus },
+  UPDATE_USER: { bg: "var(--info-soft)", fg: "var(--info)", Icon: Users },
+  DELETE_USER: { bg: "var(--alert-soft)", fg: "var(--alert-ink)", Icon: Trash2 },
+  GRANT_ACCESS: { bg: "var(--mint-soft)", fg: "var(--mint-strong)", Icon: ShieldCheck },
+  REVOKE_ACCESS: { bg: "var(--hint-bg)", fg: "var(--hint-text)", Icon: ShieldAlert },
+  UPDATE_SETTINGS: { bg: "var(--violet-soft)", fg: "var(--violet-ink)", Icon: Settings },
+  CREATE_BACKUP: { bg: "var(--info-soft)", fg: "var(--info)", Icon: DatabaseBackup },
+  RESET_PASSWORD: { bg: "var(--clay-soft)", fg: "var(--clay-ink)", Icon: KeyRound },
+  UPDATE_EMAIL_CONFIG: { bg: "var(--clay-soft)", fg: "var(--clay-ink)", Icon: Mail },
+  UPDATE_COMPANY: { bg: "var(--info-soft)", fg: "var(--info)", Icon: Users },
+  REVIEW_GPS_REPORT: { bg: "var(--mint-soft)", fg: "var(--mint-strong)", Icon: ShieldCheck },
+  REVIEW_OB_REQUEST: { bg: "var(--mint-soft)", fg: "var(--mint-strong)", Icon: PlaneTakeoff },
+  EXPORT_DATA: { bg: "var(--clay-soft)", fg: "var(--clay-ink)", Icon: FileSpreadsheet },
+};
+
+const NEUTRAL: ActionTone = { bg: "var(--bg)", fg: "var(--text-muted)", Icon: History };
+
+function toneFor(action: string): ActionTone {
+  return ACTION_TONE[action] || NEUTRAL;
 }
 
-function AuditLogsContent() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { userId, setUserId } = useUser();
+/** "CREATE_USER" -> "Create user". Used for the filter chips. */
+function actionLabel(action: string): string {
+  const known = Object.keys(ACTION_TONE);
+  if (!known.includes(action)) return action.replace(/_/g, " ").toLowerCase();
+  return action
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
-    const [logs, setLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [verifying, setVerifying] = useState(true);
-    const [searchQuery, setSearchQuery] = useState("");
+/** "2h ago" — how the grouped list orders and labels rows. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
 
-    const queryUserId = searchParams?.get("id") ?? "";
+  const mins = Math.floor((Date.now() - then) / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatPHDate(iso, { month: "short", day: "numeric" });
+}
 
-    useEffect(() => {
-        if (queryUserId && queryUserId !== userId) {
-            setUserId(queryUserId);
-        }
-    }, [queryUserId, userId, setUserId]);
+export default function AuditLogsPage() {
+  const router = useRouter();
 
-    /* ================= VERIFY ADMIN ACCESS ================= */
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState<string>("all");
 
-    useEffect(() => {
-        /* ADMGATE_V2 — the early return here used to strand `verifying`,
-           leaving the page on "Verifying access..." forever when opened
-           from the sidebar (no ?id=). Fall through instead: the session
-           endpoint below decides, and the spinner always clears. */
-
-        const verifyAdmin = async () => {
-            try {
-                setVerifying(true);
-              const sess = await fetch('/api/admin/session', { credentials: 'include' });
-              if (sess.status === 401) { router.push('/Login'); return; }
-              if (sess.ok) {
-                  const s = await sess.json();
-                  // Session endpoint already enforced the role server-side.
-                  setVerifying(false);
-                  return;
-              }
-              // Legacy ?id= link and no session probe — fall back to it.
-              if (!queryUserId) { setVerifying(false); return; }
-              const res = await fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`);
-              if (!res.ok) { setVerifying(false); return; }
-              const data = await res.json();
-              const r = (data.Role || '').trim().toLowerCase();
-              const d = (data.Department || '').trim().toLowerCase();
-              if (r !== 'admin' && r !== 'superadmin' && r !== 'super admin' && d !== 'it') {
-                  toast.error('Unauthorized access');
-                  router.push('/activity-planner');
-                  return;
-              }
-                setVerifying(false);
-            } catch (err) {
-                router.push("/Login");
-            }
-        };
-
-        verifyAdmin();
-    }, [queryUserId, router]);
-
-    /* ================= FETCH LOGS ================= */
-
-    const fetchLogs = useCallback(async () => {
-        try {
-            setLoading(true);
-            const res = await fetch("/api/admin/audit-logs");
-            if (!res.ok) throw new Error("Failed to fetch audit logs");
-            const data = await res.json();
-            setLogs(data || []);
-        } catch (err) {
-            toast.error("Failed to load audit logs");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!verifying) {
-            fetchLogs();
-        }
-    }, [verifying, fetchLogs]);
-
-    /* ================= FILTERED LOGS ================= */
-
-    const filteredLogs = useMemo(() => {
-        return logs.filter((log) => {
-            const searchStr = searchQuery.toLowerCase();
-            return (
-                log.adminName.toLowerCase().includes(searchStr) ||
-                log.targetName.toLowerCase().includes(searchStr) ||
-                log.targetId.toLowerCase().includes(searchStr) ||
-                log.action.toLowerCase().includes(searchStr) ||
-                log.details.toLowerCase().includes(searchStr)
-            );
-        });
-    }, [logs, searchQuery]);
-
-    /* ================= HANDLERS ================= */
-
-    const handleBack = () => {
-        router.push(`/activity-planner?id=${encodeURIComponent(queryUserId)}`);
-    };
-
-    const getActionIcon = (action: string) => {
-        switch (action) {
-            case "CREATE_USER": return <UserPlus size={16} className="text-green-600" />;
-            case "DELETE_USER": return <Trash2 size={16} className="text-red-600" />;
-            case "GRANT_ACCESS": return <ShieldCheck size={16} className="text-green-600" />;
-            case "REVOKE_ACCESS": return <ShieldAlert size={16} className="text-orange-600" />;
-            case "UPDATE_USER": return <User size={16} className="text-blue-600" />;
-            case "UPDATE_SETTINGS": return <Settings size={16} className="text-purple-600" />;
-            default: return <History size={16} className="text-gray-600" />;
-        }
-    };
-
-    /* ================= RENDER ================= */
-
-    if (verifying) {
-        return (
-            <div className="flex h-screen items-center justify-center bg-brand-bg">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-brand-primary" />
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Verifying access...</p>
-                </div>
-            </div>
-        );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/audit-logs", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        router.replace("/Login");
+        return;
+      }
+      if (!res.ok) throw new Error(json?.error || "Could not load audit logs.");
+      setLogs(Array.isArray(json) ? json : []);
+    } catch (err: any) {
+      setError(err?.message || "Could not load audit logs.");
+    } finally {
+      setLoading(false);
     }
+  }, [router]);
 
-    return (
-        <ProtectedPageWrapper>
-            <div className="flex min-h-screen flex-col bg-brand-bg">
-                {/* Header */}
-                <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6 shadow-sm">
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={handleBack}
-                        className="h-9 w-9 rounded-xl border border-gray-100 text-gray-500 hover:bg-gray-50 hover:text-brand-primary transition-all"
-                    >
-                        <ArrowLeft size={18} />
-                    </Button>
-                    <Separator orientation="vertical" className="h-4" />
-                    <Breadcrumb>
-                        <BreadcrumbList>
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="text-gray-400 font-medium">Admin</BreadcrumbPage>
-                            </BreadcrumbItem>
-                            <Separator orientation="vertical" className="mx-2 h-4" />
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="font-bold text-brand-primary">
-                                    Audit Trail
-                                </BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </BreadcrumbList>
-                    </Breadcrumb>
-                </header>
+  useEffect(() => {
+    load();
+  }, [load]);
 
-                <main className="flex-1 overflow-auto p-4 md:p-8 lg:p-12">
-                    <div className="w-full flex flex-col gap-8">
-                        {/* Header Actions */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight text-gray-900">System Audit Trail</h1>
-                                <p className="text-sm text-gray-500 mt-1">Monitor all administrative actions and changes for security and transparency.</p>
-                            </div>
+  /* Which actions are actually present, so the chips reflect real data rather
+     than a fixed list that may not match this install. */
+  const actionCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of logs) m.set(l.action, (m.get(l.action) || 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [logs]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return logs.filter((l) => {
+      if (actionFilter !== "all" && l.action !== actionFilter) return false;
+      if (!q) return true;
+      return [l.adminName, l.targetName, l.targetId, l.action, l.details]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [logs, search, actionFilter]);
+
+  /* Group by calendar day so the list reads as a timeline. */
+  const grouped = useMemo(() => {
+    const out: { day: string; label: string; rows: AuditLog[] }[] = [];
+    for (const l of filtered) {
+      const day = formatPHDate(l.date_created, { year: "numeric", month: "2-digit", day: "2-digit" });
+      const label = formatPHDate(l.date_created, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const last = out[out.length - 1];
+      if (last && last.day === day) last.rows.push(l);
+      else out.push({ day, label, rows: [l] });
+    }
+    return out;
+  }, [filtered]);
+
+  if (error && logs.length === 0) {
+    return <ErrorOverlay message={error} onRetry={load} />;
+  }
+
+  return (
+    <div className="mint-ui mint-scope">
+      {/* Head */}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className="min-w-0">
+          <h1 className="text-[21px] font-black text-[var(--text)] leading-tight tracking-tight">
+            Audit Logs
+          </h1>
+          <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mt-1 leading-snug">
+            Every administrative action, newest first
+          </p>
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={load}
+          loading={loading}
+          icon={<History size={16} />}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {/* Filters */}
+      {logs.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 mb-3">
+            <FilterChip
+              active={actionFilter === "all"}
+              onClick={() => setActionFilter("all")}
+              label="All"
+              n={logs.length}
+            />
+            {actionCounts.map(([action, n]) => (
+              <FilterChip
+                key={action}
+                active={actionFilter === action}
+                onClick={() => setActionFilter(actionFilter === action ? "all" : action)}
+                label={actionLabel(action)}
+                n={n}
+              />
+            ))}
+          </div>
+
+          <label
+            className="flex items-center gap-2.5 h-[44px] px-3.5 rounded-[14px] border mb-4"
+            style={{ background: "var(--card)", borderColor: "var(--border)" }}
+          >
+            <Search size={15} style={{ color: "var(--text-faint)" }} className="shrink-0" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search admin, action, target user…"
+              className="flex-1 min-w-0 bg-transparent outline-none text-[12.5px] font-semibold"
+              style={{ color: "var(--text)" }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="w-7 h-7 rounded-[9px] flex items-center justify-center shrink-0"
+                style={{ color: "var(--text-faint)" }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </label>
+        </>
+      )}
+
+      {/* List */}
+      {loading && logs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 size={24} className="animate-spin" style={{ color: "var(--mint)" }} />
+          <p className="text-[12px] font-bold" style={{ color: "var(--text-muted)" }}>
+            Loading audit logs…
+          </p>
+        </div>
+      ) : grouped.length === 0 ? (
+        <Card className="py-14">
+          <div className="flex flex-col items-center text-center px-6">
+            <div
+              className="w-16 h-16 rounded-[20px] flex items-center justify-center mb-4"
+              style={{ background: "var(--mint-soft)", color: "var(--mint)" }}
+            >
+              {search || actionFilter !== "all" ? (
+                <Search size={28} />
+              ) : (
+                <History size={28} />
+              )}
+            </div>
+            <p className="text-[15px] font-extrabold text-[var(--text)]">
+              {search || actionFilter !== "all" ? "No matching entries" : "No actions recorded yet"}
+            </p>
+            <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mt-1.5 max-w-[300px] leading-relaxed">
+              {search || actionFilter !== "all"
+                ? "Try a different search or action filter."
+                : "Administrative changes will appear here as they happen."}
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-5">
+          {grouped.map((group) => (
+            <div key={group.day}>
+              <p className="text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)] mb-2.5">
+                {group.label}
+              </p>
+
+              <Card className="divide-y divide-[var(--border)] overflow-hidden">
+                {group.rows.map((log) => {
+                  const tone = toneFor(log.action);
+                  const Icon = tone.Icon;
+                  return (
+                    <div key={log._id} className="flex items-start gap-3 px-4 py-3">
+                      {/* Action */}
+                      <span
+                        className="w-9 h-9 rounded-[11px] flex items-center justify-center shrink-0"
+                        style={{ background: tone.bg, color: tone.fg }}
+                        aria-hidden
+                      >
+                        <Icon size={16} strokeWidth={2.4} />
+                      </span>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-[13px] font-extrabold text-[var(--text)] leading-tight">
+                            {actionLabel(log.action)}
+                          </p>
+                          <span className="text-[10px] font-bold text-[var(--text-faint)] shrink-0 mt-px">
+                            {relativeTime(log.date_created)}
+                          </span>
                         </div>
 
-                        {/* Search */}
-                        <Card className="rounded-[2rem] border-none shadow-sm overflow-hidden bg-white">
-                            <div className="p-2 flex items-center">
-                                <div className="pl-5 text-gray-400">
-                                    <Search size={22} />
-                                </div>
-                                <Input 
-                                    placeholder="Search by admin name, action, or target user..." 
-                                    className="border-none focus-visible:ring-0 text-base h-14 rounded-none bg-transparent"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                                {searchQuery && (
-                                    <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")} className="mr-2 text-gray-300 hover:text-gray-500 rounded-xl">
-                                        <X size={18} />
-                                    </Button>
-                                )}
-                            </div>
-                        </Card>
+                        {log.details && (
+                          <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5 leading-snug">
+                            {log.details}
+                          </p>
+                        )}
 
-                        {/* Audit Logs Table */}
-                        <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white border border-gray-50">
-                            <Table>
-                                <TableHeader className="bg-gray-50/50">
-                                    <TableRow className="border-gray-100 hover:bg-transparent">
-                                        <TableHead className="w-[250px] font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6 pl-10">Administrator</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Action</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Target User</TableHead>
-                                        <TableHead className="font-black text-gray-400 uppercase text-[11px] tracking-[0.2em] py-6">Timestamp</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="h-80 text-center">
-                                                <div className="flex flex-col items-center justify-center gap-4">
-                                                    <div className="w-12 h-12 border-4 border-gray-100 border-t-brand-primary rounded-full animate-spin" />
-                                                    <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">Loading history...</p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : filteredLogs.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="h-80 text-center">
-                                                <div className="flex flex-col items-center justify-center gap-4">
-                                                    <div className="w-20 h-20 rounded-[2.5rem] bg-gray-50 flex items-center justify-center text-gray-200">
-                                                        <History size={40} />
-                                                    </div>
-                                                    <p className="text-lg font-bold text-gray-400">No actions recorded yet</p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredLogs.map((log) => (
-                                            <TableRow key={log._id} className="border-gray-50 hover:bg-gray-50/30 transition-all group">
-                                                <TableCell className="pl-10 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-11 h-11 rounded-2xl bg-brand-light flex items-center justify-center text-brand-primary font-black uppercase text-base shadow-inner group-hover:bg-white group-hover:shadow-md transition-all">
-                                                            {log.adminName[0]}
-                                                        </div>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <span className="font-bold text-gray-900 truncate">{log.adminName}</span>
-                                                            <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider">Admin</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                                                            {getActionIcon(log.action)}
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-black text-gray-800 uppercase tracking-widest">{log.action.replace("_", " ")}</span>
-                                                            <span className="text-[11px] text-gray-400 font-medium leading-tight max-w-[200px]">{log.details}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-sm font-bold text-gray-700">{log.targetName}</span>
-                                                        <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">ID: {log.targetId}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="text-sm font-black text-gray-700 tabular-nums">
-                                                            {format(new Date(log.date_created), "hh:mm aa")}
-                                                        </span>
-                                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                                                            {format(new Date(log.date_created), "MMM dd, yyyy")}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </Card>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span
+                            className="text-[9.5px] font-extrabold px-1.5 py-[3px] rounded-full leading-none"
+                            style={{ background: tone.bg, color: tone.fg }}
+                          >
+                            {log.adminName || "Unknown admin"}
+                          </span>
+                          {(log.targetName || log.targetId) && (
+                            <span className="text-[10.5px] font-bold text-[var(--text-faint)] truncate">
+                              → {log.targetName || log.targetId}
+                            </span>
+                          )}
+                          <span className="mint-num text-[10px] font-bold text-[var(--text-faint)]">
+                            {formatPHDateTime(log.date_created)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                </main>
+                  );
+                })}
+              </Card>
             </div>
-        </ProtectedPageWrapper>
-    );
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+  n,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  n: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="shrink-0 min-h-[36px] px-3.5 rounded-full text-[12px] font-extrabold border transition-all active:scale-95"
+      style={
+        active
+          ? { background: "var(--mint-btn)", color: "#fff", borderColor: "transparent" }
+          : { background: "var(--card)", color: "var(--text-muted)", borderColor: "var(--border)" }
+      }
+    >
+      {label}
+      <span className="ml-1.5 opacity-70">{n}</span>
+    </button>
+  );
 }

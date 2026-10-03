@@ -103,11 +103,16 @@ export function CardTitle({
 
 // ── Status pill ──────────────────────────────────────────────────────────────
 
-export type Tone = "mint" | "clay" | "alert" | "info" | "neutral";
+export type Tone = "mint" | "clay" | "amber" | "alert" | "info" | "neutral";
 
 const TONE: Record<Tone, { bg: string; fg: string; dot: string }> = {
   mint: { bg: "var(--mint-soft)", fg: "var(--mint-strong)", dot: "var(--mint)" },
   clay: { bg: "var(--clay-soft)", fg: "var(--clay-ink)", dot: "var(--clay)" },
+  // "Needs review" — low GPS accuracy, an offline fix, a log awaiting an
+  // admin's eye. Sits deliberately between clay (informational) and alert
+  // (something went wrong), because nothing HAS gone wrong: the record is
+  // just not yet trustworthy.
+  amber: { bg: "var(--amber-soft)", fg: "var(--amber-ink)", dot: "var(--amber)" },
   alert: { bg: "var(--alert-soft)", fg: "var(--alert-ink)", dot: "var(--alert)" },
   info: { bg: "var(--info-soft)", fg: "var(--info)", dot: "var(--info)" },
   neutral: { bg: "var(--bg)", fg: "var(--text-muted)", dot: "var(--text-faint)" },

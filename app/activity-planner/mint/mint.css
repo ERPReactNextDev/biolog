@@ -43,6 +43,15 @@
   --clay-ink: #b45c38; /* small text on --clay-soft -> 4.64:1 on white */
   --clay-soft: #fff1e6;
 
+  /* ── Status: amber = low GPS accuracy, needs review ──────────────────── */
+  /* Distinct from --clay (orange = "GPS / site visit" generally). Amber is
+     reserved for "this reading can't be trusted" — poor accuracy, a stale
+     offline fix, an out-of-fence log awaiting review. Deliberately NOT red:
+     a warning an agent sees dozens of times a day must not read as an error. */
+  --amber: #d97706;
+  --amber-ink: #92400e; /* small text on --amber-soft -> 7.0:1 on white */
+  --amber-soft: #fef3c7;
+
   /* ── Status: red = absent / error ─────────────────────────────────────── */
   --alert: #dc2626;
   --alert-ink: #b91c1c;
@@ -107,6 +116,10 @@
   --clay-ink: #f0a87f;
   --clay-soft: rgba(224, 138, 95, 0.15);
 
+  --amber: #fbbf24;
+  --amber-ink: #fcd34d;
+  --amber-soft: rgba(251, 191, 36, 0.16);
+
   --alert: #f87171;
   --alert-ink: #fca5a5;
   --alert-soft: rgba(248, 113, 113, 0.15);
@@ -161,6 +174,10 @@
   --clay-ink: #b45c38;
   --clay-soft: #fff1e6;
 
+  --amber: #d97706;
+  --amber-ink: #92400e;
+  --amber-soft: #fef3c7;
+
   --alert: #dc2626;
   --alert-ink: #b91c1c;
   --alert-soft: #fde8e8;
@@ -210,6 +227,10 @@
   --clay: #e08a5f;
   --clay-ink: #f0a87f;
   --clay-soft: rgba(224, 138, 95, 0.15);
+
+  --amber: #fbbf24;
+  --amber-ink: #fcd34d;
+  --amber-soft: rgba(251, 191, 36, 0.16);
 
   --alert: #f87171;
   --alert-ink: #fca5a5;

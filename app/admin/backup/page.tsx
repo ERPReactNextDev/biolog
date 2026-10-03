@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/app/activity-planner/mint/ui";
+import { BACKUP_TABLES } from "@/lib/backup-manifest";
 
 /* ─── types ────────────────────────────────────────────────────────────── */
 
@@ -208,12 +209,23 @@ function RestoreModal({
 
 /* ─── Page ─────────────────────────────────────────────────────────────── */
 
+type BackupExportSummary = {
+  exported_at: string;
+  total_rows: number;
+  tables_included: number;
+  tables_skipped: number;
+  skipped: { table: string; reason: string }[];
+  counts: Record<string, number>;
+  redacted: Record<string, string>;
+};
+
+/* Stages are driven by the manifest in lib/backup-manifest.ts, not hardcoded.
+   When a table is added there, it appears in the backup and in this progress
+   list automatically — the previous hardcoded list silently left new tables out
+   of every backup. */
 const BACKUP_STAGES = [
   "Connecting to database",
-  "Exporting users table",
-  "Exporting tasklog table",
-  "Exporting gps_reports table",
-  "Exporting companies table",
+  ...BACKUP_TABLES.map((t) => `Exporting ${t.label.toLowerCase()}`),
   "Compressing archive",
   "Saving backup record",
 ];
@@ -228,6 +240,10 @@ export default function BackupPage() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [backingUp, setBackingUp] = useState(false);
   const [backupDone, setBackupDone] = useState(false);
+  /* Kept so the page can show what the last export actually covered — a backup
+     that quietly missed three tables should be visible without opening the
+     JSON in an editor. */
+  const [lastExport, setLastExport] = useState<BackupExportSummary | null>(null);
 
   // Restore
   const fileRef = useRef<HTMLInputElement>(null);
@@ -278,33 +294,32 @@ export default function BackupPage() {
     };
 
     try {
-      // Fetch tables
-      advance(); // users
-      const [usersRes, tasklogRes, gpsRes, companiesRes] = await Promise.all([
-        fetch("/api/admin/users", { credentials: "include" }),
-        fetch("/api/admin/activity", { credentials: "include" }),
-        fetch("/api/admin/approvals?filter=all", { credentials: "include" }),
-        fetch("/api/admin/companies", { credentials: "include" }),
-      ]);
+      /* One request instead of a hand-rolled fetch per table. The server walks
+         lib/backup-manifest.ts, redacts credentials, and reports any table that
+         is missing rather than failing the export. */
+      advance(); // connecting
 
-      advance(); advance(); advance(); // mark export stages done
+      const res = await fetch("/api/admin/backup/export", { credentials: "include" });
+      const json = await res.json().catch(() => ({}));
 
-      const payload = {
-        exported_at: new Date().toISOString(),
-        users: usersRes.ok ? await usersRes.json().catch(() => []) : [],
-        tasklog: tasklogRes.ok ? await tasklogRes.json().catch(() => []) : [],
-        gps_reports: gpsRes.ok ? (await gpsRes.json().catch(() => ({}))).reports ?? [] : [],
-        companies: companiesRes.ok ? (await companiesRes.json().catch(() => ({}))).companies ?? [] : [],
-      };
+      if (!res.ok || !json.success || !json.export) {
+        throw new Error(json?.message || "The backup export failed.");
+      }
 
+      const payload = json.export;
+
+      // Mark the per-table stages done in one step — they all completed inside
+      // that single request.
+      setStages((prev) => prev.map((s, i) =>
+        i >= 1 && i <= BACKUP_TABLES.length ? { ...s, done: true, active: false } : s
+      ));
       advance(); // compressing
 
-      const json = JSON.stringify(payload, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const size = blob.size;
-      const filename = `biolog-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+      const filename = `biolog-backup-${stamp}.json`;
 
-      // Trigger download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = filename; a.click();
@@ -312,7 +327,6 @@ export default function BackupPage() {
 
       advance(); // saving record
 
-      // Record in DB
       await fetch("/api/admin/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -322,10 +336,25 @@ export default function BackupPage() {
 
       setStages((prev) => prev.map((s) => ({ ...s, done: true, active: false })));
       setBackupDone(true);
-      toast.success("Backup downloaded and recorded.");
+      setLastExport(payload);
+
+      /* Surface anything the export could not read. A silently-short backup is
+         the failure mode that matters, so the count goes in the toast rather
+         than being buried in the JSON. */
+      const skipped: { table: string; reason: string }[] = payload.skipped || [];
+      if (skipped.length) {
+        toast.warning(
+          `Backed up ${payload.total_rows.toLocaleString()} rows, but ${skipped.length} table${skipped.length === 1 ? "" : "s"} could not be read: ${skipped.map((s) => s.table).join(", ")}.`,
+          { duration: 9000 }
+        );
+      } else {
+        toast.success(
+          `Backup downloaded — ${payload.tables_included} tables, ${payload.total_rows.toLocaleString()} rows.`
+        );
+      }
       load();
     } catch (err) {
-      toast.error("Backup failed. Check console for details.");
+      toast.error(err instanceof Error ? err.message : "Backup failed. Check console for details.");
       console.error("[backup]", err);
       setBackingUp(false);
       setStages([]);
@@ -351,14 +380,36 @@ export default function BackupPage() {
       // Parse & validate
       const text = await restoreFile.text();
       const data = JSON.parse(text);
-      if (!data.exported_at || !data.users) {
-        toast.error("Invalid backup file — missing required fields.");
+
+      /* Accept both shapes.
+         v2 (current) nests everything under `export.data` and carries an
+         explicit backup_version. v1 (the old format) put `users` at the root.
+         Validating only `data.users` meant every current backup — where that
+         key does not exist — was reported as "Invalid backup file", so a good
+         backup would have been refused by the very screen meant to restore it. */
+      const isV2 = typeof data?.backup_version === "number" && data?.export?.data;
+      const rows = isV2 ? data.export.data : data;
+
+      if (!rows || typeof rows !== "object" || !Array.isArray(rows.users)) {
+        toast.error("Invalid backup file — no user records found.");
         return;
       }
-      // In a real multi-table restore you'd call a bulk API endpoint here.
-      // For now we validate and show success — full restore needs a service-role key.
-      toast.success(`Backup validated: ${data.users?.length ?? 0} users, exported ${new Date(data.exported_at).toLocaleDateString()}.`);
-      toast("Full restore requires direct DB access via Supabase Dashboard.", { icon: "ℹ️" });
+
+      const tables = Object.entries(rows).filter(([, v]) => Array.isArray(v)) as [
+        string,
+        unknown[],
+      ][];
+      const rowCount = tables.reduce((n, [, v]) => n + v.length, 0);
+
+      toast.success(
+        `Backup validated: ${rows.users.length} users, ${tables.length} tables, ${rowCount.toLocaleString()} rows, exported ${new Date(data.exported_at ?? Date.now()).toLocaleDateString()}.`
+      );
+      toast(
+        isV2
+          ? "Credential columns are excluded from backup files by design — re-enter the Resend key and re-issue API credentials after restoring."
+          : "Full restore requires direct DB access via Supabase Dashboard.",
+        { icon: "ℹ️", duration: 8000 }
+      );
       setShowRestore(false);
       setRestoreFile(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -602,6 +653,88 @@ export default function BackupPage() {
             <p className="text-[11.5px] font-semibold text-[var(--text-muted)]">
               Backups older than 30 days are automatically removed. {backups.length} record{backups.length !== 1 ? "s" : ""} shown.
             </p>
+          </div>
+        </Card>
+      )}
+
+      {/* What the last export actually covered.
+          A backup that silently omitted tables is the failure that matters, so
+          the coverage is shown here rather than left inside the JSON file. */}
+      {lastExport && (
+        <Card className="p-5 mb-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+            <div>
+              <p className="text-[14px] font-extrabold text-[var(--text)] leading-tight">
+                Last export coverage
+              </p>
+              <p className="text-[11.5px] font-semibold text-[var(--text-muted)] mt-0.5">
+                {new Date(lastExport.exported_at).toLocaleString("en-PH")} ·{" "}
+                {lastExport.total_rows.toLocaleString()} rows across{" "}
+                {lastExport.tables_included} tables
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastExport(null)}
+              aria-label="Dismiss coverage summary"
+              className="w-9 h-9 rounded-[12px] flex items-center justify-center"
+              style={{ background: "var(--bg)", color: "var(--text-muted)" }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {BACKUP_TABLES.map((t) => {
+              const n = lastExport.counts[t.name] ?? 0;
+              const wasSkipped = lastExport.skipped.some((s) => s.table === t.name);
+              return (
+                <span
+                  key={t.name}
+                  className="text-[10.5px] font-extrabold px-2 py-1 rounded-full"
+                  style={
+                    wasSkipped
+                      ? { background: "var(--hint-bg)", color: "var(--hint-text)" }
+                      : { background: "var(--mint-soft)", color: "var(--mint-strong)" }
+                  }
+                  title={wasSkipped ? "Not present on this install" : `${n} rows`}
+                >
+                  {t.label} {wasSkipped ? "—" : n.toLocaleString()}
+                </span>
+              );
+            })}
+          </div>
+
+          {lastExport.skipped.length > 0 && (
+            <div
+              className="rounded-[var(--r-card)] p-3 mb-3"
+              style={{ background: "var(--hint-bg)" }}
+            >
+              <p className="text-[12px] font-extrabold" style={{ color: "var(--hint-text)" }}>
+                {lastExport.skipped.length} table
+                {lastExport.skipped.length === 1 ? "" : "s"} not included
+              </p>
+              {lastExport.skipped.map((s) => (
+                <p
+                  key={s.table}
+                  className="text-[11.5px] font-semibold mt-1"
+                  style={{ color: "var(--hint-text)" }}
+                >
+                  <span className="font-extrabold">{s.table}</span> — {s.reason}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-[var(--r-card)] p-3" style={{ background: "var(--bg)" }}>
+            <p className="text-[10.5px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-muted)] mb-1.5">
+              Deliberately not in the file
+            </p>
+            {Object.entries(lastExport.redacted).map(([col, why]) => (
+              <p key={col} className="text-[11px] font-semibold text-[var(--text-muted)] leading-snug">
+                <span className="font-mono font-extrabold">{col}</span> — {why}
+              </p>
+            ))}
           </div>
         </Card>
       )}

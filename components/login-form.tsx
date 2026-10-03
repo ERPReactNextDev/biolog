@@ -673,9 +673,24 @@ export function LoginForm({
           so without it the whole screen renders in monospace. */}
       <div className={cn("mint-ui mint-scope min-h-svh w-full flex", className)} {...props}>
 
-        {/* Left Panel - Branding (soft mint, not a dark red wall) */}
+        {/* Left Panel - Branding (soft mint, not a dark red wall)
+
+            THE THREE FIXES HERE
+            1. One brand mark per viewport, not two. This panel owns the logo on
+               desktop; the right column's own logo is `lg:hidden` below. Two
+               BIOLOG marks side by side across the fold reads as a rendering
+               bug, and it was one.
+            2. Vertical rhythm. `justify-between` around a `flex-1 justify-center`
+               middle stranded the headline in the leftover space, so the void
+               above it grew with the viewport height. The three rows are now
+               explicit — logo / centred content / footer — and the right column
+               uses the same rhythm, so the two sides read as one composition
+               rather than two independently-parked columns.
+            3. The headline is a clamp, not a fixed 40px. In a half-width column
+               minus the padding, 40px overran the measure and the third line
+               fell onto a fourth. */}
         <div
-          className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
+          className="hidden lg:flex lg:w-1/2 flex-col relative overflow-hidden px-6 sm:px-10 xl:px-14 2xl:px-20"
           style={{ background: "linear-gradient(160deg, var(--mint-gradient) 0%, var(--bg) 55%, var(--mint-soft) 100%)" }}
         >
           <div
@@ -691,10 +706,15 @@ export function LoginForm({
             style={{ background: "rgba(13,150,105,.035)" }}
           />
 
-          <div className="relative z-10">
+          {/* Every row carries the same max-w so the logo, the pitch and the footer
+              stay on one left-hand edge. The panel itself is now full-bleed,
+              so without this the measure would be set by the monitor width
+              and a 40px headline would stretch across a very wide screen. */}
+          {/* Row 1 — brand, top anchored */}
+          <div className="relative z-10 w-full max-w-[600px] pt-9 xl:pt-11 shrink-0">
             <div className="flex items-center gap-3">
               <div
-                className="w-11 h-11 rounded-[15px] flex items-center justify-center overflow-hidden"
+                className="w-11 h-11 rounded-[15px] flex items-center justify-center overflow-hidden shrink-0"
                 style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
               >
                 {settings?.logoUrl ? (
@@ -713,10 +733,11 @@ export function LoginForm({
             </div>
           </div>
 
-          <div className="relative z-10 flex-1 flex flex-col justify-center py-16">
-            <div className="mb-8">
+          {/* Row 2 — the pitch, centred in what is left */}
+          <div className="relative z-10 w-full max-w-[600px] flex-1 flex flex-col justify-center py-8 min-h-0">
+            <div className="mb-7">
               <div
-                className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-6"
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-5"
                 style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
               >
                 <Shield size={13} />
@@ -724,19 +745,23 @@ export function LoginForm({
                   Secure Time Tracking
                 </span>
               </div>
-              <h2 className="text-[40px] font-black leading-[1.1] mb-5 text-[var(--text)]">
+              {/* clamp(), not a fixed size — see note 3 above. */}
+              <h2
+                className="font-black leading-[1.12] mb-4 text-[var(--text)]"
+                style={{ fontSize: "clamp(28px, 2.6vw, 40px)", letterSpacing: "-0.02em" }}
+              >
                 Track time.
                 <br />
                 Stay on field.
                 <br />
                 <span style={{ color: "var(--mint)" }}>Stay accountable.</span>
               </h2>
-              <p className="text-[15px] font-semibold leading-relaxed max-w-sm text-[var(--text-muted)]">
+              <p className="text-[14.5px] font-semibold leading-relaxed max-w-[38ch] text-[var(--text-muted)]">
                 A unified platform for field attendance, site visits, and timesheet management
                 &mdash; built for your team&apos;s daily operations.
               </p>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {[
                 { label: "Real-time GPS tracking", sub: "know where your team is" },
                 { label: "Client visit logs", sub: "track every site interaction" },
@@ -760,16 +785,26 @@ export function LoginForm({
             </div>
           </div>
 
-          <div className="relative z-10">
+          {/* Row 3 — footer, bottom anchored */}
+          <div className="relative z-10 w-full max-w-[600px] pb-9 xl:pb-11 shrink-0">
             <p className="text-[11px] font-bold tracking-wider text-[var(--text-faint)]">
               &copy; {new Date().getFullYear()} BIOLOG &middot; Time Tracker Activity
             </p>
           </div>
         </div>
 
-        {/* Right Panel - Login Form */}
+        {/* Right Panel - Login Form
+
+            Same three-row rhythm as the branding panel, so the two columns
+            compose as one screen instead of two independently-parked ones.
+
+            THE LOGO IS `lg:hidden` — that is the fix for the duplicate brand
+            mark. It was rendering at the top of this column on EVERY viewport,
+            including desktop where the left panel already shows one. Below lg
+            the left panel is hidden, so the logo has to live here or the mobile
+            screen has no brand at all. */}
         <div
-          className="flex-1 flex flex-col pt-6 pb-6 relative overflow-hidden"
+          className="flex-1 lg:w-1/2 flex flex-col relative overflow-hidden"
           style={{ background: "linear-gradient(180deg, var(--mint-gradient) 0%, var(--bg) 42%, var(--card) 100%)" }}
         >
           {/* Decorative mint wash, per the design */}
@@ -782,9 +817,8 @@ export function LoginForm({
             style={{ background: "rgba(13,150,105,.045)" }}
           />
 
-          {/* Logo is pinned to the top so it always sits inside the gradient
-              band — centring the whole column left it stranded below it. */}
-          <div className="w-full lg:max-w-sm mx-auto px-5 flex items-center gap-2.5 mb-7 relative shrink-0">
+          {/* Row 1 — brand, MOBILE ONLY. On desktop the left panel owns it. */}
+          <div className="lg:hidden w-full px-6 pt-6 pb-1 flex items-center justify-center gap-2.5 relative shrink-0">
             <div
               className="w-11 h-11 rounded-[15px] flex items-center justify-center overflow-hidden shrink-0"
               style={{ background: "var(--mint-btn)", boxShadow: "var(--sh-btn)" }}
@@ -804,10 +838,19 @@ export function LoginForm({
             </span>
           </div>
 
-          {/* Content takes the remaining height and centres within it, so short
-              screens (Forgot password) don't leave a void under the gradient. */}
-          <div className="flex-1 flex flex-col justify-center relative">
-            <div className="w-full lg:max-w-sm mx-auto px-5">
+          {/* Row 2 — the form, centred.
+
+              min-h-0 matters: a flex child defaults to min-height:auto, so a
+              tall form (the 4-step password reset lives here too) refuses to
+              shrink and shoves the footer off-screen instead of scrolling
+              inside this row. */}
+          <div className="flex-1 flex flex-col justify-center relative px-6 py-4 sm:py-6 min-h-0">
+            {/* The form keeps its own measure and stays centred. Now that the column is
+              as wide as the monitor, a bare max-w-sm would leave it adrift in
+              the middle of a very wide area — hence a slightly wider cap from
+              xl up, which keeps it reading as a deliberate panel rather than a
+              stray strip. */}
+            <div className="w-full max-w-sm sm:max-w-md mx-auto">
             {resetOpen ? (
               /* The 4-step reset journey replaces the login panel entirely. */
               <ForgotPasswordFlow
@@ -827,7 +870,7 @@ export function LoginForm({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:gap-4">
               {/* Email */}
               <div className="flex flex-col gap-1.5">
                 <label
@@ -921,9 +964,15 @@ export function LoginForm({
                 </div>
               )}
 
-              {/* Remember me */}
+              {/* Remember me
+
+                      min-h-[44px] on the LABEL is the touch target, not the
+                      22px box: the real <input> is `sr-only` (a peer for the
+                      styling), so without this the whole control measured 22px
+                      tall and was a poor tap target on a phone. -mt-1 pulls the
+                      extra height back so the layout does not grow. */}
               {!twoFactorRequired && (
-                <label className="flex items-center gap-2.5 -mt-1 cursor-pointer select-none">
+                <label className="flex items-center gap-2.5 min-h-[44px] -mt-1 cursor-pointer select-none">
                   <span className="relative flex items-center justify-center shrink-0">
                     <input
                       type="checkbox"
@@ -995,7 +1044,10 @@ export function LoginForm({
               {/* Biometric + Sign Up */}
               {!twoFactorRequired && (
                 <>
-                  <div className="relative my-3">
+                  {/* my-2 rather than my-3: the divider only has to separate the submit
+                      button from the social buttons, and on a short phone every
+                      8px here is 8px of scroll. */}
+                  <div className="relative my-2">
                     <div className="absolute inset-0 flex items-center">
                       <span className="w-full border-t" style={{ borderColor: "var(--border-strong)" }} />
                     </div>
@@ -1101,25 +1153,17 @@ export function LoginForm({
                 </>
               )}
             </form>
-
-            {/* Security note — inline so it never drifts from the text */}
-            <div
-              className="mt-6 flex items-start gap-2 rounded-[var(--r-card)] px-3.5 py-2.5"
-              style={{ background: "var(--mint-soft)" }}
-            >
-              <Shield size={14} style={{ color: "var(--mint-strong)" }} className="shrink-0 mt-px" />
-              <p className="text-[11.5px] font-bold leading-snug" style={{ color: "var(--mint-strong)" }}>
-                Your session is secured with device authentication
-              </p>
-            </div>
               </>
             )}
+            {/* closes the max-w-sm content wrapper */}
             </div>
           </div>
 
-          {/* Mobile footer */}
-          <p className="lg:hidden mt-6 text-[11px] font-semibold text-[var(--text-faint)] text-center relative shrink-0">
-            &copy; {new Date().getFullYear()} Biolog Time Tracker Activity
+          {/* Row 3 — footer, MOBILE ONLY. Matches the branding panel's
+              bottom-anchored row so both columns share one rhythm, and the
+              padding respects the iPhone home indicator. */}
+          <p className="lg:hidden px-6 pb-6 pt-1 text-[11px] font-semibold text-[var(--text-faint)] text-center relative shrink-0">
+            &copy; {new Date().getFullYear()} BIOLOG &middot; Time Tracker Activity
           </p>
         </div>
       </div>

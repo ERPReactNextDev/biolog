@@ -11,7 +11,7 @@
    convenience, not the boundary.
    ========================================================================== */
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -23,8 +23,10 @@ import {
   KeyRound,
   Building2,
   LayoutDashboard,
+  LogOut,
   Mail,
   MapPinned,
+  MessageSquare,
   PlaneTakeoff,
   Search,
   Settings,
@@ -53,6 +55,15 @@ type NavItem = {
   badgeTone?: "mint" | "amber";
   /** Requires a permission; omitted means everyone signed in. */
   requires?: "users" | "approvals";
+  /**
+   * Super Admin only, and NOT overridable by a permission flag.
+   *
+   * Separate from `requires` on purpose: that one means "hide unless the flag
+   * says yes", which is right for a feature an admin may delegate. This one
+   * means "third-party PII — nobody below Super Admin gets this door", which a
+   * flag must never be able to open. See requireSuperAdmin() in lib/rbac.ts.
+   */
+  superAdminOnly?: boolean;
 };
 
 type NavGroup = { heading: string; items: NavItem[] };
@@ -65,6 +76,13 @@ type AdminState = {
   canReviewGps: boolean;
   /** Team-wide visibility — gates Site Visits, Reports and Timesheet. */
   canViewAll: boolean;
+  /**
+   * Taken from /api/admin/session's own `isSuperAdmin`, NOT recomputed from the
+   * role string here. The column is hand-edited and carries both "Super Admin"
+   * and "SuperAdmin", so duplicating the normalisation in the client is how the
+   * two drift apart. One authority, read once.
+   */
+  isSuperAdmin: boolean;
 };
 
 /* ── Sidebar ────────────────────────────────────────────────────────────── */
@@ -72,9 +90,12 @@ type AdminState = {
 function Sidebar({
   groups,
   onNavigate,
+  onSignOut,
 }: {
   groups: NavGroup[];
   onNavigate?: () => void;
+  /** Opens the confirm step in the parent, which owns the actual sign-out. */
+  onSignOut: () => void;
 }) {
   const pathname = usePathname() || "";
 
@@ -159,6 +180,22 @@ function Sidebar({
           </p>
         ))}
       </div>
+
+      {/* Sign out — desktop. See signOut() above for why this lives here at
+          all. Deliberately not a dropdown: the agent app uses a confirm step
+          because an agent can have unsynced records, and a console admin has
+          none. One click is the whole interaction. */}
+      <div className="px-3 pb-4 shrink-0">
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="w-full flex items-center gap-3 min-h-[44px] px-3 rounded-[13px] text-[13.5px] font-bold transition-colors"
+          style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.82)" }}
+        >
+          <LogOut size={17} strokeWidth={2.2} />
+          <span>Sign out</span>
+        </button>
+      </div>
     </aside>
   );
 }
@@ -169,6 +206,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [state, setState] = useState<AdminState | null>(null);
   const [counts, setCounts] = useState({ users: 0, pending: 0, obPending: 0 });
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+
+  /* ── Sign out ────────────────────────────────────────────────────────────
+     THE ADMIN CONSOLE HAD NO WAY TO SIGN OUT AT ALL. Not a Super Admin
+     quirk and not a role gate: no page under /admin ever rendered a logout
+     control, and git shows this file has never had one. An admin who signed
+     in to fix something had to clear cookies by hand or log out on the agent
+     app first. The agent app's equivalent lives in the Profile tab
+     (mint/profile.tsx) and calls the same three steps, so the two are kept
+     identical on purpose.
+
+     The offline session must go too, and BEFORE the API call: it holds the
+     cached user details that /Login would otherwise read back, which is how
+     an admin could appear still signed in after "signing out". */
+  const signOut = useCallback(async () => {
+    setConfirmSignOut(false);
+    try {
+      const { clearOfflineSession } = await import("@/lib/offline-auth");
+      await clearOfflineSession();
+    } catch {
+      /* silent — the server call below is the real one */
+    }
+    try {
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+    } catch {
+      /* offline — local session is already cleared */
+    }
+    localStorage.removeItem("userId");
+    router.replace("/Login");
+  }, [router]);
 
   // Who am I, and what may I open?
   useEffect(() => {
@@ -183,29 +250,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
         const data = await res.json().catch(() => ({}));
 
-        // Prefer the user payload the app already fetches; fall back to a probe.
+        /* check-session is the cheapest probe but its shape is not guaranteed —
+           it has returned the user both at the root and nested under `user`.
+           /api/admin/session is the one route that normalises this AND answers
+           isSuperAdmin with the server's own predicate, so prefer it whenever
+           anything is missing. The optimistic branch below cannot know the role,
+           which is why isSuperAdmin stays false there. */
         let role = data?.role || data?.Role || "";
         let email = data?.email || data?.Email || "";
         let name = data?.name || "";
 
-        if (!role || !email) {
-          const probe = await fetch("/api/admin/session", { credentials: "include", cache: "no-store" });
-          if (probe.ok) {
-            const p = await probe.json();
-            role = p.role || role;
-            email = p.email || email;
-            name = p.name || name;
-            if (cancelled) return;
-            setState({
-              email,
-              name: name || email,
-              role,
-              canManageUsers: Boolean(p.canManageUsers),
-              canReviewGps: Boolean(p.canReviewGps),
-              canViewAll: Boolean(p.canViewAll),
-            });
-            return;
-          }
+        const probe = await fetch("/api/admin/session", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (probe.ok) {
+          const p = await probe.json();
+          if (cancelled) return;
+          setState({
+            email: p.email || email || "",
+            name: p.name || name || p.email || email || "",
+            role: p.role || role,
+            canManageUsers: Boolean(p.canManageUsers),
+            canReviewGps: Boolean(p.canReviewGps),
+            canViewAll: Boolean(p.canViewAll),
+            isSuperAdmin: p.isSuperAdmin === true,
+          });
+          return;
         }
 
         if (!cancelled) {
@@ -213,11 +285,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             email,
             name: name || email,
             role,
-            // Optimistic: the API is the real gate. Assume yes so the nav is
-            // not mysteriously empty if this probe is unavailable.
+            /* Optimistic: the API is the real gate for everything except the
+               Super Admin item, which must never be guessed open. Withholding
+               it hides a tab the server would refuse anyway. */
             canManageUsers: true,
             canReviewGps: true,
             canViewAll: true,
+            isSuperAdmin: false,
           });
         }
       } catch {
@@ -229,6 +303,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       cancelled = true;
     };
   }, [router]);
+
+  /* Escape closes the confirm dialog. Without this it can only be dismissed by
+     clicking "Stay" or the backdrop, which traps a keyboard user on a page
+     they cannot leave. */
+  useEffect(() => {
+    if (!confirmSignOut) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmSignOut(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirmSignOut]);
 
   // Badge counts.
   useEffect(() => {
@@ -272,49 +358,73 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
    /api/admin/* route re-checks server-side and these pages surface a clear
    403 message when the role genuinely lacks permission.
 
+   THE ONE EXCEPTION IS "Web Inquiries". It is hidden from non-Super-Admins
+   because it holds third-party PII: there is no operational reason for a
+   delegated Admin to read a stranger's message, and a tab they can always open
+   and always be refused from is worse than no tab at all. The route is still
+   gated by requireSuperAdmin() server-side — this only avoids the dead end.
+
    Two groups per the spec: Management (day-to-day) and Advanced (platform). */
-const navGroups: NavGroup[] = [
-    {
-      heading: "Management",
-      items: [
-        { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/admin/users", label: "Users", icon: UsersIcon, badge: counts.users },
-        {
-          href: "/admin/approvals",
-          label: "Approvals",
-          icon: ClipboardCheck,
-          badge: counts.pending,
-          badgeTone: "amber",
-        },
-        { href: "/admin/site-visits", label: "Site Visits", icon: MapPinned },
-        {
-          href: "/admin/ob-approvals",
-          label: "OB Approvals",
-          icon: PlaneTakeoff,
-          badge: counts.obPending,
-          badgeTone: "amber",
-        },
-        { href: "/admin/reports", label: "Reports", icon: BarChart3 },
-        { href: "/admin/timesheet", label: "Timesheet", icon: CalendarRange },
-      ],
-    },
-    {
-      heading: "Advanced",
-      items: [
-        { href: "/admin/api-keys", label: "API Credentials", icon: KeyRound },
-        { href: "/admin/api-keys/tester", label: "API Tester", icon: FlaskConical },
-        { href: "/admin/backup", label: "Backup & Restore", icon: DatabaseBackup },
-        { href: "/admin/companies", label: "Companies", icon: Building2 },
-        { href: "/admin/settings", label: "Settings", icon: Settings },
-        { href: "/admin/email-config", label: "Email Config", icon: Mail },
-        { href: "/admin/documentation", label: "Documentation", icon: Book },
-      ],
-    },
-  ];
+/* Nav is built from state, so it must recompute when the session probe
+     resolves. Before it does, the single Super-Admin-only item is withheld
+     rather than flashed and then removed — the same reason the state starts
+     null instead of pre-filled with an optimistic role. */
+  const navGroups: NavGroup[] = useMemo(() => {
+    const advanced: NavItem[] = [
+      { href: "/admin/api-keys", label: "API Credentials", icon: KeyRound },
+      { href: "/admin/api-keys/tester", label: "API Tester", icon: FlaskConical },
+      { href: "/admin/backup", label: "Backup & Restore", icon: DatabaseBackup },
+      { href: "/admin/companies", label: "Companies", icon: Building2 },
+      { href: "/admin/settings", label: "Settings", icon: Settings },
+      { href: "/admin/email-config", label: "Email Config", icon: Mail },
+      // Super Admin only — see the note above. `state` is null on the first
+      // render, so the item is withheld until /api/admin/session has actually
+      // told us who this is. Never guessed open.
+      ...(state?.isSuperAdmin
+        ? [
+            {
+              href: "/admin/website-inquiries",
+              label: "Web Inquiries",
+              icon: MessageSquare,
+              superAdminOnly: true,
+            } as NavItem,
+          ]
+        : []),
+      { href: "/admin/documentation", label: "Documentation", icon: Book },
+    ];
+
+    return [
+      {
+        heading: "Management",
+        items: [
+          { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+          { href: "/admin/users", label: "Users", icon: UsersIcon, badge: counts.users },
+          {
+            href: "/admin/approvals",
+            label: "Approvals",
+            icon: ClipboardCheck,
+            badge: counts.pending,
+            badgeTone: "amber",
+          },
+          { href: "/admin/site-visits", label: "Site Visits", icon: MapPinned },
+          {
+            href: "/admin/ob-approvals",
+            label: "OB Approvals",
+            icon: PlaneTakeoff,
+            badge: counts.obPending,
+            badgeTone: "amber",
+          },
+          { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+          { href: "/admin/timesheet", label: "Timesheet", icon: CalendarRange },
+        ],
+      },
+      { heading: "Advanced", items: advanced },
+    ];
+  }, [state?.isSuperAdmin, counts.users, counts.pending, counts.obPending]);
 
   return (
     <div className="mint-ui mint-scope flex min-h-svh" style={{ background: "var(--bg)" }}>
-      <Sidebar groups={navGroups} />
+      <Sidebar groups={navGroups} onSignOut={() => setConfirmSignOut(true)} />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
@@ -368,8 +478,78 @@ const navGroups: NavGroup[] = [
                 {(state?.role || "ADMIN").toUpperCase()}
               </p>
             </div>
+
+            {/* Sign out — also here, not only in the sidebar. The sidebar is
+                hidden below md, and the bottom bar is crowded with 13 nav
+                items, so on a phone this was the one reachable control. */}
+            <button
+              type="button"
+              onClick={() => setConfirmSignOut(true)}
+              aria-label="Sign out"
+              title="Sign out"
+              className="w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 transition-colors"
+              style={{ background: "var(--bg)", color: "var(--alert-ink)" }}
+            >
+              <LogOut size={17} strokeWidth={2.2} />
+            </button>
           </div>
         </header>
+
+        {/* Confirm step. Only shown after an explicit click, and dismissed by
+            clicking away or pressing Escape — a confirmation dialog that can
+            be escaped is not a trap. */}
+        {confirmSignOut && (
+          <>
+            <button
+              type="button"
+              aria-label="Cancel sign out"
+              onClick={() => setConfirmSignOut(false)}
+              className="fixed inset-0 z-40"
+              style={{ background: "rgba(15,23,42,0.45)", cursor: "default" }}
+            />
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="signout-title"
+              className="fixed left-1/2 top-1/2 z-50 w-[min(400px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 p-5"
+              style={{
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--r-card-lg)",
+                boxShadow: "var(--sh-card-lg)",
+              }}
+            >
+              <p
+                id="signout-title"
+                className="text-[15px] font-extrabold text-[var(--text)] mb-1.5"
+              >
+                Sign out of the admin console?
+              </p>
+              <p className="text-[12.5px] font-semibold text-[var(--text-muted)] mb-4 leading-relaxed">
+                Any unsaved edits on this page will be lost.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setConfirmSignOut(false)}
+                  className="min-h-[42px] px-4 rounded-[var(--r-btn)] text-[13px] font-extrabold"
+                  style={{ background: "var(--bg)", color: "var(--text-muted)" }}
+                >
+                  Stay
+                </button>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  autoFocus
+                  className="min-h-[42px] px-4 rounded-[var(--r-btn)] text-[13px] font-extrabold text-white"
+                  style={{ background: "var(--alert)" }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto mint-scroll px-4 md:px-6 py-5 pb-24 md:pb-6">

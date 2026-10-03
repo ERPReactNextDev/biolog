@@ -12,7 +12,7 @@
    reach, so "Team only" is never a guess.
    ========================================================================== */
 
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CalendarDays, Globe, MapPin, Timer, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Hint } from "@/app/activity-planner/mint/ui";

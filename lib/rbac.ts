@@ -37,6 +37,13 @@ export type SessionUser = {
   department: string | null;
   /** Raw jsonb from users.permissions — shape varies by row, so read defensively. */
   permissions: Record<string, unknown> | null;
+  /**
+   * Owning tenant, or null when the user is unassigned. Nullable in the schema
+   * and not back-filled on every install (see migration 20260104), so every
+   * caller must treat null as "no tenant filter" rather than "tenant 0" —
+   * filtering on it unconditionally returns nothing and looks like empty data.
+   */
+  companyId: number | null;
 };
 
 export type Permission =
@@ -221,11 +228,16 @@ export async function getSessionUser(req: NextApiRequest): Promise<SessionUser |
 
   const { data: user, error: userErr } = await supabase
     .from("users")
-    .select('id, "Email", "Role", "ReferenceID", "Department", permissions')
+    .select('id, "Email", "Role", "ReferenceID", "Department", permissions, company_id')
     .eq("id", session.userId)
     .maybeSingle();
 
   if (userErr || !user) return null;
+
+  const companyId =
+    typeof user.company_id === "number" && Number.isFinite(user.company_id)
+      ? user.company_id
+      : null;
 
   return {
     id: user.id,
@@ -234,6 +246,7 @@ export async function getSessionUser(req: NextApiRequest): Promise<SessionUser |
     referenceId: user.ReferenceID || "",
     department: user.Department || null,
     permissions: (user.permissions as Record<string, unknown>) || null,
+    companyId,
   };
 }
 
@@ -268,6 +281,34 @@ export function requirePermission(
     message: "You do not have permission to do that.",
   });
   return false;
+}
+
+/**
+ * Super Admin ONLY — and deliberately NOT overridable by a permission flag.
+ *
+ * Used for data that identifies third parties rather than employees: the
+ * marketing site's contact submissions hold a stranger's name, email, company
+ * and the contents of their message. Unlike `can_view_all` (team attendance,
+ * granted to Managers) there is no operational reason for a delegated admin to
+ * read it, and having no flag means a mis-clicked permission edit cannot
+ * accidentally expose it.
+ *
+ * `can_manage_settings` is deliberately NOT reused here: that permission passes
+ * for Admin as well as Super Admin, which is the wrong door for customer PII.
+ */
+export async function requireSuperAdmin(
+  req: NextApiRequest,
+  res: NextApiResponse
+): Promise<SessionUser | null> {
+  const user = await requireSession(req, res);
+  if (!user) return null; // 401 already written
+  if (isSuperAdminRole(user.role)) return user;
+
+  res.status(403).json({
+    success: false,
+    message: "Only a Super Admin can view this.",
+  });
+  return null;
 }
 
 /**

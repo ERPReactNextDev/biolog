@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIOLOG — Field Attendance Reimagined</title>
+<meta name="description" content="BIOLOG combines facial verification, GPS tracking and full offline support in one attendance system built for Philippine field teams.">
+<meta name="theme-color" content="#0d9669">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%230b7f5a'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>B</text></svg>">
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header class="site-header">
+  <nav class="nav container" aria-label="Main">
+    <a class="brand" href="index.html">
+      <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+      BIOLOG
+    </a>
+
+    <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Open menu" aria-controls="nav-links">
+      <i class="ri-menu-line" aria-hidden="true"></i>
+    </button>
+
+    <ul class="nav__links" id="nav-links" data-nav-links>
+      <li><a class="nav__link" href="index.html" aria-current="page">Home</a></li>
+      <li><a class="nav__link" href="features.html">Features</a></li>
+      <li><a class="nav__link" href="pricing.html">Pricing</a></li>
+      <li><a class="nav__link" href="about.html">About</a></li>
+      <li><a class="nav__link" href="contact.html">Contact</a></li>
+      <li class="nav__mobile-cta">
+        <a class="btn btn--primary btn--block" href="contact.html">
+          <i class="ri-play-circle-line" aria-hidden="true"></i> Get a Demo
+        </a>
+      </li>
+    </ul>
+
+    <a class="btn btn--primary btn--sm nav__cta" href="contact.html">
+      Get a Demo
+    </a>
+  </nav>
+</header>
+
+<div class="nav-scrim" data-nav-scrim aria-hidden="true"></div>
+
+<main>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="container hero__grid">
+      <div>
+        <span class="badge">
+          <i class="ri-shield-check-line" aria-hidden="true"></i>
+          Accurate Attendance, Anywhere
+        </span>
+
+        <h1>Field Attendance Reimagined</h1>
+
+        <p class="hero__sub">
+          BIOLOG combines facial verification, GPS tracking, and full offline
+          support — built for Philippine field teams who work where the signal
+          doesn't.
+        </p>
+
+        <div class="hero__actions">
+          <a class="btn btn--primary btn--lg" href="pricing.html">
+            Get Started <i class="ri-arrow-right-line" aria-hidden="true"></i>
+          </a>
+          <a class="btn btn--ghost btn--lg" href="features.html">
+            <i class="ri-layout-grid-line" aria-hidden="true"></i> See Features
+          </a>
+        </div>
+
+        <div class="hero__proof">
+          <span class="pill"><i class="ri-wifi-off-line" aria-hidden="true"></i> Works offline</span>
+          <span class="pill"><i class="ri-focus-3-line" aria-hidden="true"></i> Face verified</span>
+          <span class="pill"><i class="ri-map-pin-line" aria-hidden="true"></i> GPS tracked</span>
+        </div>
+      </div>
+
+      <!-- Phone mockup: drawn, not photographed. See style.css for why. -->
+      <div class="phone" role="img" aria-label="BIOLOG mobile app showing a confirmed clock-in with photo verification, location accuracy of 22 metres and a Clock Out button.">
+        <span class="phone__notch" aria-hidden="true"></span>
+        <div class="phone__status" aria-hidden="true">
+          <span>9:41</span>
+          <span>100%</span>
+        </div>
+        <div class="phone__screen">
+
+          <div class="ph-card ph-card--mint">
+            <p class="ph-label">Welcome back</p>
+            <p class="ph-title">Juan Dela Cruz</p>
+            <p class="ph-sub">On Duty · Shift 08:00–17:00</p>
+          </div>
+
+          <div class="ph-card">
+            <p class="ph-label">Verified location</p>
+            <p class="ph-sub">EDSA, Quezon City</p>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <span class="pill pill--mint" style="font-size:9.5px;padding:3px 9px">Excellent · ±22 m</span>
+            </div>
+          </div>
+
+          <div class="ph-card">
+            <p class="ph-label">Photo verification</p>
+            <p class="ph-sub">Face matched · 8:04 AM</p>
+          </div>
+
+          <div style="margin-top:auto">
+            <div class="ph-btn ph-btn--clay">
+              <i class="ri-logout-circle-line" aria-hidden="true"></i> Clock Out
+            </div>
+          </div>
+
+          <div class="ph-grid">
+            <div class="ph-tile"><i class="ri-add-line"></i>Site Visit</div>
+            <div class="ph-tile"><i class="ri-file-chart-line"></i>Reports</div>
+            <div class="ph-tile"><i class="ri-user-line"></i>Profile</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Demo launch ──────────────────────────────────────────────────────── -->
+  <section class="demo-launch" id="demo">
+    <div class="container">
+      <h2>See How It Works — Agent Demo</h2>
+      <p>Try the BIOLOG mobile experience. Step-by-step preview of what your team sees every day.</p>
+
+      <button class="btn btn--primary demo-launch__btn" type="button" data-demo-open>
+        <i class="ri-play-fill" aria-hidden="true"></i> Launch Interactive Demo
+      </button>
+
+      <p class="demo-launch__note">No login required — see exactly what your team will use.</p>
+    </div>
+  </section>
+
+  <!-- ── Highlights ───────────────────────────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">What you get</p>
+        <h2>Six things that make attendance stick</h2>
+        <p>Not a feature list for its own sake — each of these exists because
+           something about field work makes the obvious approach fail.</p>
+      </div>
+
+      <div class="cards">
+        <article class="card">
+          <div class="card__icon"><i class="ri-camera-lens-line" aria-hidden="true"></i></div>
+          <h3>Photo &amp; Face Verification</h3>
+          <p>Every clock-in and site visit takes a photo. With facial verification on, a
+             borrowed phone no longer works — which is the whole point of taking one.</p>
+        </article>
+
+        <article class="card">
+          <div class="card__icon"><i class="ri-map-pin-2-line" aria-hidden="true"></i></div>
+          <h3>Precise GPS Tracking</h3>
+          <p>BIOLOG listens for the best fix within a 15-second window instead of
+             accepting the first one. You see the accuracy figure, not just a dot.</p>
+        </article>
+
+        <article class="card">
+          <div class="card__icon"><i class="ri-wifi-off-line" aria-hidden="true"></i></div>
+          <h3>Works Offline</h3>
+          <p>No signal? The log is queued on the phone with its photo and coordinates
+             and syncs itself when the connection returns. Nothing is lost, nothing
+             is backdated.</p>
+        </article>
+
+        <article class="card">
+          <div class="card__icon"><i class="ri-file-chart-line" aria-hidden="true"></i></div>
+          <h3>Smart Reports</h3>
+          <p>Attendance, hours, late arrivals and overtime, filterable by team or
+             individual and exportable to Excel. Computed from the work day your
+             company actually runs, not midnight.</p>
+        </article>
+
+        <article class="card">
+          <div class="card__icon"><i class="ri-store-2-line" aria-hidden="true"></i></div>
+          <h3>Site Visit Logs</h3>
+          <p>Client visits are recorded separately from attendance, with the client,
+             contact and remarks attached. One row per visit, with photo proof and a
+             timestamp you can hand to a client.</p>
+        </article>
+
+        <article class="card">
+          <div class="card__icon card__icon--clay"><i class="ri-dashboard-3-line" aria-hidden="true"></i></div>
+          <h3>Admin Dashboard</h3>
+          <p>See who's in, who isn't and who claimed a location they shouldn't have.
+             Review flags, manage roles and permissions, and audit every
+             administrative action.</p>
+        </article>
+      </div>
+
+      <div class="stack mt-3">
+        <a class="btn btn--primary btn--lg" href="pricing.html">
+          View Plans <i class="ri-arrow-right-line" aria-hidden="true"></i>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Stats ────────────────────────────────────────────────────────────── -->
+  <section class="section section--tint">
+    <div class="container">
+      <div class="stats">
+        <div class="stat">
+          <p class="stat__value"><span data-count-to="15">15</span>s</p>
+          <p class="stat__label">GPS accuracy window</p>
+        </div>
+        <div class="stat">
+          <p class="stat__value"><span data-count-to="25">25</span>m</p>
+          <p class="stat__label">Accepted fix threshold</p>
+        </div>
+        <div class="stat">
+          <p class="stat__value"><span data-count-to="100">100</span>%</p>
+          <p class="stat__label">Offline queue coverage</p>
+        </div>
+        <div class="stat">
+          <p class="stat__value" data-count-to="8" data-count-suffix="&nbsp;hrs">8 hrs</p>
+          <p class="stat__label">Typical field shift</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ──────────────────────────────────────────────────────────────── -->
+  <section class="cta-band">
+    <div class="container">
+      <h2>Ready to see it on your own data?</h2>
+      <p>Tell us how many people you're managing and we'll walk you through a live
+         demo with your shift patterns, not a canned script.</p>
+      <div class="cta-band__actions">
+        <a class="btn btn--primary btn--lg" href="contact.html">
+          Book a Demo <i class="ri-calendar-check-line" aria-hidden="true"></i>
+        </a>
+        <a class="btn btn--ghost btn--lg" href="pricing.html">See Pricing</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+          BIOLOG
+        </a>
+        <p class="footer__about">
+          Attendance built for Philippine field teams. Designed around weak signal,
+          long commutes and the fact that a photo is worth more than a signature.
+        </p>
+      </div>
+
+      <div>
+        <p class="footer__title">Product</p>
+        <ul class="footer__links">
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#demo">Interactive Demo</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="footer__title">Company</p>
+        <ul class="footer__links">
+          <li><a href="about.html">About</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html">Request a Demo</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> BIOLOG. All rights reserved.</p>
+      <p>Metro Manila, Philippines</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ==========================================================================
+     DEMO MODAL
+     aria-modal + role="dialog" so assistive tech treats it as a dialog even
+     though it is a plain div. aria-hidden="true" initially: it is closed, and
+     hidden content should not be reachable by a screen reader.
+     ========================================================================== -->
+<div class="demo-modal" data-demo-modal role="dialog" aria-modal="true" aria-labelledby="demo-title" aria-hidden="true">
+
+  <div class="demo-dialog" data-demo-dialog>
+
+    <div class="demo-head">
+      <div style="flex:1;min-width:0">
+        <h2 class="demo-head__title" id="demo-title">Agent Demo</h2>
+        <p class="demo-head__sub">What a field agent sees, step by step</p>
+      </div>
+      <button class="demo-close" type="button" data-demo-close aria-label="Close demo">
+        <i class="ri-close-line" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <div class="demo-dots" role="tablist" aria-label="Demo steps">
+      <button class="progress-dot is-active" type="button" data-demo-dot aria-label="Go to step 1" aria-current="step"></button>
+      <button class="progress-dot" type="button" data-demo-dot aria-label="Go to step 2" aria-current="false"></button>
+      <button class="progress-dot" type="button" data-demo-dot aria-label="Go to step 3" aria-current="false"></button>
+      <button class="progress-dot" type="button" data-demo-dot aria-label="Go to step 4" aria-current="false"></button>
+      <button class="progress-dot" type="button" data-demo-dot aria-label="Go to step 5" aria-current="false"></button>
+      <button class="progress-dot" type="button" data-demo-dot aria-label="Go to step 6" aria-current="false"></button>
+    </div>
+
+    <div class="demo-body" data-demo-body>
+
+      <!-- ── Step 1 · Home screen ──────────────────────────────────────── -->
+      <div class="demo-step is-active" data-demo-step role="tabpanel" aria-hidden="false">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 1 of 6</p>
+          <h3 class="demo-step__title">Home Screen</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="ph-card ph-card--mint">
+                <p class="ph-label">On Duty</p>
+                <p class="ph-title">Juan Dela Cruz</p>
+                <p class="ph-sub">Shift 08:00–17:00</p>
+              </div>
+
+              <div class="ph-card">
+                <p class="ph-label">Today</p>
+                <p class="ph-sub">Clocked in at 8:04 AM</p>
+              </div>
+
+              <div class="ph-btn">
+                <i class="ri-login-circle-line" aria-hidden="true"></i> Clock In
+              </div>
+
+              <div class="ph-grid">
+                <div class="ph-tile"><i class="ri-add-line"></i>Site Visit</div>
+                <div class="ph-tile"><i class="ri-file-chart-line"></i>Reports</div>
+                <div class="ph-tile"><i class="ri-user-line"></i>Profile</div>
+              </div>
+
+              <div class="ph-grid">
+                <div class="ph-tile"><i class="ri-calendar-line"></i>Calendar</div>
+                <div class="ph-tile"><i class="ri-notification-line"></i>Alerts</div>
+                <div class="ph-tile"><i class="ri-settings-line"></i>Settings</div>
+              </div>
+            </div>
+          </div>
+
+          <p class="demo-caption">This is your home screen — everything at a glance.</p>
+        </div>
+      </div>
+
+      <!-- ── Step 2 · Photo capture ────────────────────────────────────── -->
+      <div class="demo-step" data-demo-step role="tabpanel" aria-hidden="true">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 2 of 6</p>
+          <h3 class="demo-step__title">Clock In: Photo Capture</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="demo-cam">
+                <span class="demo-cam__countdown">
+                  <i class="ri-time-line" aria-hidden="true"></i> 0:03
+                </span>
+                <span class="demo-cam__flip">
+                  <i class="ri-camera-switch-line" aria-hidden="true"></i>
+                </span>
+                <span class="demo-cam__guide" aria-hidden="true"></span>
+                <span class="demo-cam__shutter" aria-hidden="true"></span>
+                <span class="demo-cam__hint">Tap to Capture</span>
+              </div>
+              <p class="ph-sub" style="text-align:center">Flip camera option and countdown both available</p>
+            </div>
+          </div>
+
+          <p class="demo-caption">Take a quick verification photo — prevents buddy-punching.</p>
+        </div>
+      </div>
+
+      <!-- ── Step 3 · Location ─────────────────────────────────────────── -->
+      <div class="demo-step" data-demo-step role="tabpanel" aria-hidden="true">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 3 of 6</p>
+          <h3 class="demo-step__title">Clock In: Location Verification</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="ph-card">
+                <p class="ph-label">Detected Location</p>
+                <p class="ph-sub">EDSA, Quezon City</p>
+                <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+                  <span class="pill pill--mint" style="font-size:9px;padding:3px 8px">Excellent · ±22 m</span>
+                </div>
+              </div>
+
+              <div class="demo-map">
+                <span class="demo-map__grid" aria-hidden="true"></span>
+                <span class="demo-map__road demo-map__road--h" aria-hidden="true"></span>
+                <span class="demo-map__road demo-map__road--v" aria-hidden="true"></span>
+                <span class="demo-map__accuracy" aria-hidden="true"></span>
+                <span class="demo-map__pin"><i class="ri-map-pin-fill"></i></span>
+                <span class="demo-map__label">EDSA, Quezon City</span>
+              </div>
+
+              <div style="display:flex;gap:7px">
+                <div class="ph-btn ph-btn--ghost" style="flex:1">Retry</div>
+                <div class="ph-btn ph-btn--ghost" style="flex:1">Set Manually</div>
+              </div>
+            </div>
+          </div>
+
+          <p class="demo-caption">GPS confirms your location — fallback options available.</p>
+        </div>
+      </div>
+
+      <!-- ── Step 4 · Success ──────────────────────────────────────────── -->
+      <div class="demo-step" data-demo-step role="tabpanel" aria-hidden="true">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 4 of 6</p>
+          <h3 class="demo-step__title">Clock In: Success</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="demo-success">
+                <span class="demo-success__ring"><i class="ri-check-line" aria-hidden="true"></i></span>
+                <p class="ph-title">Clock In Confirmed</p>
+                <p class="ph-sub">8:04 AM · Tue, Oct 13</p>
+              </div>
+
+              <div class="ph-card">
+                <p class="ph-label">Location</p>
+                <p class="ph-sub">EDSA, Quezon City</p>
+                <div style="margin-top:6px">
+                  <span class="pill pill--mint" style="font-size:9px;padding:3px 8px">Excellent · ±22 m</span>
+                </div>
+              </div>
+
+              <div class="ph-btn ph-btn--clay">
+                <i class="ri-logout-circle-line" aria-hidden="true"></i> Clock Out
+              </div>
+            </div>
+          </div>
+
+          <p class="demo-caption">You're in! Status updates instantly.</p>
+        </div>
+      </div>
+
+      <!-- ── Step 5 · Site visit start ────────────────────────────────── -->
+      <div class="demo-step" data-demo-step role="tabpanel" aria-hidden="true">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 5 of 6</p>
+          <h3 class="demo-step__title">Site Visit: Start</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="ph-card">
+                <p class="ph-label">Select Activity</p>
+                <div class="ph-btn" style="margin-top:8px">
+                  <i class="ri-store-2-line" aria-hidden="true"></i> Site Visit
+                </div>
+              </div>
+
+              <div class="demo-cam" style="min-height:96px;flex:0 0 96px">
+                <span class="demo-cam__hint">Photo captured</span>
+                <span class="demo-cam__guide" style="width:60px;height:72px" aria-hidden="true"></span>
+              </div>
+
+              <div class="ph-card">
+                <p class="ph-label">Client Type</p>
+                <div style="display:flex;gap:6px;margin-top:7px">
+                  <span class="pill pill--mint" style="flex:1;justify-content:center">New</span>
+                  <span class="pill" style="flex:1;justify-content:center">Existing</span>
+                </div>
+              </div>
+
+              <div class="ph-grid">
+                <div class="ph-tile"><i class="ri-add-line"></i>Site Visit</div>
+                <div class="ph-tile"><i class="ri-file-chart-line"></i>Reports</div>
+                <div class="ph-tile"><i class="ri-user-line"></i>Profile</div>
+              </div>
+            </div>
+          </div>
+
+          <p class="demo-caption">Log client visits separately from regular attendance.</p>
+        </div>
+      </div>
+
+      <!-- ── Step 6 · Site visit clock out ─────────────────────────────── -->
+      <div class="demo-step" data-demo-step role="tabpanel" aria-hidden="true">
+        <div class="demo-step__inner">
+          <p class="demo-step__step">Step 6 of 6</p>
+          <h3 class="demo-step__title">Site Visit: Active &amp; Clock Out</h3>
+
+          <div class="demo-phone">
+            <div class="demo-phone__screen">
+              <div class="demo-banner">
+                <i class="ri-play-circle-fill" aria-hidden="true"></i>
+                Active visit · Robinsons Mandaue
+              </div>
+
+              <div class="ph-card">
+                <p class="ph-label">Remarks</p>
+                <p class="ph-sub">Met ops manager at the loading bay. Discussed Q4 replenishment.</p>
+              </div>
+
+              <div class="ph-card">
+                <p class="ph-label">Location</p>
+                <p class="ph-sub">Robinsons Mandaue</p>
+                <div style="margin-top:6px">
+                  <span class="pill pill--mint" style="font-size:9px;padding:3px 8px">Inside boundary</span>
+                </div>
+              </div>
+
+              <div class="ph-btn ph-btn--clay">
+                <i class="ri-logout-circle-line" aria-hidden="true"></i> Clock Out
+              </div>
+
+              <div class="demo-banner">
+                <i class="ri-check-circle-fill" aria-hidden="true"></i>
+                Visit Saved — Viewable in Calendar
+              </div>
+            </div>
+          </div>
+
+          <p class="demo-caption">Full audit trail — photos, notes, and timestamps.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="demo-foot">
+      <button class="btn btn--ghost btn--sm" type="button" data-demo-prev disabled>
+        <i class="ri-arrow-left-line" aria-hidden="true"></i> Back
+      </button>
+
+      <span class="demo-progress-text" data-demo-counter>Step 1 of 6</span>
+
+      <span class="demo-foot__spacer"></span>
+
+      <button class="demo-autoplay" type="button" data-demo-autoplay aria-pressed="false">
+        <i class="ri-pause-fill" aria-hidden="true"></i>
+        <span class="sr-only-toggle">Pause</span>
+      </button>
+
+      <button class="btn btn--primary btn--sm" type="button" data-demo-next>
+        Next <i class="ri-arrow-right-line" aria-hidden="true"></i>
+      </button>
+
+      <button class="btn btn--primary btn--sm" type="button" data-demo-finish hidden>
+        <i class="ri-close-line" aria-hidden="true"></i> Close Demo
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

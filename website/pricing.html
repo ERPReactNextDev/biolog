@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing — BIOLOG</title>
+<meta name="description" content="Simple, transparent per-month pricing. Every plan includes the mobile app and the admin dashboard.">
+<meta name="theme-color" content="#0d9669">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%230b7f5a'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>B</text></svg>">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav container" aria-label="Main">
+    <a class="brand" href="index.html">
+      <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+      BIOLOG
+    </a>
+    <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Open menu" aria-controls="nav-links">
+      <i class="ri-menu-line" aria-hidden="true"></i>
+    </button>
+    <ul class="nav__links" id="nav-links" data-nav-links>
+      <li><a class="nav__link" href="index.html">Home</a></li>
+      <li><a class="nav__link" href="features.html">Features</a></li>
+      <li><a class="nav__link" href="pricing.html" aria-current="page">Pricing</a></li>
+      <li><a class="nav__link" href="about.html">About</a></li>
+      <li><a class="nav__link" href="contact.html">Contact</a></li>
+      <li class="nav__mobile-cta">
+        <a class="btn btn--primary btn--block" href="contact.html">
+          <i class="ri-play-circle-line" aria-hidden="true"></i> Get a Demo
+        </a>
+      </li>
+    </ul>
+    <a class="btn btn--primary btn--sm nav__cta" href="contact.html">Get a Demo</a>
+  </nav>
+</header>
+
+<div class="nav-scrim" data-nav-scrim aria-hidden="true"></div>
+
+<main>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Pricing</p>
+        <h2>Simple, Transparent Pricing</h2>
+        <p>Every plan includes the admin dashboard <em>and</em> the mobile app.
+           No separate charge for the thing your team actually uses.</p>
+      </div>
+
+      <div class="plans">
+
+        <!-- ── Starter ──────────────────────────────────────────────────── -->
+        <div class="plan">
+          <p class="plan__name">Starter</p>
+          <p class="plan__price">₱1,499<small>/mo</small></p>
+          <p class="plan__users">Up to 10 users &middot; 1 admin + 9 agents</p>
+          <ul class="plan__list">
+            <li><i class="ri-check-line"></i>Core clock in / clock out with photo</li>
+            <li><i class="ri-check-line"></i>GPS tracking with accuracy grading</li>
+            <li><i class="ri-check-line"></i>Site visit logging</li>
+            <li><i class="ri-check-line"></i>Full offline queue &amp; auto-sync</li>
+            <li><i class="ri-check-line"></i>Excel export</li>
+            <li><i class="ri-check-line"></i>Admin dashboard</li>
+            <li><i class="ri-check-line"></i>Email support</li>
+          </ul>
+          <a class="btn btn--ghost btn--block" href="contact.html">Get Started</a>
+        </div>
+
+        <!-- ── Professional ─────────────────────────────────────────────── -->
+        <div class="plan plan--featured">
+          <span class="plan__flag"><i class="ri-star-fill" aria-hidden="true"></i> Recommended</span>
+          <p class="plan__name">Professional</p>
+          <p class="plan__price">₱3,999<small>/mo</small></p>
+          <p class="plan__users">Up to 50 users &middot; 3 admins + 47 agents</p>
+          <ul class="plan__list">
+            <li><i class="ri-check-line"></i>Everything in Starter</li>
+            <li><i class="ri-add-line is-add"></i>Facial verification on clock in / out</li>
+            <li><i class="ri-add-line is-add"></i>Priority background sync</li>
+            <li><i class="ri-add-line is-add"></i>GPS report approval workflow</li>
+            <li><i class="ri-add-line is-add"></i>Location review queue</li>
+            <li><i class="ri-add-line is-add"></i>Client-site boundaries</li>
+            <li><i class="ri-add-line is-add"></i>Analytics &amp; team rollups</li>
+            <li><i class="ri-add-line is-add"></i>Multi-company support</li>
+            <li><i class="ri-add-line is-add"></i>Priority support</li>
+          </ul>
+          <a class="btn btn--primary btn--block" href="contact.html">Choose Professional</a>
+        </div>
+
+        <!-- ── Enterprise ───────────────────────────────────────────────── -->
+        <div class="plan">
+          <p class="plan__name">Enterprise</p>
+          <p class="plan__price">Custom Quote</p>
+          <p class="plan__users">50+ users</p>
+          <ul class="plan__list">
+            <li><i class="ri-check-line"></i>Everything in Professional</li>
+            <li><i class="ri-add-line is-add"></i>Dedicated account manager</li>
+            <li><i class="ri-add-line is-add"></i>Third-party API access</li>
+            <li><i class="ri-add-line is-add"></i>Custom branding</li>
+            <li><i class="ri-add-line is-add"></i>Custom data retention policy</li>
+            <li><i class="ri-add-line is-add"></i>Onboarding &amp; staff training</li>
+            <li><i class="ri-add-line is-add"></i>Uptime SLA</li>
+          </ul>
+          <a class="btn btn--clay btn--block" href="contact.html">Contact Us</a>
+        </div>
+
+      </div>
+
+      <p class="text-muted text-center mt-3" style="font-size:13.5px;font-weight:700">
+        All prices in Philippine pesos, exclusive of VAT. Monthly billing, cancel
+        any time &mdash; your data exports to Excel and JSON on the way out.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Inclusions ──────────────────────────────────────────────────────── -->
+  <section class="section section--tint">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Compare</p>
+        <h2>What's in each plan</h2>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Feature comparison across the Starter, Professional and Enterprise plans</caption>
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <th scope="col">Starter</th>
+              <th scope="col">Professional</th>
+              <th scope="col">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mobile app &amp; admin dashboard</td>
+              <td><i class="ri-check-line"></i> Included</td>
+              <td><i class="ri-check-line"></i> Included</td>
+              <td><i class="ri-check-line"></i> Included</td>
+            </tr>
+            <tr>
+              <td>Photo clock in / clock out</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>GPS with accuracy grading</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Offline queue &amp; auto-sync</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Site visit logging</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Excel export</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Facial verification</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>GPS report approval workflow</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Location review queue</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Client-site boundaries</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Multi-company support</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Analytics &amp; team rollups</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Third-party API</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Dedicated manager</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Custom branding</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Uptime SLA</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td style="color:var(--text-faint)">&mdash;</td>
+              <td><i class="ri-check-line"></i></td>
+            </tr>
+            <tr>
+              <td>Support</td>
+              <td>Email</td>
+              <td>Priority</td>
+              <td>Dedicated manager</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FAQ ─────────────────────────────────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Questions</p>
+        <h2>Common questions</h2>
+      </div>
+
+      <div class="faq">
+        <details open>
+          <summary>Is the mobile app included in every plan?</summary>
+          <div class="faq__body">
+            Yes. There is no separate charge for the mobile app or for the admin
+            dashboard &mdash; a plan that gave you a dashboard without the app your
+            team uses would be selling the wrong half of the product.
+          </div>
+        </details>
+
+        <details>
+          <summary>How does offline mode actually work?</summary>
+          <div class="faq__body">
+            When the app cannot reach the server, the log is written to the
+            phone's local database with its photo and coordinates, then synced
+            automatically once a connection returns. The agent sees a pending
+            count so they know it has not yet been filed, and a record filled in
+            offline is flagged as needing review rather than passing silently.
+          </div>
+        </details>
+
+        <details>
+          <summary>Do agents need to be near the office to clock in?</summary>
+          <div class="faq__body">
+            That depends on how you configure it. You set the office boundary
+            and its radius, and you decide whether being outside it blocks the
+            clock-in or simply flags the record for review. Client-site
+            boundaries work the same way, per client.
+          </div>
+        </details>
+
+        <details>
+          <summary>What happens to our data if we leave?</summary>
+          <div class="faq__body">
+            It is yours. Every table exports to a single JSON file alongside a
+            familiar Excel export, so you can keep the records or move them
+            elsewhere. Credential columns are deliberately excluded from the
+            JSON dump, but attendance history, site visits and locations are all
+            included.
+          </div>
+        </details>
+
+        <details>
+          <summary>Can we add or remove users mid-month?</summary>
+          <div class="faq__body">
+            Yes. Seat changes take effect immediately and are billed on the next
+            invoice at a prorated rate. Upgrading does not require a reinstall
+            &mdash; the mobile app picks up the new permissions on next sign-in.
+          </div>
+        </details>
+
+        <details>
+          <summary>Is facial verification required?</summary>
+          <div class="faq__body">
+            No, it is a per-user toggle rather than a plan-wide switch. It is
+            useful where devices are shared, and pointless where every agent has
+            their own phone. You can enable it for some users and not others in
+            the same install.
+          </div>
+        </details>
+
+        <details>
+          <summary>Do you support multiple companies in one install?</summary>
+          <div class="faq__body">
+            Professional and Enterprise do. Each company is scoped to its own
+            users and records, so a shared install cannot leak one tenant's data
+            into another's reports.
+          </div>
+        </details>
+
+        <details>
+          <summary>How long does onboarding take?</summary>
+          <div class="faq__body">
+            Typically a few days: we import your users, configure your work day,
+            grace period and office boundary, then train the supervisors. Agent
+            onboarding is deliberately short &mdash; the app is four buttons deep
+            from the home screen.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container">
+      <h2>Not sure which plan fits?</h2>
+      <p>Tell us your headcount and field setup. We'd rather size it properly than
+         have you upgrade in three months.</p>
+      <div class="cta-band__actions">
+        <a class="btn btn--primary btn--lg" href="contact.html">Talk to Us</a>
+        <a class="btn btn--ghost btn--lg" href="features.html">See Features</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+          BIOLOG
+        </a>
+        <p class="footer__about">
+          Attendance built for Philippine field teams. Designed around weak signal,
+          long commutes and the fact that a photo is worth more than a signature.
+        </p>
+      </div>
+      <div>
+        <p class="footer__title">Product</p>
+        <ul class="footer__links">
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#demo">Interactive Demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer__title">Company</p>
+        <ul class="footer__links">
+          <li><a href="about.html">About</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html">Request a Demo</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> BIOLOG. All rights reserved.</p>
+      <p>Metro Manila, Philippines</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

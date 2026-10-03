@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  AlertTriangle, Check, Clock, Copy, Loader2,
+  Check, Clock, Copy, Loader2,
   Play, Zap, Shield, Database, Globe, ArrowRight,
   CheckCircle2, XCircle, Wifi, Lock,
 } from "lucide-react";

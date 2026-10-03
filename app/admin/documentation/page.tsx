@@ -21,11 +21,12 @@ import {
   KeyRound,
   Layers,
   MapPin,
+  PlaneTakeoff,
   Server,
   ShieldCheck,
   Smartphone,
 } from "lucide-react";
-import { Card, Pill } from "@/app/activity-planner/mint/ui";
+import { Pill } from "@/app/activity-planner/mint/ui";
 
 /* ── Content ─────────────────────────────────────────────────────────────── */
 
@@ -136,6 +137,170 @@ loginDate, logoutDate, "Latitude", "Longitude", "Location",
 reviewStatus default 'pending', "reviewedBy", "reviewNotes", "reviewedAt",
 date_created, company_id`,
       },
+      { k: "h", text: "ob_requests — official business trips (ROBT), image-first" },
+      {
+        k: "p",
+        text: "The signed paper form is the artifact: an agent photographs it and the photo is what HRAD approves. There are deliberately no signature columns.",
+      },
+      {
+        k: "code",
+        text: `id                      bigint PK
+"ReferenceID"           text NOT NULL   -- submitter
+"Name"/"Position"/"Department" text       -- snapshot at submit
+"Destination"           text
+"DateOfOB"              date
+"PurposeOfTravel"       text
+"IsLateFiling"          bool            -- filed with <= 1 day notice
+"Justification"         text            -- expected when late
+"PhotoURL"              jsonb NOT NULL  -- image URLs; CHECK requires >= 1
+"Status"                text default 'Pending Review'
+                          CHECK IN ('Pending Review','Approved','Declined',
+                                    'For COO Approval')
+"ReviewedBy"/"ReviewNotes"/"ReviewedAt"
+"EmailStatus"           text            -- 'pending' | 'sent' | 'failed'
+"EmailSentAt"/"EmailRetries"/"EmailError"
+date_created, company_id`,
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "'For COO Approval' is reserved",
+        text: "The approval chain is Agent → HRAD. Nothing writes 'For COO Approval' and no transition targets it; the value is kept so COO sign-off can be enabled without a migration.",
+      },
+      { k: "h", text: "group_visitations — team-restricted field visits" },
+      {
+        k: "code",
+        text: `id                      bigint PK
+"ReferenceID_creator"   text NOT NULL   -- creator decides visibility
+"CreatorRole"/"CreatorName"            -- snapshot at create
+"CompanyName"           text NOT NULL   -- the headline of every card
+"CompanyAddress"        text
+"VisitDate"             date default current_date
+"MeetupTime"            time
+"MeetingPoint"/"Purpose" text
+"MaxMembers"            int             -- NULL = unlimited
+"Visibility"            text default 'team_only'
+                          CHECK IN ('team_only','open_to_all')
+"Status"                text default 'Upcoming'
+                          CHECK IN ('Upcoming','Ongoing','Completed','Cancelled')
+date_created, company_id`,
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "Visibility follows the creator, not the visitor",
+        text: "A Manager / Territory Sales Manager creates team-only by default; an ordinary agent creates open-to-all. Both defaults carry an override. Team membership resolves from users.TSM / users.Manager by ReferenceID, with users.TSMName / users.ManagerName as a fallback.",
+      },
+      { k: "h", text: "group_visit_members — one row per person per visit" },
+      {
+        k: "code",
+        text: `id                   bigint PK
+group_visit_id       bigint NOT NULL REFERENCES group_visitations ON DELETE CASCADE
+"ReferenceID"        text NOT NULL
+joined_at, checked_in, checked_in_at
+UNIQUE (group_visit_id, "ReferenceID")   -- no double join`,
+      },
+      {
+        k: "p",
+        text: "Status is DERIVED on read, not stored: Upcoming → Ongoing at the meet-up time → Completed at end of day. Only Cancelled and manual overrides persist.",
+      },
+      { k: "h", text: "notifications — in-app bell" },
+      {
+        k: "code",
+        text: `id                bigint PK
+"ReferenceID"     text NOT NULL   -- recipient; one row each, never a broadcast
+type              text NOT NULL
+                    CHECK IN ('ob_approved','ob_declined','ob_submitted',
+                              'gps_reviewed','group_visit')
+title, message, link_url, thumb_url
+meta              jsonb
+is_read default false, read_at
+company_id, created_at`,
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "Two bells, two feeds",
+        text: "The admin bell shows ob_submitted only (OB approvals). The agent bell shows ob_approved, ob_declined and group_visit. group_visit is deliberately NOT in the admin feed, or team visits would bury real OB requests.",
+      },
+      { k: "h", text: "email_config — per-company outbound mail" },
+      {
+        k: "code",
+        text: `id                bigint PK
+company_id        bigint          -- NULL = the default install
+resend_api_key_enc text           -- AES-256-GCM; never exported to a backup
+sender_email, sender_name
+ob_recipients / gps_recipients / timesheet_recipients   jsonb
+ob_subject_template, ob_body_template
+auto_send_on_ob  bool default false
+is_active, updated_at, created_at`,
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "The key is write-only and encrypted",
+        text: "Resolution order is email_config → RESEND_API_KEY, so a fresh install works before anyone configures anything. The API never returns the plaintext key; it returns a mask and a boolean.",
+      },
+      { k: "h", text: "tasklog — the location-quality columns" },
+      {
+        k: "p",
+        text: "Added by migration 20260106_location_accuracy.sql. All nullable, so every pre-existing row is untouched and reads back as GeoFlag = NULL, meaning \u201cno geo data\u201d rather than \u201cpassed\u201d.",
+      },
+      {
+        k: "code",
+        text: `"GeoAccuracyM"     numeric     -- reported accuracy radius, metres
+"GeoSource"        text        CHECK IN ('gps','fallback','cached','manual')
+"GeoFlag"          text        CHECK IN ('low_accuracy','outside_geofence',
+                                    'manual_override','offline_stale',
+                                    'network_fix')
+"GeoDistanceM"     integer     -- distance from the client site's centre
+"GeoSiteName"      text        -- which client_sites row matched
+"GeoReviewed"      boolean     default false
+"GeoReviewedBy"/"GeoReviewedAt"
+
+-- Partial index: the review queue only ever reads flagged, unreviewed rows.
+CREATE INDEX idx_tasklog_geo_review ON tasklog (date_created DESC)
+  WHERE "GeoFlag" IS NOT NULL AND "GeoReviewed" = false;`,
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "GeoFlag is derived on the server, never accepted from the browser",
+        text: "AddLog reads GeoAccuracyM and GeoSource but ignores any GeoFlag in the request body — a client that can name its own flag has no flag at all. The value is computed from our own accuracy number and our own fence lookup. For an out-of-fence visit the server additionally REFUSES the write unless a photo and remarks are both present, since the sheet is exactly the thing an agent can bypass.",
+      },
+      {
+        k: "p",
+        text: "Priority when two apply: outside_geofence outranks everything, then offline_stale, network_fix, manual_override, low_accuracy. Being outside the boundary is the only one an admin must act on, and it must not be buried under a low-accuracy entry.",
+      },
+      { k: "h", text: "client_sites — the fence directory, NOT a client list" },
+      {
+        k: "note",
+        tone: "info",
+        title: "The clients live in Neon",
+        text: "accounts.company_name, read by /api/fetch-account, /api/fetch-tsm and /api/fetch-manager. That remains the only source of truth for who the clients are. client_sites holds no company name, contact or account reference — it stores only where a client is and how far an agent may stray from it.",
+      },
+      {
+        k: "code",
+        text: `id            bigint PK
+name          text NOT NULL   -- LOOKUP KEY ONLY, not a registry
+latitude      numeric NOT NULL
+longitude     numeric NOT NULL
+radius_meters integer NOT NULL DEFAULT 100 CHECK (> 0 AND <= 5000)
+is_active     boolean NOT NULL DEFAULT true
+created_at / updated_at / company_id
+
+-- GENERATED, so the app cannot write a wrong value:
+name_key      text GENERATED ALWAYS AS
+                (lower(btrim(regexp_replace(name, '\\s+', ' ', 'g')))) STORED`,
+      },
+      {
+        k: "p",
+        text: "The name is present purely because Neon and Supabase are separate databases and tasklog.\"SiteVisitAccount\" is a plain company-name string with no shared id — so the name is the only thing a fence can be found by. A client renamed in Neon stops matching, which is silent and harmless: no fence means no warning, exactly as before.",
+      },
+      {
+        k: "p",
+        text: "Wants the fence to travel with the account instead? Add latitude/longitude/radius_meters to Neon accounts and drop this table. Two functions change: resolveFence() in pages/api/ModuleSales/Activity/AddLog.ts and fetchSiteFence() in lib/geofence.ts. The trade is that Neon is not covered by the JSON backup.",
+      },
       { k: "h", text: "Platform tables" },
       {
         k: "table",
@@ -144,6 +309,7 @@ date_created, company_id`,
           ["sessions", "Signed-in sessions keyed by the `session` cookie"],
           ["system_settings", "Global config; upserted on type = 'global'"],
           ["meetings", "Scheduled client meetings"],
+          ["accounts (NEON)", "Client master data — the source of truth for client names"],
           ["tickets", "Agent support tickets"],
           ["audit_logs", "Who did what, admin actions"],
           ["push_tokens", "Device push registrations"],
@@ -175,19 +341,40 @@ date_created, company_id`,
         k: "code",
         text: `Super Admin / Admin / Admin / IT  → everything
 Manager                            → team-wide read (can_view_all)
-Territory Sales Associate           → sales attendance drawer
+Territory Sales Associate           → sales attendance drawer (role default)
+HRAD / Territory Sales Manager      → can review OB requests
 Default User                       → basic attendance drawer`,
       },
       {
         k: "p",
-        text: "Roles are compared case-insensitively with whitespace collapsed — \"SuperAdmin\", \"SUPERADMIN\" and \"Super Admin\" are all the same role, because the column is hand-edited.",
+        text: "Roles are compared case-insensitively with whitespace collapsed — \"SuperAdmin\", \"SUPERADMIN\" and \"Super Admin\" are all the same role, because the column is hand-edited. The live table also contains \"MANAGER\" next to \"Manager\", so a strict comparison would silently exclude a real manager.",
       },
       { k: "h", text: "Fine-grained permissions (users.permissions jsonb)" },
       {
         k: "code",
         text: `can_manage_users     can_review_gps        can_view_all
 can_manage_settings  can_view_reports      can_create_sales_attendance
-can_create_attendance`,
+can_review_ob        can_lookup_clients    can_create_attendance`,
+      },
+      {
+        k: "p",
+        text: "Super Admin and Admin pass every permission unconditionally. Everyone else is decided by these flags.",
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "Use permFlagRaw(), not permFlag(), for anything overridable",
+        text: "permFlag() collapses an ABSENT key to false, which makes it impossible to express 'the admin chose no'. permFlagRaw() returns true / false / undefined so an explicit override can override a role default in both directions. Using the boolean form for can_create_attendance also denied every user who had never been configured, which 403'd the whole attendance surface.",
+      },
+      {
+        k: "table",
+        head: ["Permission", "Default when unset"],
+        rows: [
+          ["can_create_sales_attendance", "True for a Territory Sales Associate"],
+          ["can_lookup_clients", "True — existing sales users keep the client picker"],
+          ["can_create_attendance", "True — only an explicit false denies"],
+          ["can_review_ob", "False unless the role is HRAD / TSM / Manager or Super Admin"],
+        ],
       },
     ],
   },
@@ -269,7 +456,35 @@ Content-Type: application/json
           ["/api/admin/backup", "Backup history + restore"],
           ["/api/gps-report/update", "Approve or decline a report (can_review_gps)"],
           ["/api/attendance/drawer", "Which attendance drawer this role may open"],
+          ["/api/admin/email-config", "Per-company mail settings + send test (can_manage_settings)"],
+          ["/api/admin/client-sites", "Fence CRUD (can_manage_settings); GET is open to all"],
+          ["/api/admin/geo-flags", "Flagged attendance queue + mark reviewed (can_view_reports)"],
+          ["GET /api/geofence/site?site=", "The fence for one client name — used by both sheets"],
+          ["/api/admin/backup/export", "Full JSON dump of every table in the backup manifest"],
         ],
+      },
+      { k: "h", text: "OB and Group Visit endpoints" },
+      {
+        k: "table",
+        head: ["Endpoint", "Purpose"],
+        rows: [
+          ["GET /api/ob-request?scope=mine", "Your own OB requests"],
+          ["GET /api/ob-request?scope=queue&filter=pending|approved|declined|late", "Review queue (can_review_ob)"],
+          ["POST /api/ob-request", "File a request. At least one image URL is required"],
+          ["POST /api/ob-request/review", "Approve or decline; notifies the agent"],
+          ["GET /api/group-visits?scope=feed", "Group visits you are ALLOWED to see, with join state"],
+          ["GET /api/group-visits?scope=one&id=N", "One visit — still filtered through the team rule"],
+          ["POST /api/group-visits", "Create a visit; creator auto-joins, team is notified"],
+          ["POST /api/group-visits/join", "action: join | leave | cancel | checkin"],
+          ["GET /api/notifications?bell=admin|agent", "Your notifications and unread count"],
+          ["POST /api/notifications/read", "Mark one read, or all when id is omitted"],
+        ],
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "A restricted visit is never sent to the client",
+        text: "GET /api/group-visits filters through canSee() on the server, so a team-only group is invisible to an outsider — guessing its id returns nothing. The disabled JOIN button exists only so the UI can explain the restriction.",
       },
       { k: "h", text: "Auth and activity endpoints" },
       {
@@ -367,6 +582,184 @@ console.log(\`\${meta.range.from} → \${data.length} rows\`);`,
     ],
   },
   {
+    id: "field-features",
+    title: "Field features",
+    icon: <PlaneTakeoff size={16} />,
+    blocks: [
+      {
+        k: "p",
+        text: "Three additions to the agent app that share one rule: the SERVER decides what an agent may see or do, and the UI only renders what it was told.",
+      },
+
+      { k: "h", text: "Location accuracy — watchPosition, not getCurrentPosition" },
+      {
+        k: "p",
+        text: "lib/geo.ts is the single authority for how a coordinate was obtained, how good it is, and what address it is. Both attendance sheets and the GPS report go through it, so \u201cwhat counts as a good fix\u201d cannot drift between screens.",
+      },
+      {
+        k: "table",
+        head: ["Was", "Now"],
+        rows: [
+          ["getCurrentPosition() resolved with the FIRST reading", "watchPosition() for up to 15 s, keeping the tightest"],
+          ["The first reading was accepted immediately", "2.5 s minimum dwell, so the radio can improve on it"],
+          ["coords.accuracy was discarded", "Carried end-to-end: badge, map circle, tasklog column, server-side flag"],
+          ["A poor fix looked identical to a good one", "Excellent / Good / Poor — amber only on Poor"],
+          ["Raw Nominatim fetch on every drag", "Pluggable provider + 30-day cache + 1 req/s floor"],
+          ["Offline produced a blank address", "Last known fix, then cached address, then raw coordinates"],
+        ],
+      },
+      {
+        k: "code",
+        text: `captureBestPosition()  // the fallback chain, in order
+  1. watchPosition  { enableHighAccuracy: true, timeout: 15000,
+                      maximumAge: 0 }
+     keeps the BEST reading and resolves early once <= 25 m, but only
+     AFTER a 2.5 s dwell. Own timer, because PositionOptions.timeout
+     bounds the reading AGE, not the total listening time — so it cannot
+     be relied on to end the window.
+  2. one getCurrentPosition { enableHighAccuracy: false, timeout: 10000,
+                               maximumAge: 60000 }   → source "fallback"
+  3. localStorage last known fix                    → source "cached"
+
+  PERMISSION_DENIED short-circuits the whole chain on purpose: falling
+  through to a stale pin would clock the agent in somewhere they are not.`,
+      },
+      {
+        k: "table",
+        head: ["Source", "Flagged when", "Meaning"],
+        rows: [
+          ["gps", "accuracy > 50 m", "Live fix but a weak one — usually indoors"],
+          ["gps", "never", "Accepted silently"],
+          ["fallback", "always", "The high-accuracy watch timed out; the network answered"],
+          ["cached", "always", "Last known position, not a live reading"],
+          ["manual", "always", "The agent dragged the pin or typed an address"],
+          ["— server side —", "outside the fence", "Outranks every flag above"],
+        ],
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "Nominatim is a policy risk, and swapping it costs money",
+        text: "Nominatim's public instance forbids heavy and commercial use and throttles hard. Google and Mapbox both bill per request, and this app geocodes on every drag, so the provider is an env var rather than a hardcoded swap: set NEXT_PUBLIC_MAPBOX_TOKEN or NEXT_PUBLIC_GOOGLE_GEOCODING_KEY and it is picked up automatically; otherwise Nominatim stays, but behind a real cache and a 1 req/s floor so a team of agents does not get the whole install IP blocked.",
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "The accuracy circle is the point of the map",
+        text: "The picker draws L.circle at radius = coords.accuracy, dashed so it stays distinguishable from the solid geofence. The GPS fix and the draggable marker are deliberately two separate things — collapsing them into one marker is what made the original confusing, because moving the pin visually moved the error circle. OSM streets and Esri World Imagery are both available, because an agent inside a building needs to see the roof they are under.",
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "Two fences, and they refuse differently on purpose",
+        text: "The OFFICE fence (system_settings) still REFUSES an off-site clock-in, exactly as before. A CLIENT fence only warns and flags: an agent legitimately standing near a client is not away from the office, so refusing the visit would be wrong. Both sheets apply the office fence on Login so they agree.",
+      },
+      { k: "h", text: "Attendance access — permission, not position" },
+      {
+        k: "p",
+        text: "Admin → Users has an Attendance access setting that picks which clock-in screen an agent gets. It overrides their role in BOTH directions, so a Territory Sales Associate can be moved onto the standard drawer and an ordinary agent can be given the sales one.",
+      },
+      {
+        k: "table",
+        head: ["Setting", "Effect"],
+        rows: [
+          ["Standard attendance", "components/CreateAttendance.tsx — photo, location, remarks"],
+          ["Sales & client visits", "components/CreateSalesAttenance.tsx — adds client type, account, sales remarks"],
+          ["Allow client lookup", "Sales drawer only. Off hides New/Existing Client and the account search"],
+        ],
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "Tri-state flags, not booleans",
+        text: "can_create_sales_attendance is read through permFlagRaw(), which distinguishes unset from false. The boolean reader collapsed 'never configured' into 'denied', which made it impossible for an admin to say no — and separately made every attendance endpoint answer 403, because can_create_attendance treated an absent key as a denial.",
+      },
+      {
+        k: "code",
+        text: `GET /api/attendance/drawer
+
+200 →
+{
+  "success": true,
+  "drawer": "sales",            // or "basic"
+  "canCreateSales": true,
+  "canLookupClients": true,     // forced off for the basic drawer
+  "targetQuota": 1750000
+}`,
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "Client lookup off does not block clock-out",
+        text: "The sales drawer normally requires a client on Logout. With the toggle off that validation is skipped, otherwise the agent could never log out.",
+      },
+
+      { k: "h", text: "OB Request — image-first" },
+      {
+        k: "p",
+        text: "The ROBT form is signed on paper by the Employee, Department Head and HRAD. The agent photographs that form and the photo becomes the approval artifact, so a request cannot be submitted without one — enforced in the UI, in the API, and by a CHECK constraint.",
+      },
+      {
+        k: "table",
+        head: ["Stage", "What happens"],
+        rows: [
+          ["Submit", "Image is required. Name/Position/Department auto-fill from the session — never from the request body."],
+          ["Late filing", "Computed from VisitDate vs today in Manila time. <= 1 day is late; a justification is requested."],
+          ["Queue", "HRAD sees a thumbnail, zoomable image, details, and Approve / Decline with notes."],
+          ["Decision", "Email + in-app bell both fire. The email address is resolved from users by ReferenceID."],
+          ["Failure", "EmailStatus = 'failed' raises a banner in OB Approvals pointing at Email Config."],
+        ],
+      },
+      {
+        k: "note",
+        tone: "info",
+        title: "Images go to Supabase Storage first",
+        text: "lib/storage.ts tries the 'ob-requests' bucket and falls back to Cloudinary, so the feature works before the bucket exists. Both return a plain HTTPS URL, so the viewer treats them interchangeably.",
+      },
+
+      { k: "h", text: "Group Visitation — team-restricted" },
+      {
+        k: "p",
+        text: "A manager or TSM's team visit is visible only to the people under them. Who counts as 'under them' is resolved in lib/group-visits.ts and enforced on every read and every join — the disabled JOIN button is a convenience, never the boundary.",
+      },
+      {
+        k: "code",
+        text: `users."TSM"        = creator."ReferenceID"
+OR users."Manager"  = creator."ReferenceID"
+OR users."TSMName"    = creator full name      -- fallback
+OR users."ManagerName" = creator full name    -- fallback`,
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "ReferenceID matching is primary",
+        text: "On the live database the denormalised TSMName/ManagerName columns are far emptier than TSM/Manager, so name-only matching would miss most of a team. Both are matched, case-insensitively, because the data contains 'MANAGER' alongside 'Manager'.",
+      },
+      {
+        k: "table",
+        head: ["Viewer", "team_only group"],
+        rows: [
+          ["Creator", "sees and joins"],
+          ["Agent under the creator", "sees and joins"],
+          ["Anyone else", "hidden from the feed; join is rejected with the creator's name"],
+          ["Super Admin / Admin", "sees and joins everything"],
+        ],
+      },
+
+      { k: "h", text: "Email and notifications" },
+      {
+        k: "p",
+        text: "Admin → Email Config holds the per-company Resend settings. Turning on 'Auto-send on every OB submit' makes HRAD receive the request the moment it is filed; the in-app bell works either way.",
+      },
+      {
+        k: "note",
+        tone: "warn",
+        title: "Backups exclude credentials by design",
+        text: "lib/backup-manifest.ts names columns explicitly and never uses select('*'). users.Password, email_config.resend_api_key_enc and api_keys.key_hash are excluded, and the export file records that it did so.",
+      },
+    ],
+  },
+  {
     id: "pages",
     title: "Pages",
     icon: <Smartphone size={16} />,
@@ -380,6 +773,8 @@ console.log(\`\${meta.range.from} → \${data.length} rows\`);`,
           ["/Register", "Create an account (admin review required)"],
           ["/activity-planner", "Home · Calendar · Reports · Profile"],
           ["/gps-report", "Submit a GPS report"],
+          ["/ob-request", "OB Request — submit a signed form · my requests"],
+          ["/group-visitation", "Group Visitation — feed + create a team visit"],
           ["/profile", "Account and settings"],
           ["/time-attendance/activity", "Activity log"],
           ["/time-attendance/location", "Location records"],
@@ -396,6 +791,7 @@ console.log(\`\${meta.range.from} → \${data.length} rows\`);`,
           ["/admin", "Admin Overview"],
           ["/admin/users", "System Users"],
           ["/admin/approvals", "GPS Approvals"],
+          ["/admin/ob-approvals", "OB Approvals — review signed forms"],
           ["/admin/site-visits", "Site Visits & Activity Log"],
           ["/admin/reports", "Attendance Reports — Team Overview"],
           ["/admin/timesheet", "Timesheet — weekly"],
@@ -403,6 +799,9 @@ console.log(\`\${meta.range.from} → \${data.length} rows\`);`,
           ["/admin/backup", "Backup & Restore"],
           ["/admin/companies", "Companies"],
           ["/admin/settings", "Admin Settings"],
+          ["/admin/email-config", "Email Config — Resend key, recipients, templates"],
+          ["/admin/client-sites", "Client Site Fences — map boundaries per client"],
+          ["/admin/location-review", "Location Review — flagged attendance records"],
           ["/admin/activity-logs", "Activity logs"],
           ["/admin/attendance-summary", "Attendance summary"],
           ["/admin/audit-logs", "Audit log"],

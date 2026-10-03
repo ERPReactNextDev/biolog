@@ -8,7 +8,7 @@
    adds is the JOIN state, which also came from the server.
    ========================================================================== */
 
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarPlus, Search, Users } from "lucide-react";
 import { Button, EmptyState, ErrorState, Skeleton } from "@/app/activity-planner/mint/ui";
 import type { Member } from "@/lib/group-visits";

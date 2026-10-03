@@ -1,18 +1,18 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Camera from "./camera";
+import LocationVerify, { LocationVerifyHandle } from "./location-verify";
 import Select from "react-select";
-import { MapPin, ArrowLeft, LogIn, LogOut, FileText, UserPlus, Users, AlertCircle, FileText as FileTextIcon, Loader2 } from "lucide-react";
+import { ArrowLeft, LogIn, LogOut, FileText, UserPlus, Users, AlertCircle, Loader2 } from "lucide-react";
 import { MintButton, MintDrawer, MintInput, MintLabel, MintPill } from "@/components/mint";
 import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
+import type { GeoFix } from "@/lib/geo";
 
-const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
 interface FormData {
@@ -80,15 +80,11 @@ export default function CreateSalesAttendance({
   /* Single source of truth for the whole drawer: when the admin has turned
      client lookup off, nothing below should query for or render a client. */
   const clientLookupOn = canLookupClients;
-  const [locationAddress, setLocationAddress] = useState("Fetching location...");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [manualLat, setManualLat] = useState<number | null>(null);
-  const [manualLng, setManualLng] = useState<number | null>(null);
+  const locationRef = useRef<LocationVerifyHandle>(null);
+  const [fixReady, setFixReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [faceData, setFaceData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [showMap, setShowMap] = useState(false);
 
   const [siteVisitAccounts, setSiteVisitAccounts] = useState<{ company_name: string }[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
@@ -105,71 +101,36 @@ export default function CreateSalesAttendance({
   /* ── Reset on open ── */
   useEffect(() => {
     if (!open) return;
-    setManualLat(null);
-    setManualLng(null);
     setCapturedImage(null);
     setClientType("");
-    setShowMap(false);
+    setFixReady(false);
   }, [open]);
 
-  /* ── Geolocation ── */
-  const getLocation = () => {
-    setLocationAddress("Fetching location...");
+  /* ── Geolocation ──
+     Detection, the accuracy badge, the geofence verdict and the map all live
+     in LocationVerify (shared with CreateAttendance — the two copies had
+     already drifted apart). This sheet passes the client being visited, which
+     is what makes the fence lookup possible.
 
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0
-    };
+     onLocationResolved is memoised because LocationVerify re-runs detection
+     whenever the callback identity changes. */
+const onLocationResolved = useCallback(
+    (fix: GeoFix, address: string) => {
+      setFixReady(true);
+      // A New Client has no address on file yet, so the detected one is the
+      // best starting point available. Existing clients keep theirs.
+      if (clientType === "New Client") onChangeAction("address", address);
+    },
+    [clientType, onChangeAction]
+  );
 
-    const success = (position: GeolocationPosition) => {
-      const { latitude: lat, longitude: lng } = position.coords;
-      setLatitude(lat);
-      setLongitude(lng);
-      const coordString = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-        .then((r) => r.json())
-        .then((d) => {
-          const addr = d.display_name || coordString;
-          setLocationAddress(addr);
-          // Auto-populate address field for New Client
-          if (clientType === "New Client") {
-            onChangeAction("address", addr);
-          }
-        })
-        .catch(() => {
-          setLocationAddress(coordString);
-          if (clientType === "New Client") {
-            onChangeAction("address", coordString);
-          }
-        });
-    };
-
-    const error = (err: GeolocationPositionError) => {
-      // Retry with lower accuracy if high accuracy fails
-      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-        navigator.geolocation.getCurrentPosition(success,
-          () => setLocationAddress("Location unavailable. Please check GPS."),
-          { ...options, enableHighAccuracy: false, timeout: 10000 }
-        );
-      } else {
-        setLocationAddress("Location permission denied or unavailable.");
-      }
-    };
-
-    if (!navigator.geolocation) {
-      setLocationAddress("Geolocation not supported by browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(success, error, options);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    getLocation();
-  }, [open]);
+  /* The fence is only meaningful once a client is chosen. Keying the card on
+     clientType + SiteVisitAccount makes it re-detect when the target changes,
+     which is required — the previous site had a different boundary. */
+  const fenceTarget =
+    clientType === "New Client"
+      ? (formData.company_name || null)
+      : (formData.SiteVisitAccount || null);
 
   /* ── Helper functions for last status cache ── */
   const getLastStatusCacheKey = () => {
@@ -204,7 +165,6 @@ export default function CreateSalesAttendance({
 
   const clearOldLastStatusCaches = () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
       const prefix = `last-status-${userDetails.ReferenceID}-`;
       
       for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -385,6 +345,18 @@ export default function CreateSalesAttendance({
       return toast.error("Please select a company.");
     }
 
+    /* Local half of the out-of-fence requirement. AddLog enforces the same
+       rule server-side — this copy exists only so the agent is told why
+       before the round trip, not after it. */
+    const pendingFix = locationRef.current?.getFix() ?? null;
+    if (!pendingFix) return toast.error("Location not ready yet. Please wait.");
+    const pendingAudit = locationRef.current?.getAudit();
+    if (pendingAudit?.flag === "outside_geofence" && !formData.Remarks?.trim()) {
+      return toast.error(
+        "This location is outside the client's boundary. Please add a short note in Remarks explaining why."
+      );
+    }
+
     // Save the new status to cache immediately for offline use
     const newStatus = formData.Status;
     saveLastStatusToCache(newStatus);
@@ -396,11 +368,28 @@ export default function CreateSalesAttendance({
 
     setLoading(true);
 
-    // ── Geofence check ────────────────────────────────────────────────────
-    if ((manualLat ?? latitude) !== null && (manualLng ?? longitude) !== null) {
+    /* ── Client-site geofence ────────────────────────────────────
+       An out-of-fence visit is NOT refused. It is warned in the sheet, and
+       AddLog records it as outside_geofence after demanding a photo and
+       remarks. Blocking outright would be wrong here: an agent legitimately
+       standing near a client is not "away from the office", and the office
+       fence below would refuse a visit for the wrong reason.
+
+       The office fence is therefore only applied to a Clock In — the same
+       rule CreateAttendance uses, so the two sheets agree. */
+    const fix = locationRef.current?.getFix() ?? null;
+    const geo = locationRef.current?.getAudit() ?? {
+      accuracyM: null,
+      source: null,
+      flag: null,
+      distanceM: null,
+      siteName: null,
+    };
+
+    if (newStatus === "Login") {
       try {
         const geofence = await fetchGeofenceConfig();
-        const within = isWithinGeofence(manualLat ?? latitude!, manualLng ?? longitude!, geofence);
+        const within = fix ? isWithinGeofence(fix.lat, fix.lng, geofence) : null;
         if (within === false) {
           toast.error("⚠️ You are outside the allowed area. Please move closer to the office.", { duration: 6000 });
           setLoading(false);
@@ -416,12 +405,16 @@ export default function CreateSalesAttendance({
     const basePayload = {
       ...formData,
       Type: "Client Visit",
-      Location:  locationAddress,
-      Latitude:  manualLat ?? latitude,
-      Longitude: manualLng ?? longitude,
+      Location:  locationRef.current?.getAddress() || "",
+      Latitude:  fix?.lat ?? null,
+      Longitude: fix?.lng ?? null,
       FaceData:  faceData,
       manager:   userDetails.Manager, // Pass manager from userDetails
       type_client: clientType,
+      /* What the fix was. GeoFlag is not sent — the server derives it from
+         its own fence lookup, so a tampered client cannot mark itself clean. */
+      GeoAccuracyM: geo.accuracyM,
+      GeoSource:    geo.source,
     };
 
     const resetForm = () => {
@@ -506,11 +499,16 @@ export default function CreateSalesAttendance({
   const isLogout = lastStatus === "Login";
   const nextAction = formData.Status; // Use the Status from formData which we set in useEffect
   /* Client requirements only apply when the admin has left client lookup on.
-     With it off, the agent must still be able to clock out. */
+     With it off, the agent must still be able to clock out.
+
+     A poor GPS fix does NOT disable submit — the spec wants the agent warned
+     and allowed through, with the record flagged for review. Only a MISSING
+     fix blocks, because then there is nothing to record. */
   const isSubmitDisabled =
     loading ||
     !capturedImage ||
     loadingStatus ||
+    !fixReady ||
     (clientLookupOn && formData.Status === "Logout" && !clientType) ||
     (clientLookupOn && formData.Status === "Logout" && clientType === "Existing Client" && !formData.SiteVisitAccount) ||
     (clientLookupOn && formData.Status === "Logout" && clientType === "New Client" && !formData.company_name);
@@ -667,6 +665,17 @@ export default function CreateSalesAttendance({
         className="flex flex-col gap-4 p-5"
         style={{ background: "var(--bg)" }}
       >
+        {/* Location first — the spec asks for it at the top, and an agent who is
+            at the wrong client should find out before they take the photo. The
+            fence only resolves once a client is chosen, hence fenceTarget. */}
+        <LocationVerify
+          ref={locationRef}
+          open={open}
+          siteName={fenceTarget}
+          accent="clay"
+          onResolved={onLocationResolved}
+        />
+
         {/* Camera */}
         <div>
           <MintLabel>Photo Verification</MintLabel>
@@ -704,7 +713,11 @@ export default function CreateSalesAttendance({
                           setClientType(t);
                           if (t === "New Client") {
                             onChangeAction("SiteVisitAccount", "");
-                            onChangeAction("address", locationAddress);
+                            /* Pre-fill with the detected address. Read from the
+                               card's handle rather than a local mirror, so the
+                               prefill and the submitted Location cannot differ. */
+                            const detected = locationRef.current?.getAddress();
+                            if (detected) onChangeAction("address", detected);
                           } else {
                             const next = lastStatus === "Login" ? "Logout" : "Login";
                             onChangeAction("Status", next);
@@ -951,83 +964,7 @@ export default function CreateSalesAttendance({
               />
             </div>
 
-            {/* Location */}
-            <div>
-              <MintLabel>Location</MintLabel>
-              <div
-                className="rounded-[var(--r-card)] p-3.5 flex gap-3 items-start"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                <div
-                  className="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0"
-                  style={{ background: "var(--clay-soft)" }}
-                >
-                  <MapPin size={16} style={{ color: "var(--clay-ink)" }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-[10.5px] font-black uppercase tracking-wider"
-                    style={{ color: "var(--clay-ink)" }}
-                  >
-                    Detected Location
-                  </p>
-                  <p className="text-[12.5px] font-semibold text-[var(--text)] mt-1 leading-relaxed">
-                    {locationAddress}
-                  </p>
-                  <div className="flex gap-2 mt-2.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={getLocation}
-                      className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
-                      style={{
-                        background: "var(--clay-soft)",
-                        color: "var(--clay-ink)",
-                      }}
-                    >
-                      Retry location
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!navigator.onLine) {
-                          toast.error("Manual map is not available offline.");
-                          return;
-                        }
-                        setShowMap(!showMap);
-                      }}
-                      className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
-                      style={{ background: "var(--bg)", color: "var(--text-muted)" }}
-                    >
-                      {showMap ? "Hide map" : "Set manually"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {showMap && navigator.onLine && (
-                <div
-                  className="mt-2.5 rounded-[var(--r-card)] overflow-hidden"
-                  style={{ border: "1px solid var(--border)" }}
-                >
-                  <ManualLocationPicker
-                    latitude={manualLat ?? latitude}
-                    longitude={manualLng ?? longitude}
-                    onChange={(lat, lng, addr) => {
-                      setManualLat(lat);
-                      setManualLng(lng);
-                      if (addr) {
-                        setLocationAddress(addr);
-                        if (clientType === "New Client") {
-                          onChangeAction("address", addr);
-                        }
-                      }
-                    }}
-                  />
-                </div>
-              )}
-            </div>
+            {/* Location moved to the top of the sheet - see LocationVerify above. */}
           </>
         )}
 

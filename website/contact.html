@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact — BIOLOG</title>
+<meta name="description" content="Get a BIOLOG demo or ask a question. Metro Manila, Philippines.">
+<meta name="theme-color" content="#0d9669">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%230b7f5a'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>B</text></svg>">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav container" aria-label="Main">
+    <a class="brand" href="index.html">
+      <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+      BIOLOG
+    </a>
+    <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Open menu" aria-controls="nav-links">
+      <i class="ri-menu-line" aria-hidden="true"></i>
+    </button>
+    <ul class="nav__links" id="nav-links" data-nav-links>
+      <li><a class="nav__link" href="index.html">Home</a></li>
+      <li><a class="nav__link" href="features.html">Features</a></li>
+      <li><a class="nav__link" href="pricing.html">Pricing</a></li>
+      <li><a class="nav__link" href="about.html">About</a></li>
+      <li><a class="nav__link" href="contact.html" aria-current="page">Contact</a></li>
+      <li class="nav__mobile-cta">
+        <a class="btn btn--primary btn--block" href="#inquiry">
+          <i class="ri-send-plane-line" aria-hidden="true"></i> Get a Demo
+        </a>
+      </li>
+    </ul>
+    <a class="btn btn--primary btn--sm nav__cta" href="#inquiry">Get a Demo</a>
+  </nav>
+</header>
+
+<div class="nav-scrim" data-nav-scrim aria-hidden="true"></div>
+
+<main>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Contact</p>
+        <h2>Get a demo, or ask a hard question</h2>
+        <p>Tell us how many people you manage and what your field setup looks
+           like. We'll come back with specifics rather than a brochure.</p>
+      </div>
+
+      <div class="split">
+
+        <!-- ── Left · contact details ──────────────────────────────────── -->
+        <div>
+          <div class="info-list">
+            <div class="info">
+              <span class="info__icon"><i class="ri-mail-line" aria-hidden="true"></i></span>
+              <div>
+                <p class="info__label">Email</p>
+                <p class="info__value"><a href="mailto:hello@biolog.ph">hello@biolog.ph</a></p>
+              </div>
+            </div>
+
+            <div class="info">
+              <span class="info__icon"><i class="ri-phone-line" aria-hidden="true"></i></span>
+              <div>
+                <p class="info__label">Phone</p>
+                <p class="info__value"><a href="tel:+639171234567">+63 917 123 4567</a></p>
+              </div>
+            </div>
+
+            <div class="info">
+              <span class="info__icon"><i class="ri-map-pin-line" aria-hidden="true"></i></span>
+              <div>
+                <p class="info__label">Location</p>
+                <p class="info__value">Metro Manila, Philippines</p>
+                <p class="info__label" style="margin-top:6px">Visits by appointment</p>
+              </div>
+            </div>
+
+            <div class="info">
+              <span class="info__icon"><i class="ri-time-line" aria-hidden="true"></i></span>
+              <div>
+                <p class="info__label">Business hours</p>
+                <p class="info__value">Monday – Friday, 9:00 AM – 6:00 PM PHT</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:24px">
+            <div class="card__icon"><i class="ri-question-line" aria-hidden="true"></i></div>
+            <h3 style="font-size:16px">Before you write</h3>
+            <p style="font-size:14px">
+              The interactive demo covers the whole agent flow in about a minute
+              and needs no login. If you would rather just look first, that's the
+              fastest way in.
+            </p>
+            <a class="btn btn--soft btn--sm mt-2" href="index.html#demo">
+              <i class="ri-play-fill" aria-hidden="true"></i> Open the Demo
+            </a>
+          </div>
+        </div>
+
+        <!-- ── Right · form ─────────────────────────────────────────────── -->
+        <div id="inquiry">
+          <!--
+            novalidate: the browser's native bubbles are correct but generic
+            ("Please enter an email address") and cannot say which field or why
+            in the site's own voice. Validation is handled in script.js with
+            readable, per-field messages.
+
+            Still keeping type="email" and required: they drive mobile keyboards
+            and are a cheap first line of defence if JS fails.
+
+            data-endpoint is the one place the API URL is configured — the
+            script reads it from here rather than hardcoding a path, so this
+            file can be pointed at a different host without touching the JS.
+          -->
+          <form class="form" data-contact-form data-endpoint="/api/public/website-inquiry" novalidate>
+            <!--
+              novalidate on purpose. The browser's native bubbles are correct but
+              generic ("Please enter an email address"), and they cannot say
+              which field or why in the site's own voice. Validation is handled in
+              script.js with readable, per-field messages instead.
+
+              Still keeping type="email" and required: they drive mobile keyboards
+              and are a cheap first line of defence if JS fails.
+            -->
+            <div class="form__row">
+              <div class="field">
+                <label for="f-name">Your name</label>
+                <input id="f-name" name="name" type="text" required
+                       placeholder="Juan Dela Cruz"
+                       data-error-required="Please tell us your name.">
+                <p class="field__error"></p>
+              </div>
+
+              <div class="field">
+                <label for="f-company">Company</label>
+                <input id="f-company" name="company" type="text" required
+                       placeholder="Acme Trading"
+                       data-error-required="Please tell us your company.">
+                <p class="field__error"></p>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-email">Work email</label>
+              <input id="f-email" name="email" type="email" required
+                     placeholder="you@company.ph"
+                     data-error-required="We need an email to reply to."
+                     data-error-email="That doesn't look like an email address yet.">
+              <p class="field__error"></p>
+            </div>
+
+            <div class="field">
+              <label for="f-users">How many people will you manage?</label>
+              <select id="f-users" name="users" required
+                      data-error-required="Pick a range so we can size the plan.">
+                <option value="">Select a range…</option>
+                <option value="1-10">1 – 10 people</option>
+                <option value="11-50">11 – 50 people</option>
+                <option value="51-200">51 – 200 people</option>
+                <option value="200+">More than 200 people</option>
+              </select>
+              <p class="field__error"></p>
+            </div>
+
+            <div class="field">
+              <label for="f-message">What would you like to see?</label>
+              <textarea id="f-message" name="message" rows="5" required
+                        placeholder="Tell us about your field setup — where your agents work, whether signal is a problem, and what you're trying to fix."
+                        data-error-required="A sentence or two is plenty."></textarea>
+              <p class="field__error"></p>
+            </div>
+
+            <!--
+                Honeypot. Bots fill every input they find; humans never see this
+                one because it is moved off-screen and hidden from assistive tech
+                — NOT display:none, because a bot that checks visibility would skip it.
+                Kept out of the client-side validation list in script.js too, so a
+                human is never shown an error about a field they cannot see.
+              -->
+            <div class="hp-field" aria-hidden="true">
+              <label for="f-hp">Website</label>
+              <input id="f-hp" name="website_url" type="text" tabindex="-1" autocomplete="off">
+            </div>
+
+            <button class="btn btn--primary btn--block btn--lg" type="submit">
+              <i class="ri-send-plane-line" aria-hidden="true"></i> Request a Demo
+            </button>
+
+            <!-- Failure banner. Hidden until there is something to say, and
+                 focused on failure so it is announced, not just displayed. -->
+            <p class="form__status" data-form-status role="alert" hidden></p>
+
+            <p class="form__note">
+              We'll reply within one business day. No newsletter, no drip campaign,
+              and we won't pass your details to anyone.
+            </p>
+          </form>
+
+          <!-- Success panel, shown in place of the form. Hidden by CSS and
+               revealed by adding .is-visible, so there is no flash of it on load. -->
+          <div class="form form-success" data-form-success role="status" aria-live="polite">
+            <div class="form-success__icon">
+              <i class="ri-check-line" aria-hidden="true"></i>
+            </div>
+            <h3>Request received</h3>
+            <p>
+              We'll get back to you within one business day with a demo slot and a
+              short list of questions specific to your setup.
+            </p>
+            <div class="form-success__detail" data-form-success-detail></div>
+            <div>
+              <a class="btn btn--soft btn--sm" href="index.html#demo">
+                <i class="ri-play-fill" aria-hidden="true"></i> Try the demo meanwhile
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container">
+      <h2>Prefer to just look?</h2>
+      <p>The interactive agent demo takes about a minute, needs no login, and
+         covers the full flow from clock-in to site visit.</p>
+      <div class="cta-band__actions">
+        <a class="btn btn--primary btn--lg" href="index.html#demo">
+          <i class="ri-play-fill" aria-hidden="true"></i> Launch Interactive Demo
+        </a>
+        <a class="btn btn--ghost btn--lg" href="pricing.html">See Pricing</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+          BIOLOG
+        </a>
+        <p class="footer__about">
+          Attendance built for Philippine field teams. Designed around weak signal,
+          long commutes and the fact that a photo is worth more than a signature.
+        </p>
+      </div>
+      <div>
+        <p class="footer__title">Product</p>
+        <ul class="footer__links">
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#demo">Interactive Demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer__title">Company</p>
+        <ul class="footer__links">
+          <li><a href="about.html">About</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html">Request a Demo</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> BIOLOG. All rights reserved.</p>
+      <p>Metro Manila, Philippines</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

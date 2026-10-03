@@ -1,14 +1,14 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Camera from "./camera";
+import LocationVerify, { LocationVerifyHandle } from "./location-verify";
 import { enqueuePendingLog } from "@/lib/offline-store";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { compressImage } from "@/lib/image-compress";
 import { fetchGeofenceConfig, isWithinGeofence } from "@/lib/geofence";
-import { MapPin, CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
+import { CheckCircle2, LogIn, LogOut, FileText, AlertCircle } from "lucide-react";
 import {
   MintButton,
   MintDialogHeader,
@@ -18,8 +18,6 @@ import {
   MintLabel,
   cx,
 } from "@/components/mint";
-
-const ManualLocationPicker = dynamic(() => import("./manual-location-picker"), { ssr: false });
 
 interface FormData {
   ReferenceID: string;
@@ -51,16 +49,6 @@ interface CreateAttendanceProps {
   setFormAction: React.Dispatch<React.SetStateAction<FormData>>;
 }
 
-const LOCATION_PENDING = "Fetching location...";
-
-function isLocationReady(addr: string): boolean {
-  return (
-    addr !== LOCATION_PENDING &&
-    !addr.includes("permission denied") &&
-    addr.length > 0
-  );
-}
-
 export default function CreateAttendance({
   open,
   onOpenChangeAction,
@@ -70,74 +58,31 @@ export default function CreateAttendance({
   fetchAccountAction,
   setFormAction,
 }: CreateAttendanceProps) {
-  const [locationAddress, setLocationAddress] = useState(LOCATION_PENDING);
-  const [manualLat, setManualLat] = useState<number | null>(null);
-  const [manualLng, setManualLng] = useState<number | null>(null);
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+  /* The location card owns detection, the accuracy badge, the geofence verdict
+     and the map. This sheet keeps only what it must display and what it must
+     submit, reading the point through a ref at save time — so there is no
+     window where React state and the submitted coordinate disagree.
+
+     onLocationResolved is stable on purpose: LocationVerify re-runs detection
+     whenever that callback identity changes, so an inline arrow here would
+     re-detect on every render and never settle. */
+  const locationRef = useRef<LocationVerifyHandle>(null);
+  const [fixReady, setFixReady] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [faceData, setFaceData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [lastStatus, setLastStatus] = useState<"Login" | "Logout" | null>(null);
   const [lastTime, setLastTime] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
+
+  const onLocationResolved = useCallback(() => setFixReady(true), []);
 
   // Reset state when dialog opens
   useEffect(() => {
     if (!open) return;
     if (formData.Type !== "On Field") onChangeAction("Type", "On Field");
     setCapturedImage(null);
-    setLocationAddress(LOCATION_PENDING);
-    setManualLat(null);
-    setManualLng(null);
-    setShowMap(false);
+    setFixReady(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  // Geolocation function
-  const getLocation = () => {
-    setLocationAddress(LOCATION_PENDING);
-    const options: PositionOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
-
-    const onSuccess = (pos: GeolocationPosition) => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      setLatitude(lat);
-      setLongitude(lng);
-
-      const latLngFallback = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
-      
-      // Reverse geocode — if offline this will fail, fall back to coords string
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-        .then((r) => r.json())
-        .then((d) => setLocationAddress(d.display_name || latLngFallback))
-        .catch(() => setLocationAddress(latLngFallback));
-    };
-
-    const onError = (err: GeolocationPositionError) => {
-      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-        // Retry with lower accuracy
-        navigator.geolocation.getCurrentPosition(
-          onSuccess,
-          () => setLocationAddress("Location unavailable — check GPS settings."),
-          { ...options, enableHighAccuracy: false, timeout: 10000 }
-        );
-      } else {
-        setLocationAddress("Location permission denied.");
-      }
-    };
-
-    if (!navigator.geolocation) {
-      setLocationAddress("Geolocation not supported.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
-  };
-
-  // Geolocation
-  useEffect(() => {
-    if (!open) return;
-    getLocation();
   }, [open]);
 
   /* ── Helper functions for last status cache ── */
@@ -231,7 +176,19 @@ export default function CreateAttendance({
   const handleCreate = async () => {
     if (!capturedImage) return toast.error("Please capture a photo first.");
     if (!formData.Status) return toast.error("Please select Login or Logout.");
-    if (!isLocationReady(locationAddress)) return toast.error("Location not ready yet. Please wait.");
+
+    /* Read the point from the card, not from local state: this is the value
+       that gets submitted, so the two cannot drift. */
+    const fix = locationRef.current?.getFix() ?? null;
+    if (!fix) return toast.error("Location not ready yet. Please wait.");
+
+    const geo = locationRef.current?.getAudit() ?? {
+      accuracyM: null,
+      source: null,
+      flag: null,
+      distanceM: null,
+      siteName: null,
+    };
 
     // Save the new status to cache immediately
     const newStatus = formData.Status as "Login" | "Logout" | null;
@@ -242,18 +199,20 @@ export default function CreateAttendance({
     
     setLoading(true);
 
-    // ── Geofence check ────────────────────────────────────────────────────
-    if (latitude !== null && longitude !== null) {
-      try {
-        const geofence = await fetchGeofenceConfig();
-        const within = isWithinGeofence(latitude, longitude, geofence);
-        if (within === false) {
-          toast.error("⚠️ You are outside the allowed area. Please move closer to the office to log attendance.", { duration: 6000 });
-          setLoading(false);
-          return;
-        }
-      } catch { /* non-critical — allow if geofence check fails */ }
-    }
+    // ── Office geofence check ─────────────────────────────────────────────
+    // Still a hard block for a plain Clock In: this is the pre-existing rule
+    // and it has always refused an off-site clock-in. A client visit is a
+    // different case — it is warned and flagged, not refused, because an agent
+    // legitimately standing near a client is not "away from the office".
+    try {
+      const geofence = await fetchGeofenceConfig();
+      const within = isWithinGeofence(fix.lat, fix.lng, geofence);
+      if (within === false) {
+        toast.error("⚠️ You are outside the allowed area. Please move closer to the office to log attendance.", { duration: 6000 });
+        setLoading(false);
+        return;
+      }
+    } catch { /* non-critical — allow if geofence check fails */ }
 
     // ── Compress photo before storing/uploading ───────────────────────────
     let photo = capturedImage;
@@ -261,13 +220,18 @@ export default function CreateAttendance({
       photo = await compressImage(capturedImage);
     } catch { /* use original if compression fails */ }
 
-const basePayload = {
+    const basePayload = {
   ...formData,
-  Location:  locationAddress,
-  Latitude:  manualLat ?? latitude,
-  Longitude: manualLng ?? longitude,
+  Location:  locationRef.current?.getAddress() || "",
+  Latitude:  fix.lat,
+  Longitude: fix.lng,
   FaceData:  faceData,
   manager:   userDetails.Manager,
+  /* Sent so the server can record WHAT the fix was. GeoFlag is deliberately
+     NOT sent — AddLog derives it from its own fence lookup, because a client
+     that can name its own flag has no flag at all. */
+  GeoAccuracyM: geo.accuracyM,
+  GeoSource:    geo.source,
 };
 
     try {
@@ -321,17 +285,19 @@ const basePayload = {
     }
   };
 
+  /* A poor fix does NOT disable submit — the spec wants the agent warned and
+     allowed to proceed, with the record flagged. What blocks a save is only
+     the absence of a fix, since there would be nothing to record. */
   const isSubmitDisabled =
     loading ||
     !formData.Status ||
     !capturedImage ||
-    !isLocationReady(locationAddress);
+    !fixReady;
 
   const online = typeof navigator !== "undefined" ? navigator.onLine : true;
 
   // Micro-copy so the agent always knows what happens next
-  const nextAction = lastStatus === "Login" ? "Logout" : "Login";
-  const footerHint = !online
+const footerHint = !online
     ? "Saved to this phone — it uploads automatically once you have signal."
     : formData.Status === "Logout"
       ? "This ends your shift for today. Your supervisor sees the GPS and timestamp."
@@ -394,6 +360,15 @@ const basePayload = {
       }
     >
       <div className="flex flex-col gap-4 p-5" style={{ background: "var(--bg)" }}>
+              {/* Location first. The spec asks for it at the top, and it is the
+                  right place on its own merits: an agent who is in the wrong
+                  place should find out before they take a photo, not after. */}
+              <LocationVerify
+                ref={locationRef}
+                open={open}
+                onResolved={onLocationResolved}
+              />
+
               {/* Current status — always tells you the next action */}
               {lastStatus ? (
                 <div
@@ -520,80 +495,8 @@ const basePayload = {
                     />
                   </div>
 
-                  {/* Location */}
-                  <div>
-                    <MintLabel>Location</MintLabel>
-                    <div
-                      className="rounded-[var(--r-card)] p-3.5 flex gap-3 items-start"
-                      style={{
-                        background: "var(--card)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-[12px] flex items-center justify-center shrink-0"
-                        style={{ background: "var(--mint-soft)" }}
-                      >
-                        <MapPin size={16} style={{ color: "var(--mint-strong)" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-[10.5px] font-black uppercase tracking-wider"
-                          style={{ color: "var(--mint-strong)" }}
-                        >
-                          {locationAddress === LOCATION_PENDING
-                            ? "Detecting location…"
-                            : "Detected Location"}
-                        </p>
-                        <p className="text-[12.5px] font-semibold text-[var(--text)] mt-1 leading-relaxed">
-                          {locationAddress}
-                        </p>
-                        <div className="flex gap-2 mt-2.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={getLocation}
-                            className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
-                            style={{ background: "var(--mint-soft)", color: "var(--mint-strong)" }}
-                          >
-                            Retry location
-                          </button>
-                          {isLocationReady(locationAddress) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!navigator.onLine) {
-                                  toast.error("Manual map is not available offline.");
-                                  return;
-                                }
-                                setShowMap(!showMap);
-                              }}
-                              className="min-h-[40px] px-3 rounded-full text-[11.5px] font-extrabold"
-                              style={{ background: "var(--bg)", color: "var(--text-muted)" }}
-                            >
-                              {showMap ? "Hide map" : "Set manually →"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {showMap && (
-                      <div
-                        className="mt-2.5 rounded-[var(--r-card)] overflow-hidden"
-                        style={{ border: "1px solid var(--border)" }}
-                      >
-                        <ManualLocationPicker
-                          latitude={manualLat ?? latitude}
-                          longitude={manualLng ?? longitude}
-                          onChange={(lat, lng, address) => {
-                            setManualLat(lat);
-                            setManualLng(lng);
-                            if (address) setLocationAddress(address);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
 
+                  {/* Location moved to the top of the sheet - see LocationVerify above. */}
                   {/* Submit lives in the drawer footer so it's always reachable */}
                 </>
               )}

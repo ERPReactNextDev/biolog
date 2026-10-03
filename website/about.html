@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — BIOLOG</title>
+<meta name="description" content="BIOLOG is an attendance system built for Philippine field teams, where connectivity is unreliable and a photo is worth more than a signature.">
+<meta name="theme-color" content="#0d9669">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%230b7f5a'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>B</text></svg>">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav container" aria-label="Main">
+    <a class="brand" href="index.html">
+      <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+      BIOLOG
+    </a>
+    <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-label="Open menu" aria-controls="nav-links">
+      <i class="ri-menu-line" aria-hidden="true"></i>
+    </button>
+    <ul class="nav__links" id="nav-links" data-nav-links>
+      <li><a class="nav__link" href="index.html">Home</a></li>
+      <li><a class="nav__link" href="features.html">Features</a></li>
+      <li><a class="nav__link" href="pricing.html">Pricing</a></li>
+      <li><a class="nav__link" href="about.html" aria-current="page">About</a></li>
+      <li><a class="nav__link" href="contact.html">Contact</a></li>
+      <li class="nav__mobile-cta">
+        <a class="btn btn--primary btn--block" href="contact.html">
+          <i class="ri-play-circle-line" aria-hidden="true"></i> Get a Demo
+        </a>
+      </li>
+    </ul>
+    <a class="btn btn--primary btn--sm nav__cta" href="contact.html">Get a Demo</a>
+  </nav>
+</header>
+
+<div class="nav-scrim" data-nav-scrim aria-hidden="true"></div>
+
+<main>
+
+  <section class="section" style="padding-bottom:24px">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">About us</p>
+        <h2>Built for field teams, not for HR departments</h2>
+        <p>Most attendance software assumes an office, a desk and a reliable
+           connection. Philippine field teams have none of those three.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Who we are ──────────────────────────────────────────────────────── -->
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="split">
+        <div>
+          <p class="eyebrow" style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--mint-strong);margin:0 0 10px">Who we are</p>
+          <h2 style="margin:0 0 14px;font-size:clamp(22px,2.8vw,30px);font-weight:900;letter-spacing:-.02em;line-height:1.2">
+            Software that assumes the signal is bad
+          </h2>
+          <p style="margin:0 0 14px;font-size:15.5px;font-weight:600;color:var(--text-muted);line-height:1.68">
+            BIOLOG was not designed in a conference room. It came out of watching
+            a sales team lose half a day of attendance records because the
+            building they worked from had no signal, and the app simply refused
+            to submit.
+          </p>
+          <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--text-muted);line-height:1.68">
+            So we built the opposite of that assumption. Offline is not a degraded
+            mode we tolerate &mdash; it is the normal path, and the system is
+            designed to tell you honestly which records were captured live and
+            which were captured later.
+          </p>
+        </div>
+
+        <div class="info-list">
+          <div class="info">
+            <span class="info__icon"><i class="ri-wifi-off-line" aria-hidden="true"></i></span>
+            <div>
+              <p class="info__label">Offline is the default path</p>
+              <p class="info__value">Queued on the device, synced automatically</p>
+            </div>
+          </div>
+          <div class="info">
+            <span class="info__icon"><i class="ri-focus-3-line" aria-hidden="true"></i></span>
+            <div>
+              <p class="info__label">Accuracy is stated, not implied</p>
+              <p class="info__value">Every fix carries its own margin of error</p>
+            </div>
+          </div>
+          <div class="info">
+            <span class="info__icon"><i class="ri-camera-lens-line" aria-hidden="true"></i></span>
+            <div>
+              <p class="info__label">A photo settles a dispute</p>
+              <p class="info__value">More reliable than a signature, easier to check</p>
+            </div>
+          </div>
+          <div class="info">
+            <span class="info__icon"><i class="ri-bar-chart-box-line" aria-hidden="true"></i></span>
+            <div>
+              <p class="info__label">Reports built for payroll</p>
+              <p class="info__value">Your work day, not midnight's</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Mission ─────────────────────────────────────────────────────────── -->
+  <section class="section section--tint">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Our mission</p>
+        <h2>Reliable attendance, even with limited internet</h2>
+        <p>A field agent's shift should be recorded the moment it happens &mdash;
+           not whenever the network next cooperates. Everything we build comes
+           back to that.</p>
+      </div>
+
+      <div class="cards">
+        <article class="card">
+          <div class="card__icon"><i class="ri-bullseye-line" aria-hidden="true"></i></div>
+          <h3>Never lose a record</h3>
+          <p>If an agent took the photo, the shift happened. The system stores it
+             locally and finds a way to file it later.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon"><i class="ri-eye-line" aria-hidden="true"></i></div>
+          <h3>Show your uncertainty</h3>
+          <p>A pin with no accuracy figure is a guess dressed as data. We render
+             the number rather than hiding it.</p>
+        </article>
+        <article class="card">
+          <div class="card__icon card__icon--clay"><i class="ri-shield-check-line" aria-hidden="true"></i></div>
+          <h3>Be honest to admins</h3>
+          <p>Flag the records that need a human rather than burying them. A
+             clean-looking report built on unexamined data is not clean.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── System overview ─────────────────────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">How it fits together</p>
+        <h2>Three systems, one record</h2>
+        <p>BIOLOG is the product of combining what each of these does well &mdash;
+           and of being honest about what each one cannot do alone.</p>
+      </div>
+
+      <div class="feature" style="padding-block:20px">
+        <div class="feature__text">
+          <h2 style="margin-bottom:10px">Biometrics</h2>
+          <p style="margin-bottom:14px">
+            A fingerprint scanner on a wall in an office answers "are you here?"
+            for one person at a time. It does not answer where, and it stops
+            working the moment the employee is at a client instead.
+          </p>
+          <p style="margin:0">
+            BIOLOG keeps the identity check &mdash; face verification against the
+            registered agent &mdash; and drops the hardware.
+          </p>
+        </div>
+        <div class="feature__visual">
+          <div class="card" style="width:min(320px,86%)">
+            <div class="card__icon"><i class="ri-fingerprint-line" aria-hidden="true"></i></div>
+            <h3 style="font-size:15px">Identity</h3>
+            <p style="font-size:13.5px">Proves who took the photo. No shared
+               devices, no borrowed phones, no logins handed around.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature" style="padding-block:20px">
+        <div class="feature__text">
+          <h2 style="margin-bottom:10px">GPS</h2>
+          <p style="margin-bottom:14px">
+            A coordinate without an accuracy figure is a guess. Most apps take
+            the first reading the phone's radio offers, which indoors is routinely
+            a block away &mdash; and then present it as fact.
+          </p>
+          <p style="margin:0">
+            BIOLOG listens for the best fix within a window and tells you what it
+            got, including when it is poor enough to doubt.
+          </p>
+        </div>
+        <div class="feature__visual">
+          <div class="card" style="width:min(320px,86%)">
+            <div class="card__icon"><i class="ri-map-pin-2-line" aria-hidden="true"></i></div>
+            <h3 style="font-size:15px">Place</h3>
+            <p style="font-size:13.5px">Proves where, with the accuracy attached.
+               Plus a manual override when the GPS is simply wrong.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature" style="padding-block:20px">
+        <div class="feature__text">
+          <h2 style="margin-bottom:10px">Offline</h2>
+          <p style="margin-bottom:14px">
+            Neither of the above works in a barangay with no signal, which is
+            exactly where a field team spends its day. A cloud-only system fails
+            in the field and works fine in the office, which is the worst ratio
+            of useful hours to total hours.
+          </p>
+          <p style="margin:0">
+            BIOLOG treats the offline case as the expected case and syncs when it
+            can, rather than pretending the network is there.
+          </p>
+        </div>
+        <div class="feature__visual">
+          <div class="card" style="width:min(320px,86%)">
+            <div class="card__icon"><i class="ri-wifi-off-line" aria-hidden="true"></i></div>
+            <h3 style="font-size:15px">Continuity</h3>
+            <p style="font-size:13.5px">Proves it happened even when the network
+               could not be told about it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack mt-3">
+        <p class="text-muted" style="font-size:16px;font-weight:800;margin:0">
+          Biometrics + GPS + Offline&nbsp;=&nbsp;<span style="color:var(--mint-strong)">BIOLOG</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Team & version ──────────────────────────────────────────────────── -->
+  <section class="section section--tint">
+    <div class="container">
+      <div class="split">
+        <div>
+          <p class="eyebrow" style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--mint-strong);margin:0 0 10px">Where we are</p>
+          <h2 style="margin:0 0 14px;font-size:clamp(22px,2.8vw,30px);font-weight:900;letter-spacing:-.02em;line-height:1.2">
+            Metro Manila, Philippines
+          </h2>
+          <p style="margin:0 0 14px;font-size:15.5px;font-weight:600;color:var(--text-muted);line-height:1.68">
+            We build and support BIOLOG in the Philippines, which means support
+            hours that actually overlap with a working day and someone who knows
+            what a 3&nbsp;AM signal loss in Bulacan actually feels like.
+          </p>
+          <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--text-muted);line-height:1.68">
+            Onboarding is done with your supervisors, not handed over as a PDF.
+          </p>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card__icon"><i class="ri-git-branch-line" aria-hidden="true"></i></div>
+            <h3 style="font-size:17px">Current version</h3>
+            <p class="pill pill--mint" style="margin:6px 0 12px">
+              <i class="ri-checkbox-circle-line" aria-hidden="true"></i> v2.4.1
+            </p>
+            <p style="margin:0">
+              Released <strong style="color:var(--text)">October 2026</strong>. This
+              build adds the location-accuracy engine: best-fix GPS within a
+              15-second window, accuracy grading on every clock-in, per-client-site
+              boundaries, and a review queue for records that need a human look.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container">
+      <h2>Let's talk about your team</h2>
+      <p>Thirty minutes, your data, your shift patterns. Bring the hard questions
+         &mdash; offline behaviour, GPS accuracy, what happens when someone is at
+         a client instead of the office.</p>
+      <div class="cta-band__actions">
+        <a class="btn btn--primary btn--lg" href="contact.html">Get in Touch</a>
+        <a class="btn btn--ghost btn--lg" href="index.html#demo">Try the Demo</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true"><i class="ri-fingerprint-line"></i></span>
+          BIOLOG
+        </a>
+        <p class="footer__about">
+          Attendance built for Philippine field teams. Designed around weak signal,
+          long commutes and the fact that a photo is worth more than a signature.
+        </p>
+      </div>
+      <div>
+        <p class="footer__title">Product</p>
+        <ul class="footer__links">
+          <li><a href="features.html">Features</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#demo">Interactive Demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer__title">Company</p>
+        <ul class="footer__links">
+          <li><a href="about.html">About</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="contact.html">Request a Demo</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> BIOLOG. All rights reserved.</p>
+      <p>Metro Manila, Philippines</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/script.js"></script>
+</body>
+</html>

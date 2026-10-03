@@ -11,7 +11,7 @@
    may see or join anything — it renders what /api/group-visits returned.
    ========================================================================== */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -19,11 +19,7 @@ import ProtectedPageWrapper from "@/components/protected-page-wrapper";
 import { UserProvider } from "@/contexts/UserContext";
 import { SplashScreen } from "@/app/activity-planner/mint/states";
 import { cx } from "@/app/activity-planner/mint/ui";
-import {
-  loadTeamIndex,
-  teamOf,
-  type Member,
-} from "@/lib/group-visits";
+import type { Member } from "@/lib/group-visits";
 import { GroupVisitFeed } from "./mint/gv-feed";
 import { GroupVisitCreate, type CreatePayload } from "./mint/gv-create";
 import { GroupVisitDetail } from "./mint/gv-detail";
@@ -31,7 +27,7 @@ import { type GroupVisitCard } from "./mint/gv-shared";
 
 type Tab = "feed" | "create";
 
-export default function GroupVisitationPage() {
+function GroupVisitationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryUserId = searchParams?.get("id") ?? "";
@@ -402,6 +398,21 @@ export default function GroupVisitationPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/* Wrapped in ProtectedPageWrapper so a signed-out visitor is redirected to
+   /Login instead of seeing the feed chrome fail with "Could not load group
+   visits" — the wrapper was imported but never applied. */
+export default function Page() {
+  return (
+    <ProtectedPageWrapper>
+      <UserProvider>
+        <div className="mint-root">
+          <GroupVisitationPage />
+        </div>
+      </UserProvider>
+    </ProtectedPageWrapper>
   );
 }
 

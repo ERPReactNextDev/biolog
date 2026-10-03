@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { supabase } from "@/lib/supabase";
-import { requireSession, hasPermission } from "@/lib/rbac";
+import { requireSession } from "@/lib/rbac";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   canJoin,
